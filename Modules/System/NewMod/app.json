@@ -1,0 +1,25 @@
+{
+  "id": "32eea6d1-f0e9-4718-a2ab-198367b58ebd",
+  "name": "Example - Background Task",
+  "publisher": "Microsoft",
+  "version": "1.0.0.0",
+  "brief": "Example project of a new module",
+  "description": "Example project detailing how to create a new module.",
+  "privacyStatement": "",
+  "EULA": "",
+  "help": "",
+  "url": "",
+  "logo": "",
+  "dependencies": [],
+  "screenshots": [],
+  "platform": "16.0.0.0",
+  "application": "16.0.0.0",
+  "idRanges": [
+    {
+      "from": 50100,
+      "to": 50149
+    }
+  ],
+  "showMyCode": true,
+  "runtime": "6.0"
+}
