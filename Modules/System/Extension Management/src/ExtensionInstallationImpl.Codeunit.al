@@ -6,8 +6,8 @@
 codeunit 2500 "Extension Installation Impl"
 {
     Access = Internal;
-    Permissions = TableData "NAV App Installed App" = rimd,
-                  TableData "Published Application" = rimd;
+    Permissions = tabledata "NAV App Installed App" = rimd,
+                  tabledata "Published Application" = rimd;
     SingleInstance = false;
 
     var
@@ -25,7 +25,12 @@ codeunit 2500 "Extension Installation Impl"
         RestartActivityInstallMsg: Label 'The %1 extension was successfully installed. All active users must sign out and sign in again to see the navigation changes.', Comment = 'Indicates that users need to restart their activity to pick up new menusuite items. %1=Name of Extension';
         AlreadyUninstalledMsg: Label 'The extension %1 is not installed.', Comment = '%1=name of app';
         RestartActivityUninstallMsg: Label 'The %1 extension was successfully uninstalled. All active users must sign out and sign in again to see the navigation changes.', Comment = 'Indicates that users need to restart their activity to pick up new menusuite items. %1=Name of Extension';
+        ClearExtensionSchemaQst: Label 'Enabling Delete Extension Data will delete the tables that contain data for the %1 extension and all of its dependents on uninstall. This action cannot be undone. Do you want to continue?', Comment = '%1=name of app';
+        ClearExtensionSchemaMsg: Label 'You have selected to delete extension data for the %1 extension and all of its dependents: %2. Continuing uninstall will delete the tables that contain data for the %1 extension and all of its dependents. This action cannot be undone. Do you want to continue?', Comment = '%1=name of app ,%2= all dependent extensions';
         NotSufficientPermissionErr: Label 'You do not have sufficient permissions to manage extensions. Please contact your administrator.';
+        InstallationBestPracticesUrlLbl: Label 'https://go.microsoft.com/fwlink/?linkid=2138922', comment = 'link to the best practices and tips about the installing and publishing a new extension.', Locked = true;
+        DisclaimerUrlLbl: Label 'https://go.microsoft.com/fwlink/?linkid=2193002&clcid=0x409', comment = 'link to the Business Central PTE disclaimer.', Locked = true;
+        PrivacyPolicyUrlLbl: Label 'https://go.microsoft.com/fwlink/?LinkId=521839', comment = 'link to the privacy and cookies docs.', Locked = true;
 
     procedure IsInstalledByPackageId(PackageID: Guid): Boolean
     var
@@ -125,6 +130,14 @@ codeunit 2500 "Extension Installation Impl"
         exit(NotInstalledTxt);
     end;
 
+    procedure GetExtensionInstalledDisplayString(Installed: Boolean): Text
+    begin
+        if Installed then
+            exit(InstalledTxt);
+
+        exit(NotInstalledTxt);
+    end;
+
     procedure GetDependenciesForExtensionToInstall(PackageID: Guid): Text
     begin
         AssertIsInitialized();
@@ -159,12 +172,17 @@ codeunit 2500 "Extension Installation Impl"
     end;
 
     procedure UninstallExtension(PackageID: Guid; IsUIEnabled: Boolean): Boolean
+    begin
+        exit(UninstallExtension(PackageID, IsUIEnabled, false));
+    end;
+
+    procedure UninstallExtension(PackageID: Guid; IsUIEnabled: Boolean; ClearSchema: Boolean): Boolean
     var
         PublishedApplication: Record "Published Application";
     begin
         CheckPermissions();
         if IsUIEnabled = true then
-            exit(UninstallExtensionWithConfirmDialog(PackageID));
+            exit(UninstallExtensionWithConfirmDialog(PackageID, ClearSchema, ClearSchema));
 
         PublishedApplication.SetRange("Package ID", PackageID);
         PublishedApplication.SetRange("Tenant Visible", true);
@@ -172,14 +190,14 @@ codeunit 2500 "Extension Installation Impl"
         if PublishedApplication.IsEmpty() then
             exit(false);
 
-        exit(UninstallExtensionSilently(PackageID));
+        exit(UninstallExtensionSilently(PackageID, ClearSchema, ClearSchema));
     end;
 
-    local procedure UninstallExtensionSilently(PackageID: Guid): Boolean
+    local procedure UninstallExtensionSilently(PackageID: Guid; ClearData: Boolean; ClearSchema: Boolean): Boolean
     begin
         CheckPermissions();
         AssertIsInitialized();
-        DotNetNavAppALInstaller.ALUninstallNavApp(PackageID);
+        DotNetNavAppALInstaller.ALUninstallNavApp(PackageID, ClearData, ClearSchema);
 
         if IsInstalledByPackageId(PackageID) then
             exit(false);
@@ -187,12 +205,11 @@ codeunit 2500 "Extension Installation Impl"
         exit(true);
     end;
 
-    procedure UninstallExtensionWithConfirmDialog(PackageId: Guid): Boolean
+    procedure UninstallExtensionWithConfirmDialog(PackageId: Guid; ClearData: Boolean; ClearSchema: Boolean): Boolean
     var
         PublishedApplication: Record "Published Application";
         ConfirmManagement: Codeunit "Confirm Management";
         Dependents: Text;
-        CanChange: Boolean;
     begin
         CheckPermissions();
 
@@ -210,15 +227,19 @@ codeunit 2500 "Extension Installation Impl"
 
         Dependents := GetNonExcludedApps(Dependents);
 
-        CanChange := true;
         if StrLen(Dependents) <> 0 then
-            CanChange := ConfirmManagement.GetResponse(StrSubstNo(DependentsFoundQst,
-                  PublishedApplication.Name, Dependents), false);
+            if not ConfirmManagement.GetResponse(
+                StrSubstNo(DependentsFoundQst, PublishedApplication.Name, Dependents), false)
+            then
+                exit(false);
 
-        if CanChange then
-            UninstallExtensionSilently(PackageId)
-        else
-            exit(false);
+        if ClearSchema then
+            if not ConfirmManagement.GetResponse(
+                StrSubstNo(ClearExtensionSchemaMsg, PublishedApplication.Name, Dependents), false)
+            then
+                exit(false);
+
+        UninstallExtensionSilently(PackageId, ClearData, ClearSchema);
 
         // If successfully uninstalled, message users to restart activity for menusuites
         if not IsInstalledByPackageId(PackageId) then
@@ -227,6 +248,23 @@ codeunit 2500 "Extension Installation Impl"
             exit(false);
 
         exit(true);
+    end;
+
+    procedure GetClearExtensionSchemaConfirmation(PackageId: Guid; var ClearSchema: Boolean)
+    var
+        PublishedApplication: Record "Published Application";
+        ConfirmManagement: Codeunit "Confirm Management";
+    begin
+        if not ClearSchema then
+            exit;
+
+        PublishedApplication.SetRange("Package ID", PackageId);
+        PublishedApplication.SetRange("Tenant Visible", true);
+        if not PublishedApplication.FindFirst() then
+            ClearSchema := false
+        else
+            ClearSchema := ConfirmManagement.GetResponse(
+                StrSubstNo(ClearExtensionSchemaQst, PublishedApplication.Name), false);
     end;
 
     procedure GetNonExcludedApps(Dependents: Text): Text
@@ -267,6 +305,21 @@ codeunit 2500 "Extension Installation Impl"
 
         exit(StrSubstNo(FullVersionStringTxt, PublishedApplication."Version Major",
             PublishedApplication."Version Minor", PublishedApplication."Version Build", PublishedApplication."Version Revision"));
+    end;
+
+    procedure GetInstallationBestPracticesURL(): Text;
+    begin
+        exit(InstallationBestPracticesUrlLbl);
+    end;
+
+    procedure GetDisclaimerURL(): Text;
+    begin
+        exit(DisclaimerUrlLbl);
+    end;
+
+    procedure GetPrivacyAndCookeisURL(): Text;
+    begin
+        exit(PrivacyPolicyUrlLbl);
     end;
 
     procedure RunExtensionInstallation(PublishedApplication: Record "Published Application"): Boolean

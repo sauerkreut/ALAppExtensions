@@ -27,17 +27,17 @@ codeunit 6241 "Xml Validation Impl."
 
     procedure ValidateAgainstSchema(XmlDoc: XmlDocument; XmlSchemaDoc: XmlDocument; Namespace: Text)
     var
-        XmlDocBlob, XmlSchemaBlob : Codeunit "Temp Blob";
+        XmlDocTempBlob, XmlSchemaTempBlob : Codeunit "Temp Blob";
         XmlDocOutStream, XmlSchemaOutStream : OutStream;
         XmlDocInStream, XmlSchemaInStream : InStream;
     begin
-        XmlDocBlob.CreateOutStream(XmlDocOutStream);
+        XmlDocTempBlob.CreateOutStream(XmlDocOutStream);
         XmlDoc.WriteTo(XmlDocOutStream);
-        XmlDocBlob.CreateInStream(XmlDocInStream);
+        XmlDocTempBlob.CreateInStream(XmlDocInStream);
 
-        XmlSchemaBlob.CreateOutStream(XmlSchemaOutStream);
+        XmlSchemaTempBlob.CreateOutStream(XmlSchemaOutStream);
         XmlSchemaDoc.WriteTo(XmlSchemaOutStream);
-        XmlSchemaBlob.CreateInStream(XmlSchemaInStream);
+        XmlSchemaTempBlob.CreateInStream(XmlSchemaInStream);
 
         ValidateAgainstSchema(XmlDocInStream, XmlSchemaInStream, Namespace);
     end;
@@ -46,7 +46,6 @@ codeunit 6241 "Xml Validation Impl."
     var
         XmlDoc: DotNet XmlDocument;
         XmlReader: DotNet XmlReader;
-        ValidationEventHandler: DotNet ValidationEventHandler;
     begin
         XmlDoc := XmlDoc.XmlDocument();
         XmlDoc.Load(XmlDocStream);
@@ -54,6 +53,23 @@ codeunit 6241 "Xml Validation Impl."
         XmlReader := XmlReader.Create(XmlSchemaStream);
         XmlDoc.Schemas.Add(Namespace, XmlReader);
 
+        if not TryValidate(XmlDoc) then
+            HandleValidateException();
+    end;
+
+    [TryFunction]
+    local procedure TryValidate(XmlDoc: DotNet XmlDocument)
+    var
+        ValidationEventHandler: DotNet ValidationEventHandler;
+    begin
         XmlDoc.Validate(ValidationEventHandler);
+    end;
+
+    local procedure HandleValidateException()
+    var
+        Exception: DotNet Exception;
+    begin
+        Exception := GetLastErrorObject();
+        Error(Exception.InnerException.Message);
     end;
 }

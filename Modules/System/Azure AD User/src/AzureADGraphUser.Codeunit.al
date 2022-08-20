@@ -15,6 +15,7 @@ codeunit 9024 "Azure AD Graph User"
     end;
 
     var
+        [NonDebuggable]
         AzureADGraphUserImpl: Codeunit "Azure AD Graph User Impl.";
 
     /// <summary>    
@@ -24,6 +25,7 @@ codeunit 9024 "Azure AD Graph User"
     /// <param name="User">The Azure AD user.</param>
     [Scope('OnPrem')]
     [TryFunction]
+    [NonDebuggable]
     procedure GetGraphUser(UserSecurityId: Guid; var User: DotNet UserInfo)
     begin
         AzureADGraphUserImpl.GetGraphUser(UserSecurityId, false, User);
@@ -37,6 +39,7 @@ codeunit 9024 "Azure AD Graph User"
     /// <param name="User">The Azure AD user.</param>
     [Scope('OnPrem')]
     [TryFunction]
+    [NonDebuggable]
     procedure GetGraphUser(UserSecurityId: Guid; ForceFetchFromGraph: Boolean; var User: DotNet UserInfo)
     begin
         AzureADGraphUserImpl.GetGraphUser(UserSecurityId, ForceFetchFromGraph, User);
@@ -50,6 +53,7 @@ codeunit 9024 "Azure AD Graph User"
     /// The object ID of the Azure AD user, or an empty string if the user cannot be found.
     /// </returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure GetObjectId(UserSecurityId: Guid): Text
     begin
         exit(AzureADGraphUserImpl.GetObjectId(UserSecurityId));
@@ -62,6 +66,7 @@ codeunit 9024 "Azure AD Graph User"
     /// <error>User with Security ID UserSecurityId does not exist.</error>
     /// <returns>The user's authentication object ID.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure GetUserAuthenticationObjectId(UserSecurityId: Guid): Text
     begin
         exit(AzureADGraphUserImpl.GetUserAuthenticationObjectId(UserSecurityId));
@@ -72,8 +77,9 @@ codeunit 9024 "Azure AD Graph User"
     /// </summary>
     /// <param name="UserSecurityId">The user's security ID.</param>
     /// <param name="AuthenticationObjectId">Var parameter that hold the user's authention object ID.</param>
-    /// <return>True if the call was successful; otherwise - false.</error>
+    /// <returns>True if the call was successful; otherwise - false.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure TryGetUserAuthenticationObjectId(UserSecurityId: Guid; var AuthenticationObjectId: Text): Boolean
     begin
         exit(AzureADGraphUserImpl.TryGetUserAuthenticationObjectId(UserSecurityId, AuthenticationObjectId));
@@ -86,9 +92,32 @@ codeunit 9024 "Azure AD Graph User"
     /// <param name="User">The user that has provided Authentication object ID.</param>
     /// <returns>True if the user was found, false otherwise.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure GetUser(AuthenticationObjectID: Text; var User: Record User): Boolean
     begin
         exit(AzureADGraphUserImpl.GetUser(AuthenticationObjectID, User));
+    end;
+
+    /// <summary>    
+    /// Returns whether the current user is Delegated Admin.
+    /// </summary>
+    /// <returns>True if the current user is Delegated Admin, false otherwise.</returns>
+    [Scope('OnPrem')]
+    [NonDebuggable]
+    procedure IsUserDelegatedAdmin(): Boolean
+    begin
+        exit(AzureADGraphUserImpl.IsUserDelegatedAdmin());
+    end;
+
+    /// <summary>    
+    /// Returns whether the current user is Delegated Helpdesk.
+    /// </summary>
+    /// <returns>True if the current user is Delegated Helpdesk, false otherwise.</returns>
+    [Scope('OnPrem')]
+    [NonDebuggable]
+    procedure IsUserDelegatedHelpdesk(): Boolean
+    begin
+        exit(AzureADGraphUserImpl.IsUserDelegatedHelpdesk());
     end;
 
     /// <summary>    
@@ -98,6 +127,7 @@ codeunit 9024 "Azure AD Graph User"
     /// <param name="AzureADUser">The Azure AD user.</param>
     /// <returns>True if the user record has been updated. Otherwise, false.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure UpdateUserFromAzureGraph(var User: Record User; var AzureADUser: DotNet UserInfo): Boolean
     begin
         exit(AzureADGraphUserImpl.UpdateUserFromAzureGraph(User, AzureADUser));
@@ -107,48 +137,52 @@ codeunit 9024 "Azure AD Graph User"
     /// Gets the authentication email of the provided Graph user.
     /// </summary>
     /// <remarks>Authentication email corresponds to userPrincipalName property on the Graph user.</remarks>
-    /// <param name="GraphUser">The Azure AD user.</param>
+    /// <param name="GraphUserInfo">The Azure AD user.</param>
     /// <returns>The authentication email of the provided Graph user. Can be used to assign to "Authentication Email" field on the User table.</returns>
     [Scope('OnPrem')]
-    procedure GetAuthenticationEmail(GraphUser: DotNet UserInfo): Text[250]
+    [NonDebuggable]
+    procedure GetAuthenticationEmail(GraphUserInfo: DotNet UserInfo): Text[250]
     begin
-        exit(AzureADGraphUserImpl.GetAuthenticationEmail(GraphUser));
+        exit(AzureADGraphUserImpl.GetAuthenticationEmail(GraphUserInfo));
     end;
 
     /// <summary>    
     /// Gets the display name of the provided Graph user.
     /// </summary>
     /// <remarks>Display name corresponds to displayName property on the Graph user.</remarks>
-    /// <param name="GraphUser">The Azure AD user.</param>
+    /// <param name="GraphUserInfo">The Azure AD user.</param>
     /// <returns>The display name of the provided Graph user. Can be used to assign to "User Name" field on the User table.</returns>
     [Scope('OnPrem')]
-    procedure GetDisplayName(GraphUser: DotNet UserInfo): Text[50]
+    [NonDebuggable]
+    procedure GetDisplayName(GraphUserInfo: DotNet UserInfo): Text[50]
     begin
-        exit(AzureADGraphUserImpl.GetDisplayName(GraphUser));
+        exit(AzureADGraphUserImpl.GetDisplayName(GraphUserInfo));
     end;
 
     /// <summary>    
     /// Gets the contact email of the provided Graph user.
     /// </summary>
     /// <remarks>Contact email corresponds to Mail property on the Graph user.</remarks>
-    /// <param name="GraphUser">The Azure AD user.</param>
+    /// <param name="GraphUserInfo">The Azure AD user.</param>
     /// <returns>The contact email of the provided Graph user. Can be used to assign to "Contact Email" field on the User table.</returns>
     [Scope('OnPrem')]
-    procedure GetContactEmail(GraphUser: DotNet UserInfo): Text[250]
+    [NonDebuggable]
+    procedure GetContactEmail(GraphUserInfo: DotNet UserInfo): Text[250]
     begin
-        exit(AzureADGraphUserImpl.GetContactEmail(GraphUser));
+        exit(AzureADGraphUserImpl.GetContactEmail(GraphUserInfo));
     end;
 
     /// <summary>    
     /// Gets the full name of the provided Graph user.
     /// </summary>
     /// <remarks>Full name is composed from the combination of givenName and surname properties on the Graph user.</remarks>
-    /// <param name="GraphUser">The Azure AD user.</param>
+    /// <param name="GraphUserInfo">The Azure AD user.</param>
     /// <returns>The full name of the provided Graph user. Can be used to assign to "Full Name" field on the User table.</returns>
     [Scope('OnPrem')]
-    procedure GetFullName(GraphUser: DotNet UserInfo): Text[80]
+    [NonDebuggable]
+    procedure GetFullName(GraphUserInfo: DotNet UserInfo): Text[80]
     begin
-        exit(AzureADGraphUserImpl.GetFullName(GraphUser));
+        exit(AzureADGraphUserImpl.GetFullName(GraphUserInfo));
     end;
 
     /// <summary>    
@@ -158,12 +192,13 @@ codeunit 9024 "Azure AD Graph User"
     /// Preferred language ID is derived from preferredLanguage property on the Graph user. 
     /// If the preferred language is not set or it is set to a language that is not supported in Business Central, the function returns 0.
     /// </remarks>
-    /// <param name="GraphUser">The Azure AD user.</param>
+    /// <param name="GraphUserInfo">The Azure AD user.</param>
     /// <returns>The preferred language ID of the provided Graph user. Can be used to set the preferred language using the Language module.</returns>
     [Scope('OnPrem')]
-    procedure GetPreferredLanguageID(GraphUser: DotNet UserInfo): Integer
+    [NonDebuggable]
+    procedure GetPreferredLanguageID(GraphUserInfo: DotNet UserInfo): Integer
     begin
-        exit(AzureADGraphUserImpl.GetPreferredLanguageID(GraphUser));
+        exit(AzureADGraphUserImpl.GetPreferredLanguageID(GraphUserInfo));
     end;
 
     /// <summary>    
@@ -173,6 +208,7 @@ codeunit 9024 "Azure AD Graph User"
     /// </summary>
     /// <param name="AuthenticationEmail">The authentication email address.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure EnsureAuthenticationEmailIsNotInUse(AuthenticationEmail: Text)
     begin
         AzureADGraphUserImpl.EnsureAuthenticationEmailIsNotInUse(AuthenticationEmail);
@@ -183,6 +219,7 @@ codeunit 9024 "Azure AD Graph User"
     /// </summary>
     /// <param name="TestInProgress">The value to be set to the flag.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure SetTestInProgress(TestInProgress: Boolean)
     begin
         AzureADGraphUserImpl.SetTestInProgress(TestInProgress);

@@ -4,10 +4,9 @@
 // ------------------------------------------------------------------------------------------------
 
 /// <summary>
-// Provides helper functions for the Data Encryption Standard (DES)
+/// Provides helper functions for the Data Encryption Standard (DES)
 /// </summary>
-
-codeunit 1379 "DESCryptoServiceProvider"
+codeunit 1379 DESCryptoServiceProvider
 {
     Access = Public;
 
@@ -17,13 +16,17 @@ codeunit 1379 "DESCryptoServiceProvider"
     /// <summary>
     /// Encrypts text with DotNet Cryptography.DESCryptoServiceProvider
     /// </summary>
+    /// <remark>
+    /// For more information, visit https://docs.microsoft.com/en-us/dotnet/api/system.security.cryptography.descryptoserviceprovider.
+    /// </remark>
     /// <param name="Password">Represents the password to be used to initialize a new instance of DotNet System.Security.Cryptography.Rfc2898DeriveBytes</param>
     /// <param name="Salt">Represents the salt to be used to initialize a new instance of System.Security.Cryptography.Rfc2898DeriveBytes</param>
-    /// <param name="EncryptedText">Represents the text to encrypt</param>
-    /// <param name="DecryptedText">Returns the encrypted text</param>
-    procedure EncryptTextWithDESCryptoServiceProvider(DecryptedText: Text; Password: Text; Salt: Text) EncryptedText: Text
+    /// <param name="DecryptedText">Represents the text to encrypt</param>
+    /// <returns name="EncryptedText">Returns the encrypted text</returns>
+    [NonDebuggable]
+    procedure EncryptText(DecryptedText: Text; Password: Text; Salt: Text) EncryptedText: Text
     begin
-        EncryptedText := DESCryptoServiceProviderImpl.EncryptTextWithDESCryptoServiceProvider(DecryptedText, Password, Salt);
+        EncryptedText := DESCryptoServiceProviderImpl.EncryptText(DecryptedText, Password, Salt);
     end;
 
     /// <summary>
@@ -32,34 +35,64 @@ codeunit 1379 "DESCryptoServiceProvider"
     /// <param name="Password">Represents the password to be used to initialize a new instance of DotNet System.Security.Cryptography.Rfc2898DeriveBytes</param>
     /// <param name="Salt">Represents the salt to be used to initialize a new instance of System.Security.Cryptography.Rfc2898DeriveBytes</param>
     /// <param name="EncryptedText">Represents the text to decrypt</param>
-    /// <param name="DecryptedText">Returns the decrypted text</param>
-    procedure DecryptTextWithDESCryptoServiceProvider(EncryptedText: Text; Password: Text; Salt: Text) DecryptedText: Text
+    /// <returns name="DecryptedText">Returns the decrypted text</returns>
+    [NonDebuggable]
+    procedure DecryptText(EncryptedText: Text; Password: Text; Salt: Text) DecryptedText: Text
     begin
-        DecryptedText := DESCryptoServiceProviderImpl.DecryptTextWithDESCryptoServiceProvider(EncryptedText, Password, Salt);
+        DecryptedText := DESCryptoServiceProviderImpl.DecryptText(EncryptedText, Password, Salt);
     end;
 
-
+#if not CLEAN18
     /// <summary>
     /// Encrypts data in stream with DotNet Cryptography.DESCryptoServiceProvider
     /// </summary>
     /// <param name="Password">Represents the password to be used to initialize a new instance of Rfc2898DeriveBytes</param>
-    /// <param name="Salt">Represents the salt to be used to initialize a new instance of Rfc2898DeriveBytes</param>
     /// <param name="InputInstream">Represents the input instream data to encrypt</param>
     /// <param name="OutputOutstream">Represents the output instream encrypted data</param>
-    procedure EncryptStreamWithDESCryptoServiceProvider(Password: Text; EncryptStream: InStream; VAR DecryptStream: Outstream)
+    [NonDebuggable]
+    [Obsolete('Replaced, add the salt parameter to continue using this function', '18.0')]
+    procedure EncryptStream(Password: Text; InputInstream: InStream; var OutputOutstream: Outstream)
     begin
-        DESCryptoServiceProviderImpl.EncryptStreamWithDESCryptoServiceProvider(Password, EncryptStream, DecryptStream);
+        DESCryptoServiceProviderImpl.EncryptStream(Password, Password, InputInstream, OutputOutstream);
     end;
+
+    /// <summary>
+    /// Decrypts data in stream with DotNet Cryptography.DESCryptoServiceProvider
+    /// </summary>
+    /// <param name="Password">Represents the password to be used to initialize a new instance of Rfc2898DeriveBytes</param>
+    /// <param name="InputInstream">Represents the input instream data to decrypt</param>
+    /// <param name="OutputOutstream">Represents the output instream decrypted data</param>
+    [NonDebuggable]
+    [Obsolete('Replaced, add the salt parameter to continue using this function', '18.0')]
+    procedure DecryptStream(Password: Text; InputInstream: InStream; var OutputOutstream: Outstream)
+    begin
+        DESCryptoServiceProviderImpl.DecryptStream(Password, Password, InputInstream, OutputOutstream);
+    end;
+#endif
 
     /// <summary>
     /// Encrypts data in stream with DotNet Cryptography.DESCryptoServiceProvider
     /// </summary>
     /// <param name="Password">Represents the password to be used to initialize a new instance of Rfc2898DeriveBytes</param>
-    /// <param name="Salt">Represents the salt to be used to initialize a new instance of Rfc2898DeriveBytes</param>
+    /// <param name="Salt">Represents the salt to be used to initialize a new instance of System.Security.Cryptography.Rfc2898DeriveBytes</param>
+    /// <param name="InputInstream">Represents the input instream data to encrypt</param>
+    /// <param name="OutputOutstream">Represents the output instream encrypted data</param>
+    [NonDebuggable]
+    procedure EncryptStream(Password: Text; Salt: Text; InputInstream: InStream; var OutputOutstream: Outstream)
+    begin
+        DESCryptoServiceProviderImpl.EncryptStream(Password, Salt, InputInstream, OutputOutstream);
+    end;
+
+    /// <summary>
+    /// Decrypts data in stream with DotNet Cryptography.DESCryptoServiceProvider
+    /// </summary>
+    /// <param name="Password">Represents the password to be used to initialize a new instance of Rfc2898DeriveBytes</param>
+    /// <param name="Salt">Represents the salt to be used to initialize a new instance of System.Security.Cryptography.Rfc2898DeriveBytes</param>
     /// <param name="InputInstream">Represents the input instream data to decrypt</param>
     /// <param name="OutputOutstream">Represents the output instream decrypted data</param>
-    procedure DecryptStreamWithDESCryptoServiceProvider(Password: Text; InputInstream: InStream; VAR OutputOutstream: Outstream)
+    [NonDebuggable]
+    procedure DecryptStream(Password: Text; Salt: Text; InputInstream: InStream; var OutputOutstream: Outstream)
     begin
-        DESCryptoServiceProviderImpl.DecryptStreamWithDESCryptoServiceProvider(Password, InputInstream, OutputOutstream);
+        DESCryptoServiceProviderImpl.DecryptStream(Password, Salt, InputInstream, OutputOutstream);
     end;
 }

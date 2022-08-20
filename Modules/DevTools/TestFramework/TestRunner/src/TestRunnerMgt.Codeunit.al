@@ -7,6 +7,9 @@ codeunit 130454 "Test Runner - Mgt"
 {
     Permissions = TableData "AL Test Suite" = rimd, TableData "Test Method Line" = rimd;
 
+    var
+        SkipLoggingResults: Boolean;
+
     trigger OnRun()
     begin
     end;
@@ -37,6 +40,14 @@ codeunit 130454 "Test Runner - Mgt"
         OnAfterRunTestSuite(TestMethodLine);
     end;
 
+    /// This method is called when the caller needs to run a test codeunit but do not want to log results or the caller has 
+    /// an alternateway to log the results. Currently, this is used by the Performance Toolkit
+    procedure RunTestsWithoutLoggingResults(var TestMethodLine: Record "Test Method Line")
+    begin
+        SkipLoggingResults := true;
+        CODEUNIT.Run(TestMethodLine."Test Codeunit");
+    end;
+
     procedure GetDefaultTestRunner(): Integer
     begin
         exit(GetCodeIsolationTestRunner());
@@ -57,12 +68,18 @@ codeunit 130454 "Test Runner - Mgt"
         TestMethodLineFunction: Record "Test Method Line";
         CodeunitTestMethodLine: Record "Test Method Line";
     begin
+        if SkipLoggingResults then
+            exit(true);
+
         // Invoked by the platform before any codeunit is run
         if (FunctionName = '') or (FunctionName = 'OnRun') then begin
             if GetTestCodeunit(CodeunitTestMethodLine, TestSuite, CodeunitID) then
                 SetStartTimeOnTestLine(CodeunitTestMethodLine);
             exit(true);
         end;
+
+        // Start permission mock if installed
+        StartStopPermissionMock();
 
         if not GetTestFunction(TestMethodLineFunction, FunctionName, TestSuite, CodeunitID, LineNoTestFilter) then
             exit(false);
@@ -81,6 +98,15 @@ codeunit 130454 "Test Runner - Mgt"
         TestMethodLine: Record "Test Method Line";
         CodeunitTestMethodLine: Record "Test Method Line";
     begin
+        // Stop Permisson Mock if installed
+        if (FunctionName <> '') and (FunctionName <> 'OnRun') then
+            StartStopPermissionMock();
+
+        if SkipLoggingResults then begin
+            OnAfterTestMethodRun(TestMethodLine, CodeunitID, CodeunitName, FunctionName, FunctionTestPermissions, IsSuccess);
+            exit;
+        end;
+
         // Invoked by platform after every test method is run
         if (FunctionName = '') or (FunctionName = 'OnRun') then
             exit;
@@ -117,6 +143,7 @@ codeunit 130454 "Test Runner - Mgt"
             TestSuiteMgt.SetLastErrorOnLine(CodeunitTestMethodLine);
         end;
 
+        DummyBlankDateTime := 0DT;
         if (TestMethodLine."Start Time" < CodeunitTestMethodLine."Start Time") or
            (CodeunitTestMethodLine."Start Time" = DummyBlankDateTime)
         then
@@ -149,6 +176,19 @@ codeunit 130454 "Test Runner - Mgt"
 
         TestMethodLineFunction."Finish Time" := CurrentDateTime();
         TestMethodLineFunction.Modify();
+    end;
+
+    // TODO: Temporary fix refactor to system events.
+    local procedure StartStopPermissionMock()
+    var
+        AllObj: Record AllObj;
+        PermissionMockID: Integer;
+    begin
+        PermissionMockID := 131006; // codeunit 131006 "Permissions Mock"
+        AllObj.SetRange("Object Type", AllObj."Object Type"::Codeunit);
+        AllObj.SetRange("Object ID", PermissionMockID);
+        if not AllObj.IsEmpty() then
+            Codeunit.Run(PermissionMockID);
     end;
 
     local procedure GetTestFunction(var TestMethodLineFunction: Record "Test Method Line"; FunctionName: Text[128]; TestSuite: Code[10]; TestCodeunit: Integer; LineNoTestFilter: Text): Boolean

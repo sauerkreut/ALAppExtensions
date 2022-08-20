@@ -8,7 +8,8 @@
 codeunit 153 "User Permissions Impl."
 {
     Access = Internal;
-    Permissions = TableData 2000000053 = rimd;
+    Permissions = TableData "Access Control" = rimd,
+                  TableData User = r;
 
     var
         SUPERTok: Label 'SUPER', Locked = true;
@@ -46,6 +47,9 @@ codeunit 153 "User Permissions Impl."
     var
         EnvironmentInfo: Codeunit "Environment Information";
     begin
+        if Rec.IsTemporary() then
+            exit;
+
         if not EnvironmentInfo.IsSaaS() then
             exit;
 
@@ -63,6 +67,9 @@ codeunit 153 "User Permissions Impl."
     var
         EnvironmentInfo: Codeunit "Environment Information";
     begin
+        if Rec.IsTemporary() then
+            exit;
+
         if not EnvironmentInfo.IsSaaS() then
             exit;
 
@@ -81,6 +88,9 @@ codeunit 153 "User Permissions Impl."
     [EventSubscriber(ObjectType::Table, Database::User, 'OnBeforeModifyEvent', '', true, true)]
     local procedure CheckSuperPermissionsBeforeModifyUser(var Rec: Record User; var xRec: Record User; RunTrigger: Boolean)
     begin
+        if Rec.IsTemporary() then
+            exit;
+
         if not IsSuper(Rec."User Security ID") then
             exit;
 
@@ -196,6 +206,40 @@ codeunit 153 "User Permissions Impl."
             exit(true);
     end;
 
+    procedure HasUserPermissionSetAssigned(UserSecurityId: Guid; Company: Text; RoleId: Code[20]; ItemScope: Option; AppId: Guid): Boolean
+    var
+        AccessControl: Record "Access Control";
+    begin
+        AccessControl.SetRange("User Security ID", UserSecurityId);
+        AccessControl.SetRange("Role ID", RoleID);
+        AccessControl.SetFilter("Company Name", '%1|%2', '', Company);
+        AccessControl.SetRange(Scope, ItemScope);
+        AccessControl.SetRange("App ID", AppId);
+
+        exit(not AccessControl.IsEmpty());
+    end;
+
+    internal procedure GetEffectivePermission(UserSecurityIdToCheck: Guid; CompanyNameToCheck: Text; PermissionObjectType: Option "Table Data","Table",,"Report",,"Codeunit","XMLport","MenuSuite","Page","Query","System",,,,,,,,,; ObjectId: Integer): Text
+    var
+        NavUserAccountHelper: DotNet NavUserAccountHelper;
+    begin
+        exit(NavUserAccountHelper.GetEffectivePermissionForObject(UserSecurityIdToCheck, CompanyNameToCheck, PermissionObjectType, ObjectId));
+    end;
+
+    procedure GetEffectivePermission(PermissionObjectType: Option "Table Data","Table",,"Report",,"Codeunit","XMLport","MenuSuite","Page","Query","System",,,,,,,,,; ObjectId: Integer) TempExpandedPermission: Record "Expanded Permission" temporary
+    var
+        PermissionMask: Text;
+    begin
+        TempExpandedPermission."Object Type" := PermissionObjectType;
+        TempExpandedPermission."Object ID" := ObjectId;
+        PermissionMask := GetEffectivePermission(UserSecurityId(), CompanyName(), PermissionObjectType, ObjectId);
+        Evaluate(TempExpandedPermission."Read Permission", SelectStr(1, PermissionMask));
+        Evaluate(TempExpandedPermission."Insert Permission", SelectStr(2, PermissionMask));
+        Evaluate(TempExpandedPermission."Modify Permission", SelectStr(3, PermissionMask));
+        Evaluate(TempExpandedPermission."Delete Permission", SelectStr(4, PermissionMask));
+        Evaluate(TempExpandedPermission."Execute Permission", SelectStr(5, PermissionMask));
+    end;
+
     /// <summary>
     /// An event that indicates that subscribers should set the result that should be returned when the CanManageUsersOnTenant is called.
     /// </summary>
@@ -204,7 +248,7 @@ codeunit 153 "User Permissions Impl."
     /// This feature is for testing and is subject to a different SLA than production features.
     /// Do not use this event in a production environment. This should be subscribed to only in tests.
     /// </remarks>
-    [IntegrationEvent(false, false)]
+    [InternalEvent(false)]
     local procedure OnCanManageUsersOnTenant(UserSID: Guid; var Result: Boolean)
     begin
     end;

@@ -9,6 +9,7 @@
 codeunit 9016 "Azure AD Plan"
 {
     var
+        [NonDebuggable]
         AzureAdPlanImpl: Codeunit "Azure AD Plan Impl.";
 
     /// <summary>
@@ -17,9 +18,10 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="PlanGUID">the plan GUID.</param>
     /// <returns>true if the given plan has users assigned to it.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure IsPlanAssigned(PlanGUID: Guid): Boolean
     begin
-        EXIT(AzureAdPlanImpl.IsPlanAssigned(PlanGUID));
+        exit(AzureAdPlanImpl.IsPlanAssigned(PlanGUID));
     end;
 
     /// <summary>
@@ -27,10 +29,10 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <param name="PlanGUID">the plan GUID.</param>
     /// <returns>true if the given plan is assigned to the current user.</returns>
-    [Scope('OnPrem')]
+    [NonDebuggable]
     procedure IsPlanAssignedToUser(PlanGUID: Guid): Boolean
     begin
-        EXIT(AzureAdPlanImpl.IsPlanAssignedToUser(PlanGUID));
+        exit(AzureAdPlanImpl.IsPlanAssignedToUser(PlanGUID));
     end;
 
     /// <summary>
@@ -39,75 +41,108 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="PlanGUID">the plan GUID.</param>
     /// <param name="UserGUID">the user GUID.</param>
     /// <returns>true if the given plan is assigned to the given user.</returns>
-    [Scope('OnPrem')]
+    [NonDebuggable]
     procedure IsPlanAssignedToUser(PlanGUID: Guid; UserGUID: Guid): Boolean
     begin
-        EXIT(AzureAdPlanImpl.IsPlanAssignedToUser(PlanGUID, UserGUID));
+        exit(AzureAdPlanImpl.IsPlanAssignedToUser(PlanGUID, UserGUID));
     end;
 
     /// <summary>
     /// Returns true if the given user is entitled from the service plan.
     /// </summary>
-    /// <param name="GraphUser">the user to check.</param>
+    /// <param name="GraphUserInfo">the user to check.</param>
     /// <returns>True if the given user is entitled from the service plan.</returns>
     [Scope('OnPrem')]
-    procedure IsGraphUserEntitledFromServicePlan(var GraphUser: DotNet UserInfo): Boolean
+    [NonDebuggable]
+    procedure IsGraphUserEntitledFromServicePlan(var GraphUserInfo: DotNet UserInfo): Boolean
     begin
-        EXIT(AzureAdPlanImpl.IsGraphUserEntitledFromServicePlan(GraphUser));
+        exit(AzureAdPlanImpl.IsGraphUserEntitledFromServicePlan(GraphUserInfo));
     end;
 
     /// <summary>
-    /// Updates plans for user.
+    /// Assign the delegated admin plan and default user groups to the current user.
     /// </summary>
-    /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
-    /// <raises>OnUpdateUserAccessForSaaS</raises>
-    /// <param name="UserSecurityId">The user to update.</param>
-    /// <param name="GraphUser">The graph user corresponding to the user to update, and containing the information about the plans assigned to the user.</param>
     [Scope('OnPrem')]
-    procedure UpdateUserPlans(UserSecurityId: Guid; var GraphUser: DotNet UserInfo)
+    [NonDebuggable]
+    procedure AssignDelegatedAdminPlanAndUserGroups()
     begin
-        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, GraphUser, true, true);
+        AzureAdPlanImpl.AssignDelegatedAdminPlanAndUserGroups();
     end;
 
     /// <summary>
-    /// Updates plans for user.
+    /// Updates license plans for a user.
     /// </summary>
     /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
     /// <raises>OnUpdateUserAccessForSaaS</raises>
-    /// <param name="UserSecurityId">The user to update.</param>
-    /// <param name="GraphUser">The graph user corresponding to the user to update, and containing the information about the plans assigned to the user.</param>
+    /// <param name="UserSecurityId">The user for whom to update license information.</param>
+    /// <param name="GraphUserInfo">The graph user corresponding to the user to update, and containing the information about the plans assigned to the user.</param>
+    [Scope('OnPrem')]
+    [NonDebuggable]
+    procedure UpdateUserPlans(UserSecurityId: Guid; var GraphUserInfo: DotNet UserInfo)
+    begin
+        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, GraphUserInfo, true, true);
+    end;
+
+    /// <summary>
+    /// Updates license plans for a user.
+    /// </summary>
+    /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
+    /// <raises>OnUpdateUserAccessForSaaS</raises>
+    /// <param name="UserSecurityId">The user for whom to update license information.</param>
+    /// <param name="GraphUserInfo">The graph user corresponding to the user to update, and containing the information about the plans assigned to the user.</param>
     /// <param name="AppendPermissionsOnNewPlan">Append permissions from the new plan to the user.</param>
     /// <param name="RemovePermissionsOnDeletePlan">Remove permissions when removing the plan for the user.</param>
     [Scope('OnPrem')]
-    procedure UpdateUserPlans(UserSecurityId: Guid; var GraphUser: DotNet UserInfo; AppendPermissionsOnNewPlan: Boolean; RemovePermissionsOnDeletePlan: Boolean)
+    [NonDebuggable]
+    procedure UpdateUserPlans(UserSecurityId: Guid; var GraphUserInfo: DotNet UserInfo; AppendPermissionsOnNewPlan: Boolean; RemovePermissionsOnDeletePlan: Boolean)
     begin
-        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, GraphUser, AppendPermissionsOnNewPlan, RemovePermissionsOnDeletePlan);
+        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, GraphUserInfo, AppendPermissionsOnNewPlan, RemovePermissionsOnDeletePlan);
     end;
 
     /// <summary>
-    /// Updates plans for user.
+    /// Updates license plans for a user.
     /// </summary>
     /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
     /// <raises>OnUpdateUserAccessForSaaS</raises>
-    /// <param name="UserSecurityId">The user to update.</param>
+    /// <param name="UserSecurityId">The user for whom to update license information.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure UpdateUserPlans(UserSecurityId: Guid)
     begin
-        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, true, true);
+        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, true, true, false);
     end;
 
+#if not CLEAN18
     /// <summary>
-    /// Updates plans for user.
+    /// Updates license plans for a user.
     /// </summary>
     /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
     /// <raises>OnUpdateUserAccessForSaaS</raises>
-    /// <param name="UserSecurityId">The user to update.</param>
+    /// <param name="UserSecurityId">The user for whom to update license information.</param>
     /// <param name="AppendPermissionsOnNewPlan">Append permissions from the new plan to the user.</param>
     /// <param name="RemovePermissionsOnDeletePlan">Remove permissions when removing the plan for the user.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
+    [Obsolete('Replaced with an overload accepting the RemovePlansOnDeleteUser parameter', '18.0')]
     procedure UpdateUserPlans(UserSecurityId: Guid; AppendPermissionsOnNewPlan: Boolean; RemovePermissionsOnDeletePlan: Boolean)
     begin
-        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, AppendPermissionsOnNewPlan, RemovePermissionsOnDeletePlan);
+        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, AppendPermissionsOnNewPlan, RemovePermissionsOnDeletePlan, false);
+    end;
+#endif
+
+    /// <summary>
+    /// Updates license plans for a user.
+    /// </summary>
+    /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
+    /// <raises>OnUpdateUserAccessForSaaS</raises>
+    /// <param name="UserSecurityId">The user for whom to update license information.</param>
+    /// <param name="AppendPermissionsOnNewPlan">Add permissions from the new license plan to the user. Existing permissions will not be affected.</param>
+    /// <param name="RemovePermissionsOnDeletePlan">Remove permissions when removing a license plan for a user.</param>
+    /// <param name="RemovePlansOnDeleteUser">Remove license plans when a user is deleted in Office 365.</param>
+    [Scope('OnPrem')]
+    procedure UpdateUserPlans(UserSecurityId: Guid; AppendPermissionsOnNewPlan: Boolean; RemovePermissionsOnDeletePlan: Boolean; RemovePlansOnDeleteUser: Boolean)
+    begin
+        AzureAdPlanImpl.UpdateUserPlans(UserSecurityId, AppendPermissionsOnNewPlan, RemovePermissionsOnDeletePlan, RemovePlansOnDeleteUser);
     end;
 
     /// <summary>
@@ -116,6 +151,7 @@ codeunit 9016 "Azure AD Plan"
     /// <raises>OnRemoveUserGroupsForUserAndPlan</raises>
     /// <raises>OnUpdateUserAccessForSaaS</raises>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure UpdateUserPlans()
     begin
         AzureAdPlanImpl.UpdateUserPlans();
@@ -128,6 +164,7 @@ codeunit 9016 "Azure AD Plan"
     /// <raises>OnUpdateUserAccessForSaaS</raises>
     /// <param name="UserSecurityId">The user to update.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure RefreshUserPlanAssignments(UserSecurityId: Guid)
     begin
         AzureAdPlanImpl.RefreshUserPlanAssignments(UserSecurityId);
@@ -140,6 +177,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="UserSecurityId">The user GUID.</param>
     [Scope('OnPrem')]
     [TryFunction]
+    [NonDebuggable]
     procedure TryGetAzureUserPlanRoleCenterId(var RoleCenterID: Integer; UserSecurityId: Guid)
     begin
         AzureAdPlanImpl.TryGetAzureUserPlanRoleCenterId(RoleCenterID, UserSecurityId);
@@ -150,6 +188,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <returns>Returns true if at least one plan exist.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure DoPlansExist(): Boolean
     begin
         exit(AzureAdPlanImpl.DoPlansExist());
@@ -160,6 +199,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <returns>Returns true if at least one user is assigned to a plan.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure DoUserPlansExist(): Boolean
     begin
         exit(AzureAdPlanImpl.DoUserPlansExist());
@@ -171,6 +211,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="PlanGUID">The plan GUID.</param>
     /// <returns>Returns true if the given plan exists.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure DoesPlanExist(PlanGUID: Guid): Boolean
     begin
         exit(AzureAdPlanImpl.DoesPlanExist(PlanGUID));
@@ -182,6 +223,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="UserSecurityId">The user GUID.</param>
     /// <returns>Returns true if the given user has at least one plan.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure DoesUserHavePlans(UserSecurityId: Guid): Boolean
     begin
         exit(AzureAdPlanImpl.DoesUserHavePlans(UserSecurityId));
@@ -192,6 +234,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <returns>Returns the total number of available plans.</returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure GetAvailablePlansCount(): Integer
     begin
         exit(AzureAdPlanImpl.GetAvailablePlansCount());
@@ -202,6 +245,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <raises>The OnCanCurrentUserManagePlansAndGroups event to ensure this API is called with the proper authorization.</raises>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure CheckMixedPlans()
     begin
         AzureAdPlanImpl.CheckMixedPlans();
@@ -213,6 +257,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="PlanNamesPerUser">A mapping of new plans for user identifiers.</param>
     /// <param name="ErrorOutForAdmin">Specifies if an error (instead of a message) should be shown for an admin when this function is called.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure CheckMixedPlans(PlanNamesPerUser: Dictionary of [Text, List of [Text]]; ErrorOutForAdmin: Boolean)
     begin
         AzureAdPlanImpl.CheckMixedPlans(PlanNamesPerUser, ErrorOutForAdmin);
@@ -223,6 +268,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <returns>Returns true if there are incompatible plans in the system. </returns>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure MixedPlansExist(): Boolean
     begin
         exit(AzureAdPlanImpl.MixedPlansExist());
@@ -231,12 +277,13 @@ codeunit 9016 "Azure AD Plan"
     /// <summary>
     /// Gets plans that are assigned to a user in Office 365.
     /// </summary>
-    /// <param name="GraphUser">The Graph user to get plans for.</param>
+    /// <param name="GraphUserInfo">The Graph user to get plans for.</param>
     /// <param name="PlanNames">The names of the plans that are assigned to the user in Office 365.</param>
     [Scope('OnPrem')]
-    procedure GetPlanNames(GraphUser: DotNet UserInfo; var PlanNames: List of [Text])
+    [NonDebuggable]
+    procedure GetPlanNames(GraphUserInfo: DotNet UserInfo; var PlanNames: List of [Text])
     begin
-        AzureAdPlanImpl.GetPlanNames(GraphUser, PlanNames);
+        AzureAdPlanImpl.GetPlanNames(GraphUserInfo, PlanNames);
     end;
 
     /// <summary>
@@ -245,6 +292,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="UserSecID">The security ID of the user whose plans we are getting.</param>
     /// <param name="PlanNames">The plan names of plans assigned to the Office 365 user.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure GetPlanNames(UserSecID: Guid; var PlanNames: List of [Text])
     begin
         AzureAdPlanImpl.GetPlanNames(UserSecID, PlanNames);
@@ -253,23 +301,36 @@ codeunit 9016 "Azure AD Plan"
     /// <summary>
     /// Gets plans that are assigned to a user in Office 365.
     /// </summary>
-    /// <param name="GraphUser">The Graph user to get plans for.</param>
+    /// <param name="GraphUserInfo">The Graph user to get plans for.</param>
     /// <param name="PlanIDs">The IDs of the plans that are assigned to the user in Office 365.</param>
     [Scope('OnPrem')]
-    procedure GetPlanIDs(GraphUser: DotNet UserInfo; var PlanIDs: List of [Guid])
+    [NonDebuggable]
+    procedure GetPlanIDs(GraphUserInfo: DotNet UserInfo; var PlanIDs: List of [Guid])
     begin
-        AzureAdPlanImpl.GetPlanIDs(GraphUser, PlanIDs);
+        AzureAdPlanImpl.GetPlanIDs(GraphUserInfo, PlanIDs);
     end;
 
     /// <summary>
     /// Checks whether a user is assigned to different plans in Business Central and Graph.
     /// </summary>
-    /// <param name="GraphUser">The user in Graph to check plans for.</param>
+    /// <param name="GraphUserInfo">The user in Graph to check plans for.</param>
     /// <param name="UserSecID">The security ID of the user to get plans for.</param>
     /// <returns>True, if the plans differ, false otherwise.</returns>
-    procedure CheckIfPlansDifferent(GraphUser: DotNet UserInfo; UserSecID: Guid): Boolean
+    [NonDebuggable]
+    procedure CheckIfPlansDifferent(GraphUserInfo: DotNet UserInfo; UserSecID: Guid): Boolean
     begin
-        exit(AzureAdPlanImpl.CheckIfPlansDifferent(GraphUser, UserSecID));
+        exit(AzureAdPlanImpl.CheckIfPlansDifferent(GraphUserInfo, UserSecID));
+    end;
+
+    /// <summary>
+    /// Checks whether a given service plan is a Business Central service Plan
+    /// </summary>
+    /// <param name="ServicePlanId">The plan to check.</param>
+    /// <returns>True, if the service plan is a Business Central Plan, false otherwise.</returns>
+    [NonDebuggable]
+    procedure IsBCServicePlan(ServicePlanId: Guid): Boolean
+    begin
+        exit(AzureAdPlanImpl.IsBCServicePlan(ServicePlanId));
     end;
 
     /// <summary>
@@ -277,6 +338,7 @@ codeunit 9016 "Azure AD Plan"
     /// </summary>
     /// <param name="EnableTestability">True to enable the test mode.</param>
     [Scope('OnPrem')]
+    [NonDebuggable]
     procedure SetTestInProgress(EnableTestability: Boolean)
     begin
         AzureAdPlanImpl.SetTestInProgress(EnableTestability);
@@ -290,6 +352,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="UserSecurityID">The user to remove.</param>
     [IntegrationEvent(false, false)]
     [Scope('OnPrem')]
+    [NonDebuggable]
     internal procedure OnRemoveUserGroupsForUserAndPlan(PlanID: Guid; UserSecurityID: Guid)
     begin
     end;
@@ -302,6 +365,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="UserGroupsAdded">Whether the user groups were updated</param>
     [IntegrationEvent(false, false)]
     [Scope('OnPrem')]
+    [NonDebuggable]
     internal procedure OnUpdateUserAccessForSaaS(UserSecurityID: Guid; var UserGroupsAdded: Boolean)
     begin
     end;
@@ -313,6 +377,7 @@ codeunit 9016 "Azure AD Plan"
     /// <param name="CanManage">Whether the user can manage plans and groups</param>
     [IntegrationEvent(false, false)]
     [Scope('OnPrem')]
+    [NonDebuggable]
     internal procedure OnCanCurrentUserManagePlansAndGroups(var CanManage: Boolean);
     begin
     end;

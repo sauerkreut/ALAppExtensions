@@ -8,6 +8,7 @@
 /// </summary>
 page 2500 "Extension Management"
 {
+    Caption = 'Extension Management';
     Extensible = false;
     AdditionalSearchTerms = 'app,add-in,customize,plug-in,appsource';
     ApplicationArea = All;
@@ -26,6 +27,7 @@ page 2500 "Extension Management"
                             "Tenant Visible" = CONST(true));
     UsageCategory = Administration;
     ContextSensitiveHelpPage = 'ui-extensions';
+    Permissions = tabledata "Published Application" = r;
 
     layout
     {
@@ -40,19 +42,37 @@ page 2500 "Extension Management"
                     Caption = 'Logo';
                     ToolTip = 'Specifies the logo of the extension, such as the logo of the service provider.';
                 }
-                field(AdditionalInfo; InfoText)
+                field("Is Installed"; IsInstalled)
                 {
                     ApplicationArea = All;
-                    Caption = 'Description';
+                    Caption = 'Is Installed';
                     Style = Favorable;
                     StyleExpr = InfoStyle;
-                    ToolTip = 'Specifies, in case of on-premises, either the person or company who provided the extension and, in case of SaaS, whether the extension is installed or not.';
+                    ToolTip = 'Specifies whether the extension is installed.';
                 }
                 field(Name; Name)
                 {
                     ApplicationArea = All;
                     ToolTip = 'Specifies the name of the extension.';
                 }
+                field(Publisher; Publisher)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Specifies the publisher of the extension.';
+                }
+                field(Version; VersionDisplay)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Version';
+                    ToolTip = 'Specifies the version of the extension.';
+                }
+                field("Published As"; "Published As")
+                {
+                    ApplicationArea = All;
+                    Caption = 'Published As';
+                    ToolTip = 'Specifies whether the extension is published as a per-tenant, development, or a global extension.';
+                }
+
                 label(Control18)
                 {
                     ApplicationArea = All;
@@ -64,12 +84,6 @@ page 2500 "Extension Management"
                     StyleExpr = TRUE;
                     ToolTip = 'Specifies a spacer for ''Brick'' view mode.';
                     Visible = NOT IsOnPremDisplay;
-                }
-                field(Version; VersionDisplay)
-                {
-                    ApplicationArea = All;
-                    Caption = 'Version';
-                    ToolTip = 'Specifies the version of the extension.';
                 }
             }
         }
@@ -93,7 +107,6 @@ page 2500 "Extension Management"
                     PromotedCategory = Category5;
                     Scope = Repeater;
                     ToolTip = 'Install the extension for the current tenant.';
-                    Visible = IsInstallAllowed;
 
                     trigger OnAction()
                     begin
@@ -123,14 +136,13 @@ page 2500 "Extension Management"
                 {
                     ApplicationArea = All;
                     Caption = 'Unpublish';
-                    Enabled = ActionsEnabled;
+                    Enabled = ActionsEnabled AND IsTenantExtension AND (not IsInstalled);
                     Image = RemoveLine;
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category5;
                     Scope = Repeater;
                     ToolTip = 'Unpublish the extension from the tenant.';
-                    Visible = IsTenantExtension;
 
                     trigger OnAction()
                     begin
@@ -159,7 +171,7 @@ page 2500 "Extension Management"
                 {
                     ApplicationArea = All;
                     Caption = 'Download Source';
-                    Enabled = IsTenantExtension AND "Show My Code";
+                    Enabled = IsTenantExtension;
                     Image = ExportFile;
                     Promoted = true;
                     PromotedOnly = true;
@@ -194,7 +206,7 @@ page 2500 "Extension Management"
                 {
                     ApplicationArea = All;
                     Caption = 'Refresh';
-                    Image = RefreshLines;
+                    Image = Refresh;
                     Promoted = true;
                     PromotedCategory = Category5;
                     ToolTip = 'Refresh the list of extensions.';
@@ -217,14 +229,7 @@ page 2500 "Extension Management"
                     PromotedIsBig = true;
                     ToolTip = 'Browse the extension marketplace for new extensions to install.';
                     Visible = NOT IsOnPremDisplay;
-
-                    trigger OnAction()
-                    begin
-                        if AppSource.IsAvailable() then begin
-                            AppSource := AppSource.Create();
-                            AppSource.ShowAppSource();
-                        end;
-                    end;
+                    RunObject = page "Extension Marketplace";
                 }
                 action("Upload Extension")
                 {
@@ -283,7 +288,7 @@ page 2500 "Extension Management"
         DetermineExtensionConfigurations();
 
         VersionDisplay := GetVersionDisplayText();
-        SetAdditionalInfoProperties();
+        SetInfoStyleForIsInstalled();
     end;
 
     trigger OnAfterGetCurrRecord()
@@ -307,10 +312,7 @@ page 2500 "Extension Management"
     var
         ExtensionInstallationImpl: Codeunit "Extension Installation Impl";
         ExtensionOperationImpl: Codeunit "Extension Operation Impl";
-        [RunOnClient]
-        AppSource: DotNet AppSource;
         VersionDisplay: Text;
-        InstalledStatus: Text;
         ActionsEnabled: Boolean;
         IsSaaS: Boolean;
         VersionFormatTxt: Label 'v. %1', Comment = 'v=version abbr, %1=Version string';
@@ -319,10 +321,8 @@ page 2500 "Extension Management"
         CannotUnpublishIfInstalledMsg: Label 'The extension %1 cannot be unpublished because it is installed.', Comment = '%1 = name of extension';
         IsMarketplaceEnabled: Boolean;
         IsOnPremDisplay: Boolean;
-        VersionPerTenantTxt: Label 'v. %1 - %2', Comment = '%1=formatted version string, %2=not installed constant', Locked = true;
         IsInstalled: Boolean;
         IsInstallAllowed: Boolean;
-        InfoText: Text;
         InfoStyle: Boolean;
         [InDataSet]
         HelpActionVisible: Boolean;
@@ -357,34 +357,17 @@ page 2500 "Extension Management"
     begin
         // Determining Record and Styling Configurations
         IsInstalled := ExtensionInstallationImpl.IsInstalledByPackageId("Package ID");
-        InstalledStatus := ExtensionInstallationImpl.GetExtensionInstalledDisplayString("Package ID");
-        // Currently using the "Tenant ID" field to identify development extensions
-        if "Published As" = "Published As"::Global then
-            IsTenantExtension := false
-        else
-            IsTenantExtension := true;
+        IsTenantExtension := "Published As" <> "Published As"::Global;
     end;
 
     local procedure GetVersionDisplayText(): Text
     begin
-        // Getting the version display text and adding a '- NotInstalled' if in SaaS for PerTenant extensions
-        if IsInstalled or not IsSaaS or not IsTenantExtension then
-            exit(StrSubstNo(VersionFormatTxt, ExtensionInstallationImpl.GetVersionDisplayString(Rec)));
-
-        exit(StrSubstNo(VersionPerTenantTxt,
-            ExtensionInstallationImpl.GetVersionDisplayString(Rec), InstalledStatus));
+        exit(StrSubstNo(VersionFormatTxt, ExtensionInstallationImpl.GetVersionDisplayString(Rec)));
     end;
 
-    local procedure SetAdditionalInfoProperties()
+    local procedure SetInfoStyleForIsInstalled()
     begin
-        // Set Name styling if on prem display (shows green)
-        if IsInstallAllowed then begin
-            InfoText := InstalledStatus;
-            InfoStyle := IsInstalled
-        end else begin
-            InfoStyle := false;
-            InfoText := Publisher;
-        end;
+        InfoStyle := IsInstalled and IsInstallAllowed;
     end;
 }
 

@@ -117,3 +117,43 @@ procedure GetApiSubscriptionDelayTime(): Integer
 *[Integer](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/integer/integer-data-type)*
 
 The time value in milliseconds.
+### GetTestAutomationEnabled (Method) <a name="GetTestAutomationEnabled"></a> 
+Checks whether the Test Automation is enabled.
+
+Gets the value of the server setting TestAutomationEnabled.
+
+#### Syntax
+```
+[Scope('OnPrem')]
+procedure GetTestAutomationEnabled(): Boolean
+```
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+True if enabled; otherwise, false.
+### GetUsePermissionSetsFromExtensions (Method) <a name="GetUsePermissionSetsFromExtensions"></a> 
+Checks whether permissions are read from the permission table in SQL or from metadata (.al code)
+
+Gets the value of the server setting UsePermissionSetsFromExtensions.
+
+#### Syntax
+```
+procedure GetUsePermissionSetsFromExtensions(): Boolean
+```
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+True if enabled; otherwise, false.
+### GetEnableMembershipEntitlement (Method) <a name="GetEnableMembershipEntitlement"></a> 
+Checks whether Entitlements are enabled
+
+Gets the value of the server setting EnableMembershipEntitlement.
+
+#### Syntax
+```
+procedure GetEnableMembershipEntitlement(): Boolean
+```
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+True if enabled; otherwise false.

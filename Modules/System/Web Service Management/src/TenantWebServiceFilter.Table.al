@@ -12,6 +12,7 @@ table 6712 "Tenant Web Service Filter"
     DataPerCompany = false;
     Extensible = false;
     Access = Public;
+    ReplicateData = false;
 
     fields
     {
@@ -27,7 +28,7 @@ table 6712 "Tenant Web Service Filter"
         field(3; TenantWebServiceID; RecordID)
         {
             Caption = 'Tenant Web Service ID';
-            DataClassification = SystemMetadata;
+            DataClassification = CustomerContent;
         }
         field(4; "Data Item"; Integer)
         {

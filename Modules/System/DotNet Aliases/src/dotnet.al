@@ -321,16 +321,6 @@ dotnet
         }
     }
 
-    assembly("Microsoft.Dynamics.Nav.Client.BusinessChart")
-    {
-        Culture = 'neutral';
-        PublicKeyToken = '31bf3856ad364e35';
-
-        type("Microsoft.Dynamics.Nav.Client.BusinessChart.BusinessChartAddIn"; "BusinessChartAddIn")
-        {
-        }
-    }
-
     assembly("Microsoft.Dynamics.Nav.Client.BusinessChart.Model")
     {
         Culture = 'neutral';
@@ -366,15 +356,6 @@ dotnet
 
         type("Microsoft.Dynamics.Nav.Client.BusinessChart.QueryMetadataReader"; "QueryMetadataReader")
         {
-        }
-    }
-
-    assembly("Microsoft.Dynamics.Nav.Client.DynamicsOnlineConnect")
-    {
-
-        type("Microsoft.Dynamics.Nav.Client.DynamicsOnlineConnect.IDynamicsOnlineConnectControlDefinition"; "Microsoft.Dynamics.Nav.Client.DynamicsOnlineConnect")
-        {
-            IsControlAddin = true;
         }
     }
 
@@ -428,7 +409,19 @@ dotnet
         {
         }
 
+        type("Microsoft.Dynamics.Nav.Client.Capabilities.LocationStatus"; LocationStatus)
+        {
+        }
+
+        type("Microsoft.Dynamics.Nav.Client.Capabilities.Coordinate"; Coordinate)
+        {
+        }
+
         type("Microsoft.Dynamics.Nav.Client.Capabilities.LocationProvider"; "LocationProvider")
+        {
+        }
+
+        type("Microsoft.Dynamics.Nav.Client.Capabilities.LocationOptions"; LocationOptions)
         {
         }
 
@@ -499,6 +492,12 @@ dotnet
         PublicKeyToken = '31bf3856ad364e35';
 
         type("Microsoft.Dynamics.Nav.DocumentService.Types.IDocumentService"; "IDocumentService")
+        {
+        }
+        type("Microsoft.Dynamics.Nav.DocumentService.Types.ConflictBehavior"; "ConflictBehavior")
+        {
+        }
+        type("Microsoft.Dynamics.Nav.DocumentService.Types.UploadedDocument"; "UploadedDocument")
         {
         }
     }
@@ -676,6 +675,13 @@ dotnet
         {
         }
 
+        type("Microsoft.Dynamics.Nav.Runtime.CompoundTokenInfo"; "CompoundTokenInfo")
+        {
+        }
+        type("Microsoft.Dynamics.Nav.Runtime.NavSqlConnectionTelemetry"; "NavSqlConnectionTelemetry")
+        {
+        }
+
         type("Microsoft.Dynamics.Nav.Runtime.Designer.DesignerFieldProperty"; "DesignerFieldProperty")
         {
         }
@@ -759,14 +765,8 @@ dotnet
         type("Microsoft.Dynamics.Nav.Runtime.Designer.NavDesignerALProfileExportResponse"; "NavDesignerALProfileExportResponse")
         {
         }
-    }
 
-    assembly("Microsoft.Dynamics.Nav.O365ActionableMessageWrapper")
-    {
-        Culture = 'neutral';
-        PublicKeyToken = '31bf3856ad364e35';
-
-        type("Microsoft.Dynamics.Nav.O365ActionableMessageWrapper.ActionableMessage"; "ActionableMessage")
+        type("Microsoft.Dynamics.Nav.Runtime.Designer.NavDesignerALCopyResponse"; "NavDesignerALCopyResponse")
         {
         }
     }
@@ -859,12 +859,16 @@ dotnet
         }
     }
 
-    assembly("Microsoft.Dynamics.Nav.PdfWriter")
+    assembly("Microsoft.BusinessCentral.DocumentProcessor")
     {
         Culture = 'neutral';
         PublicKeyToken = '31bf3856ad364e35';
 
-        type("Microsoft.Dynamics.Nav.PdfWriter.WordToPdf"; "WordToPdf")
+        type("Microsoft.BusinessCentral.DocumentProcessor.WordTransformation"; "WordTransformation")
+        {
+        }
+
+        type("Microsoft.BusinessCentral.DocumentProcessor.MailMerge"; "MailMerge")
         {
         }
     }
@@ -1096,15 +1100,23 @@ dotnet
         type("Microsoft.Office.Interop.Word.WdWindowState"; "WdWindowState")
         {
         }
+
+        type("Microsoft.Office.Interop.Word.Fields"; "Microsoft.Office.Interop.Word.Fields")
+        {
+        }
+
+        type("Microsoft.Office.Interop.Word.Range"; "Microsoft.Office.Interop.Word.Range")
+        {
+        }
     }
 
     assembly("mscorlib")
     {
-
+#if not CLEAN17
         type("Microsoft.Win32.Registry"; "Registry")
         {
         }
-
+#endif
         type("System.Activator"; "Activator")
         {
         }
@@ -1177,6 +1189,10 @@ dotnet
         {
         }
 
+        type("System.String[]"; "StringArray")
+        {
+        }
+
         type("System.Collections.IDictionaryEnumerator"; "IDictionaryEnumerator")
         {
         }
@@ -1194,6 +1210,10 @@ dotnet
         }
 
         type("System.Collections.Queue"; "Queue")
+        {
+        }
+
+        type("System.Collections.Stack"; "Stack")
         {
         }
 
@@ -1365,11 +1385,18 @@ dotnet
         {
         }
 
+        type(System.Security.Cryptography.SymmetricAlgorithm; "SymmetricAlgorithm")
+        {
+        }
+
         type(System.Security.Cryptography.AsymmetricAlgorithm; "AsymmetricAlgorithm")
         {
         }
 
         type("System.Security.Cryptography.HashAlgorithm"; "HashAlgorithm")
+        {
+        }
+        type("System.Security.Cryptography.HashAlgorithmName"; "HashAlgorithmName")
         {
         }
 
@@ -1382,6 +1409,9 @@ dotnet
         }
 
         type("System.Security.Cryptography.RSACryptoServiceProvider"; "RSACryptoServiceProvider")
+        {
+        }
+        type("System.Security.Cryptography.DSACryptoServiceProvider"; "DSACryptoServiceProvider")
         {
         }
 
@@ -1485,6 +1515,10 @@ dotnet
         {
         }
 
+        type("Newtonsoft.Json.JsonSerializer"; "JsonSerializer")
+        {
+        }
+
         type("Newtonsoft.Json.JsonTextReader"; "JsonTextReader")
         {
         }
@@ -1528,14 +1562,18 @@ dotnet
         {
         }
 
+        type("System.Collections.Generic.SortedDictionary`2"; "GenericSortedDictionary2")
+        {
+        }
+
         type("System.Diagnostics.FileVersionInfo"; "FileVersionInfo")
         {
         }
-
+#if not CLEAN17
         type("System.Diagnostics.Process"; "Process")
         {
         }
-
+#endif
         type("System.Diagnostics.Stopwatch"; "Stopwatch")
         {
         }
@@ -1577,6 +1615,10 @@ dotnet
         }
 
         type("System.Net.HttpWebResponse"; "HttpWebResponse")
+        {
+        }
+
+        type("System.Net.Mail.MailAddress"; "MailAddress")
         {
         }
 
@@ -1687,22 +1729,6 @@ dotnet
         type("System.Text.RegularExpressions.RegexOptions"; "RegexOptions")
         {
         }
-
-        type("System.Uri"; "Uri")
-        {
-        }
-
-        type("System.UriBuilder"; "UriBuilder")
-        {
-        }
-
-        type("System.UriKind"; "UriKind")
-        {
-        }
-
-        type("System.UriPartial"; "UriPartial")
-        {
-        }
     }
 
     assembly("System.Core")
@@ -1710,6 +1736,10 @@ dotnet
         Version = '4.0.0.0';
         Culture = 'neutral';
         PublicKeyToken = 'b77a5c561934e089';
+
+        type("System.Collections.Generic.HashSet`1"; "GenericHashSet1")
+        {
+        }
 
         type("System.IO.MemoryMappedFiles.MemoryMappedFile"; "MemoryMappedFile")
         {
@@ -1773,6 +1803,30 @@ dotnet
         }
 
         type("System.Drawing.Graphics"; "Graphics")
+        {
+        }
+
+        type("System.Drawing.GraphicsUnit"; "GraphicsUnit")
+        {
+        }
+
+        type("System.Drawing.Imaging.EncoderParameters"; "EncoderParameters")
+        {
+        }
+
+        type("System.Drawing.Imaging.EncoderParameter"; "EncoderParameter")
+        {
+        }
+
+        type("System.Drawing.Imaging.EncoderParameter[]"; "EncoderParameterList")
+        {
+        }
+
+        type("System.Drawing.Imaging.ImageCodecInfo"; "ImageCodecInfo")
+        {
+        }
+
+        type("System.Drawing.Imaging.Encoder"; "Encoder")
         {
         }
 
@@ -1911,6 +1965,10 @@ dotnet
         Culture = 'neutral';
         PublicKeyToken = 'b03f5f7f11d50a3a';
 
+        type("System.Security.Cryptography.Xml.DataObject"; DataObject)
+        {
+        }
+
         type("System.Security.Cryptography.Xml.KeyInfo"; "KeyInfo")
         {
         }
@@ -1927,6 +1985,9 @@ dotnet
         {
         }
 
+        type("System.Security.Cryptography.Xml.SignedInfo"; "SignedInfo")
+        {
+        }
         type("System.Security.Cryptography.Xml.SignedXml"; "SignedXml")
         {
         }
@@ -2001,14 +2062,6 @@ dotnet
         PublicKeyToken = 'b77a5c561934e089';
 
         type("System.Resources.ResXDataNode"; "ResXDataNode")
-        {
-        }
-
-        type("System.Resources.ResXResourceReader"; "ResXResourceReader")
-        {
-        }
-
-        type("System.Resources.ResXResourceWriter"; "ResXResourceWriter")
         {
         }
 
@@ -2185,7 +2238,7 @@ dotnet
 
     assembly("MailKit")
     {
-        Version = '2.2.0.0';
+        Version = '2.15.0.0';
         Culture = 'neutral';
         PublicKeyToken = '4e064fe7c44a8f1b';
 
@@ -2208,11 +2261,19 @@ dotnet
         type("MailKit.Security.SecureSocketOptions"; "SecureSocketOptions")
         {
         }
+
+        type("MailKit.Security.SaslMechanismOAuth2"; "SaslMechanismOAuth2")
+        {
+        }
+
+        type("MailKit.Security.SaslMechanismNtlm"; "SaslMechanismNtlm")
+        {
+        }
     }
 
     assembly("MimeKit")
     {
-        Version = '2.2.0.0';
+        Version = '2.15.0.0';
         Culture = 'neutral';
         PublicKeyToken = 'bede1c8a46c66814';
 
@@ -2245,6 +2306,103 @@ dotnet
         }
 
         type("MimeKit.ContentType"; "MimeContentType")
+        {
+        }
+
+        type("MimeKit.MimePart"; "MimePart")
+        {
+        }
+
+        type("MimeKit.ContentObject"; "MimeContentObject")
+        {
+        }
+    }
+
+    assembly("IDAutomation.LinearFontEncoder")
+    {
+        type("IDAutomation.Linear.FontEncoder"; "FontEncoder")
+        {
+        }
+    }
+
+    assembly("IDAutomation.NetStandard.Aztec.FontEncoder")
+    {
+        type("IDAutomation.NetStandard.Aztec.FontEncoder.Aztec"; "AztecFontEncoder")
+        {
+        }
+        type("EncodingModes"; "EncodingModesAztec")
+        {
+        }
+        type("OutputTypes"; "OutputTypesAztec")
+        {
+        }
+    }
+
+
+    assembly("IDAutomation.NetStandard.DataMatrix.FontEncoder")
+    {
+        type("IDAutomation.NetStandard.DataMatrix.FontEncoder.DataMatrix"; "DataMatrixFontEncoder")
+        {
+        }
+        type("EncodingModes"; "EncodingModesDM")
+        {
+        }
+        type("OutputTypes"; "OutputTypesDM")
+        {
+        }
+    }
+
+    assembly("IDAutomation.NetStandard.MaxiCode.FontEncoder")
+    {
+        type("IDAutomation.NetStandard.MaxiCode.FontEncoder.MaxiCode"; "MaxiCodeFontEncoder")
+        {
+        }
+        type("EncodingModes"; "EncodingModesMaxiCode")
+        {
+        }
+    }
+
+    assembly("IDAutomation.NetStandard.PDF417.FontEncoder")
+    {
+        type("IDAutomation.NetStandard.PDF417.FontEncoder.PDF417"; "PDF417FontEncoder")
+        {
+        }
+        type("IDAutomation.NetStandard.PDF417.FontEncoder.EncodingModes"; "EncodingModesPDF417")
+        {
+        }
+        type("IDAutomation.NetStandard.PDF417.FontEncoder.OutputTypes"; "OutputTypesPDF417")
+        {
+        }
+    }
+
+    assembly("IDAutomation.NetStandard.QRCode.FontEncoder")
+    {
+        type("IDAutomation.NetStandard.QRCode.FontEncoder.QRCode"; "QRCodeFontEncoder")
+        {
+        }
+        type("EncodingModes"; "EncodingModesQR")
+        {
+        }
+        type("Versions"; "VersionsQR")
+        {
+        }
+        type("ErrorCorrectionLevels"; "ErrorCorrectionLevelsQR")
+        {
+        }
+        type("OutputTypes"; "OutputTypesQR")
+        {
+        }
+    }
+
+    assembly(Microsoft.Dynamics.Nav.MX)
+    {
+        type(Microsoft.Dynamics.QRCode.ErrorCorrectionLevel; "QRCodeErrorCorrectionLevel")
+        {
+        }
+        type(Microsoft.Dynamics.Nav.MX.BarcodeProviders.IBarcodeProvider; "IBarcodeProvider")
+        {
+        }
+        type(Microsoft.Dynamics.Nav.MX.BarcodeProviders.QRCodeProvider; "QRCodeProvider")
         {
         }
     }

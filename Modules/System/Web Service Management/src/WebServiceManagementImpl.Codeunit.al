@@ -6,6 +6,16 @@
 codeunit 9751 "Web Service Management Impl."
 {
     Access = Internal;
+    Permissions = tabledata AllObj = r,
+                  tabledata AllObjWithCaption = r,
+                  tabledata Field = r,
+                  tabledata "Tenant Web Service" = rimd,
+                  tabledata "Web Service" = rimd,
+                  tabledata "Tenant Web Service Columns" = imd,
+                  tabledata "Tenant Web Service Filter" = imd,
+                  tabledata "Tenant Web Service OData" = imd,
+                  tabledata "Web Service Aggregate" = imd;
+
 
     var
         ODataProtocolVersion: Enum "OData Protocol Version";
@@ -16,6 +26,10 @@ codeunit 9751 "Web Service Management Impl."
         WebServiceAlreadyPublishedErr: Label 'The web service name %1 already exists.  Enter a different service name.', Comment = '%1 = Web Service name';
         WebServiceNotAllowedErr: Label 'The web service cannot be added because it conflicts with an unpublished system web service for the object.';
         WebServiceModNotAllowedErr: Label 'The web service cannot be modified because it conflicts with an unpublished system web service for the object.';
+        WebServiceDeleteAttemptTxt: Label 'Attempt to delete a web service', Locked = true;
+        WebServiceDeletedTxt: Label 'Web Service Deleted', Locked = true;
+        TenantWebServiceDeletedTxt: Label 'Tenant Web Service Deleted', Locked = true;
+        ODataUnboundActionHelpUrlLbl: Label 'https://go.microsoft.com/fwlink/?linkid=2138827', Locked = true;
 
     procedure CreateWebService(ObjectType: Option; ObjectId: Integer; ObjectName: Text; Published: Boolean)
     var
@@ -88,8 +102,10 @@ codeunit 9751 "Web Service Management Impl."
                     case ClientTypeParam of
                         ClientTypeParam::SOAP:
                             exit(GetUrl(CLIENTTYPE::SOAP, CompanyName(), OBJECTTYPE::Codeunit, WebServiceAggregate."Object ID", WebService));
-                        else
+                        ClientTypeParam::ODataV3:
                             exit(NotApplicableTxt);
+                        ClientTypeParam::ODataV4:
+                            exit(ODataUnboundActionHelpUrlLbl);
                     end;
             end;
         end else begin
@@ -131,8 +147,10 @@ codeunit 9751 "Web Service Management Impl."
                     case ClientTypeParam of
                         ClientTypeParam::SOAP:
                             exit(GetUrl(CLIENTTYPE::SOAP, CompanyName(), OBJECTTYPE::Codeunit, WebServiceAggregate."Object ID", TenantWebService));
-                        else
+                        ClientTypeParam::ODataV3:
                             exit(NotApplicableTxt);
+                        ClientTypeParam::ODataV4:
+                            exit(ODataUnboundActionHelpUrlLbl);
                     end;
             end;
         end;
@@ -154,47 +172,58 @@ codeunit 9751 "Web Service Management Impl."
         end;
     end;
 
-    procedure CreateTenantWebServiceFilterFromRecordRef(var TenantWebServiceFilter: Record "Tenant Web Service Filter"; var RecRef: RecordRef; TenantWebServiceRecordId: RecordID)
+    procedure CreateTenantWebServiceFilterFromRecordRef(var TenantWebServiceFilter: Record "Tenant Web Service Filter"; var RecordRef: RecordRef; TenantWebServiceRecordId: RecordID)
     begin
         TenantWebServiceFilter.SetRange(TenantWebServiceID, TenantWebServiceRecordId);
         TenantWebServiceFilter.DeleteAll();
 
         TenantWebServiceFilter.Init();
         TenantWebServiceFilter."Entry ID" := 0;
-        TenantWebServiceFilter."Data Item" := RecRef.Number();
+        TenantWebServiceFilter."Data Item" := RecordRef.Number();
         TenantWebServiceFilter.TenantWebServiceID := TenantWebServiceRecordId;
-        SetTenantWebServiceFilter(TenantWebServiceFilter, RecRef.GetView());
+        SetTenantWebServiceFilter(TenantWebServiceFilter, RecordRef.GetView());
         TenantWebServiceFilter.Insert();
     end;
 
     procedure GetTenantWebServiceFilter(TenantWebServiceFilter: Record "Tenant Web Service Filter"): Text
     var
-        ReadStream: InStream;
+        ReadInStream: InStream;
         FilterText: Text;
     begin
         TenantWebServiceFilter.CalcFields(TenantWebServiceFilter.Filter);
-        TenantWebServiceFilter.Filter.CreateInStream(ReadStream);
-        ReadStream.ReadText(FilterText);
+        TenantWebServiceFilter.Filter.CreateInStream(ReadInStream);
+        ReadInStream.ReadText(FilterText);
+        exit(FilterText);
+    end;
+
+    procedure RetrieveTenantWebServiceFilter(var TenantWebServiceFilter: Record "Tenant Web Service Filter"): Text
+    var
+        ReadInStream: InStream;
+        FilterText: Text;
+    begin
+        TenantWebServiceFilter.CalcFields(TenantWebServiceFilter.Filter);
+        TenantWebServiceFilter.Filter.CreateInStream(ReadInStream);
+        ReadInStream.ReadText(FilterText);
         exit(FilterText);
     end;
 
     procedure SetTenantWebServiceFilter(var TenantWebServiceFilter: Record "Tenant Web Service Filter"; FilterText: Text)
     var
-        WriteStream: OutStream;
+        WriteOutStream: OutStream;
     begin
         Clear(TenantWebServiceFilter.Filter);
-        TenantWebServiceFilter.Filter.CreateOutStream(WriteStream);
-        WriteStream.WriteText(FilterText);
+        TenantWebServiceFilter.Filter.CreateOutStream(WriteOutStream);
+        WriteOutStream.WriteText(FilterText);
     end;
 
     procedure GetODataSelectClause(TenantWebServiceOData: Record "Tenant Web Service OData"): Text
     var
-        ReadStream: InStream;
+        ReadInStream: InStream;
         ODataText: Text;
     begin
         TenantWebServiceOData.CalcFields(TenantWebServiceOData.ODataSelectClause);
-        TenantWebServiceOData.ODataSelectClause.CreateInStream(ReadStream);
-        ReadStream.ReadText(ODataText);
+        TenantWebServiceOData.ODataSelectClause.CreateInStream(ReadInStream);
+        ReadInStream.ReadText(ODataText);
         exit(ODataText);
     end;
 
@@ -209,42 +238,42 @@ codeunit 9751 "Web Service Management Impl."
 
     procedure GetODataFilterClause(TenantWebServiceOData: Record "Tenant Web Service OData"): Text
     var
-        ReadStream: InStream;
+        InStream: InStream;
         ODataText: Text;
     begin
         TenantWebServiceOData.CalcFields(TenantWebServiceOData.ODataFilterClause);
-        TenantWebServiceOData.ODataFilterClause.CreateInStream(ReadStream);
-        ReadStream.ReadText(ODataText);
+        TenantWebServiceOData.ODataFilterClause.CreateInStream(InStream);
+        InStream.ReadText(ODataText);
         exit(ODataText);
     end;
 
     procedure SetODataFilterClause(var TenantWebServiceOData: Record "Tenant Web Service OData"; ODataText: Text)
     var
-        WriteStream: OutStream;
+        OutStream: OutStream;
     begin
         Clear(TenantWebServiceOData.ODataFilterClause);
-        TenantWebServiceOData.ODataFilterClause.CreateOutStream(WriteStream);
-        WriteStream.WriteText(ODataText);
+        TenantWebServiceOData.ODataFilterClause.CreateOutStream(OutStream);
+        OutStream.WriteText(ODataText);
     end;
 
     procedure GetODataV4FilterClause(TenantWebServiceOData: Record "Tenant Web Service OData"): Text
     var
-        ReadStream: InStream;
+        InStream: InStream;
         ODataText: Text;
     begin
         TenantWebServiceOData.CalcFields(TenantWebServiceOData.ODataV4FilterClause);
-        TenantWebServiceOData.ODataV4FilterClause.CreateInStream(ReadStream);
-        ReadStream.ReadText(ODataText);
+        TenantWebServiceOData.ODataV4FilterClause.CreateInStream(InStream);
+        InStream.ReadText(ODataText);
         exit(ODataText);
     end;
 
     procedure SetODataV4FilterClause(var TenantWebServiceOData: Record "Tenant Web Service OData"; ODataText: Text)
     var
-        WriteStream: OutStream;
+        OutStream: OutStream;
     begin
         Clear(TenantWebServiceOData.ODataV4FilterClause);
-        TenantWebServiceOData.ODataV4FilterClause.CreateOutStream(WriteStream);
-        WriteStream.WriteText(ODataText);
+        TenantWebServiceOData.ODataV4FilterClause.CreateOutStream(OutStream);
+        OutStream.WriteText(ODataText);
     end;
 
     procedure GetObjectCaption(WebServiceAggregate: Record "Web Service Aggregate"): Text[80]
@@ -271,7 +300,6 @@ codeunit 9751 "Web Service Management Impl."
     var
         WebService: Record "Web Service";
         TenantWebService: Record "Tenant Web Service";
-        AllObj: Record AllObj;
     begin
         Rec.Reset();
         Rec.DeleteAll();
@@ -290,18 +318,17 @@ codeunit 9751 "Web Service Management Impl."
         if TenantWebService.FindSet() then
             repeat
                 Clear(WebService);
-                if AllObj.get(TenantWebService."Object Type", TenantWebService."Object ID") then
-                    if not WebService.Get(TenantWebService."Object Type", TenantWebService."Service Name") then begin
-                        WebService.SetRange("Object Type", TenantWebService."Object Type");
-                        WebService.SetRange("Object ID", TenantWebService."Object ID");
-                        WebService.SetRange(Published, false);
+                if not WebService.Get(TenantWebService."Object Type", TenantWebService."Service Name") then begin
+                    WebService.SetRange("Object Type", TenantWebService."Object Type");
+                    WebService.SetRange("Object ID", TenantWebService."Object ID");
+                    WebService.SetRange(Published, false);
 
-                        if WebService.IsEmpty() then begin
-                            Rec.Init();
-                            Rec.TransferFields(TenantWebService);
-                            Rec.Insert();
-                        end
+                    if WebService.IsEmpty() then begin
+                        Rec.Init();
+                        Rec.TransferFields(TenantWebService);
+                        Rec.Insert();
                     end
+                end
             until TenantWebService.Next() = 0;
     end;
 
@@ -330,6 +357,8 @@ codeunit 9751 "Web Service Management Impl."
                 if WebService.Get(Rec."Object Type", Rec."Service Name") then begin
                     WebService."Object ID" := Rec."Object ID";
                     WebService.Published := Rec.Published;
+                    WebService.ExcludeFieldsOutsideRepeater := Rec.ExcludeFieldsOutsideRepeater;
+                    WebService.ExcludeNonEditableFlowFields := Rec.ExcludeNonEditableFlowFields;
                     WebService.Modify();
                 end else begin
                     Clear(WebService);
@@ -357,6 +386,8 @@ codeunit 9751 "Web Service Management Impl."
                 if TenantWebService.Get(Rec."Object Type", Rec."Service Name") then begin
                     TenantWebService."Object ID" := Rec."Object ID";
                     TenantWebService.Published := Rec.Published;
+                    TenantWebService.ExcludeFieldsOutsideRepeater := Rec.ExcludeFieldsOutsideRepeater;
+                    TenantWebService.ExcludeNonEditableFlowFields := Rec.ExcludeNonEditableFlowFields;
                     TenantWebService.Modify();
                 end else begin
                     TenantWebService.TransferFields(Rec);
@@ -377,6 +408,8 @@ codeunit 9751 "Web Service Management Impl."
 
                 if WebService.Get(Rec."Object Type", Rec."Service Name") then begin
                     WebService."Object ID" := Rec."Object ID";
+                    WebService.ExcludeFieldsOutsideRepeater := Rec.ExcludeFieldsOutsideRepeater;
+                    WebService.ExcludeNonEditableFlowFields := Rec.ExcludeNonEditableFlowFields;
                     WebService.Published := Rec.Published;
                     WebService.Modify();
                 end else begin
@@ -407,6 +440,8 @@ codeunit 9751 "Web Service Management Impl."
 
                 if TenantWebService.Get(Rec."Object Type", Rec."Service Name") then begin
                     TenantWebService."Object ID" := Rec."Object ID";
+                    TenantWebService.ExcludeFieldsOutsideRepeater := Rec.ExcludeFieldsOutsideRepeater;
+                    TenantWebService.ExcludeNonEditableFlowFields := Rec.ExcludeNonEditableFlowFields;
                     TenantWebService.Published := Rec.Published;
                     TenantWebService.Modify();
                 end else begin
@@ -432,24 +467,24 @@ codeunit 9751 "Web Service Management Impl."
             Error(WebServiceNameNotValidErr);
     end;
 
-    procedure AssertUniquePublishedServiceName(Rec: Record "Web Service Aggregate"; xRec: Record "Web Service Aggregate")
+    procedure AssertUniquePublishedServiceName(WebServiceAggregate: Record "Web Service Aggregate"; xRec: Record "Web Service Aggregate")
     var
         WebService: Record "Web Service";
         TenantWebService: Record "Tenant Web Service";
     begin
-        if (((Rec."Service Name" <> xRec."Service Name") or (Rec.Published <> xRec.Published)) and
-            (Rec.Published = true) and (Rec."Object Type" <> Rec."Object Type"::Codeunit))
+        if (((WebServiceAggregate."Service Name" <> xRec."Service Name") or (WebServiceAggregate.Published <> xRec.Published)) and
+            (WebServiceAggregate.Published = true) and (WebServiceAggregate."Object Type" <> WebServiceAggregate."Object Type"::Codeunit))
         then begin
             WebService.SetRange(Published, true);
-            WebService.SetRange("Service Name", Rec."Service Name");
-            WebService.SetRange("Object Type", Rec."Object Type"::Page, Rec."Object Type"::Query);
+            WebService.SetRange("Service Name", WebServiceAggregate."Service Name");
+            WebService.SetRange("Object Type", WebServiceAggregate."Object Type"::Page, WebServiceAggregate."Object Type"::Query);
 
             TenantWebService.SetRange(Published, true);
-            TenantWebService.SetRange("Service Name", Rec."Service Name");
-            TenantWebService.SetRange("Object Type", Rec."Object Type"::Page, Rec."Object Type"::Query);
+            TenantWebService.SetRange("Service Name", WebServiceAggregate."Service Name");
+            TenantWebService.SetRange("Object Type", WebServiceAggregate."Object Type"::Page, WebServiceAggregate."Object Type"::Query);
 
             if (not WebService.IsEmpty()) or (not TenantWebService.IsEmpty()) then
-                Error(WebServiceAlreadyPublishedErr, Rec."Service Name");
+                Error(WebServiceAlreadyPublishedErr, WebServiceAggregate."Service Name");
         end;
     end;
 
@@ -501,7 +536,7 @@ codeunit 9751 "Web Service Management Impl."
         TenantWebService.Published := Published;
     end;
 
-    [EventSubscriber(ObjectType::Table, 2000000168, 'OnAfterDeleteEvent', '', false, false)]
+    [EventSubscriber(ObjectType::Table, Database::"Tenant Web Service", 'OnAfterDeleteEvent', '', false, false)]
     local procedure DeleteODataOnDeleteTenantWebService(var Rec: Record "Tenant Web Service"; RunTrigger: Boolean)
     var
         TenantWebServiceColumns: Record "Tenant Web Service Columns";
@@ -629,31 +664,36 @@ codeunit 9751 "Web Service Management Impl."
         exit(Input);
     end;
 
-    procedure DeleteWebService(var Rec: Record "Web Service Aggregate")
+    procedure DeleteWebService(var WebServiceAggregate: Record "Web Service Aggregate")
     var
         WebService: Record "Web Service";
         TenantWebService: Record "Tenant Web Service";
     begin
-        if Rec."All Tenants" then begin
-            if WebService.Get(Rec."Object Type", Rec."Service Name") then
-                WebService.Delete();
+        Session.LogMessage('0000GRJ', WebServiceDeleteAttemptTxt, Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, GetTelemetryDimensions(WebServiceAggregate));
+
+        if WebServiceAggregate."All Tenants" then begin
+            if WebService.Get(WebServiceAggregate."Object Type", WebServiceAggregate."Service Name") then
+                if WebService.Delete() then
+                    Session.LogMessage('0000GRK', WebServiceDeletedTxt, Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, GetTelemetryDimensions(WebServiceAggregate));
+            ;
         end else
-            if TenantWebService.Get(Rec."Object Type", Rec."Service Name") then
-                TenantWebService.Delete();
+            if TenantWebService.Get(WebServiceAggregate."Object Type", WebServiceAggregate."Service Name") then
+                if TenantWebService.Delete() then
+                    Session.LogMessage('0000GRL', TenantWebServiceDeletedTxt, Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, GetTelemetryDimensions(WebServiceAggregate));
     end;
 
-    procedure InsertWebService(var Rec: Record "Web Service Aggregate")
+    procedure InsertWebService(var WebServiceAggregate: Record "Web Service Aggregate")
     var
         WebService: Record "Web Service";
         TenantWebService: Record "Tenant Web Service";
     begin
-        if Rec."All Tenants" then begin
+        if WebServiceAggregate."All Tenants" then begin
             Clear(WebService);
-            WebService.TransferFields(Rec);
+            WebService.TransferFields(WebServiceAggregate);
             WebService.Insert();
         end else begin
             Clear(TenantWebService);
-            TenantWebService.TransferFields(Rec);
+            TenantWebService.TransferFields(WebServiceAggregate);
             TenantWebService.Insert();
         end
     end;
@@ -661,25 +701,45 @@ codeunit 9751 "Web Service Management Impl."
     procedure RemoveUnselectedColumnsFromFilter(var TenantWebService: Record "Tenant Web Service"; DataItemNumber: Integer; DataItemView: Text): Text
     var
         TenantWebServiceColumns: Record "Tenant Web Service Columns";
-        BaseRecRef: RecordRef;
-        UpdatedRecRef: RecordRef;
+        BaseRecordRef: RecordRef;
+        UpdatedRecordRef: RecordRef;
         BaseFieldRef: FieldRef;
         UpdatedFieldRef: FieldRef;
     begin
-        BaseRecRef.Open(DataItemNumber);
-        BaseRecRef.SetView(DataItemView);
-        UpdatedRecRef.Open(DataItemNumber);
+        BaseRecordRef.Open(DataItemNumber);
+        BaseRecordRef.SetView(DataItemView);
+        UpdatedRecordRef.Open(DataItemNumber);
 
         TenantWebServiceColumns.SetRange(TenantWebServiceID, TenantWebService.RecordId());
         TenantWebServiceColumns.SetRange("Data Item", DataItemNumber);
         if TenantWebServiceColumns.FindSet() then
             repeat
-                BaseFieldRef := BaseRecRef.Field(TenantWebServiceColumns."Field Number");
-                UpdatedFieldRef := UpdatedRecRef.Field(TenantWebServiceColumns."Field Number");
-                UpdatedFieldRef.SetFilter(BaseFieldRef.GetFilter());
+                if BaseRecordRef.FieldExist(TenantWebServiceColumns."Field Number") then begin
+                    BaseFieldRef := BaseRecordRef.Field(TenantWebServiceColumns."Field Number");
+                    UpdatedFieldRef := UpdatedRecordRef.Field(TenantWebServiceColumns."Field Number");
+                    UpdatedFieldRef.SetFilter(BaseFieldRef.GetFilter());
+                end;
             until TenantWebServiceColumns.Next() = 0;
 
-        exit(UpdatedRecRef.GetView());
+        ApplyFlowFilters(BaseRecordRef, UpdatedRecordRef, UpdatedFieldRef);
+
+        exit(UpdatedRecordRef.GetView());
+    end;
+
+    local procedure ApplyFlowFilters(var BaseRecordRef: RecordRef; var UpdatedRecordRef: RecordRef; var UpdatedFieldRef: FieldRef)
+    var
+        FlowFilterFieldRef: FieldRef;
+        BaseFieldRef: FieldRef;
+        FieldIndex: Integer;
+    begin
+        for FieldIndex := 1 to BaseRecordRef.FieldCount do begin
+            FlowFilterFieldRef := BaseRecordRef.FieldIndex(FieldIndex);
+            if FlowFilterFieldRef.Class = FlowFilterFieldRef.Class::FlowFilter then begin
+                BaseFieldRef := BaseRecordRef.FieldIndex(FieldIndex);
+                UpdatedFieldRef := UpdatedRecordRef.FieldIndex(FieldIndex);
+                UpdatedFieldRef.SetFilter(BaseFieldRef.GetFilter());
+            end;
+        end;
     end;
 
     local procedure GenerateODataV3Url(ServiceRootUrlParam: Text; ServiceNameParam: Text; ObjectTypeParam: Option ,,,,,,,,"Page","Query"): Text
@@ -735,5 +795,15 @@ codeunit 9751 "Web Service Management Impl."
                 ODataUrl := ServiceRootUrlParam;
 
         exit(ODataUrl);
+    end;
+
+    local procedure GetTelemetryDimensions(WebServiceAggregate: Record "Web Service Aggregate") Dimensions: Dictionary of [Text, Text]
+    begin
+        Dimensions.Add('Category', 'WebServiceManagement');
+        Dimensions.Add('IsTenantWebService', Format(not WebServiceAggregate."All Tenants"));
+        Dimensions.Add('ObjectID', Format(WebServiceAggregate."Object ID"));
+        Dimensions.Add('ObjectType', Format(WebServiceAggregate."Object Type"));
+        Dimensions.Add('IsPublished', Format(WebServiceAggregate.Published));
+        Dimensions.Add('ServiceName', Format(WebServiceAggregate."Service Name"));
     end;
 }

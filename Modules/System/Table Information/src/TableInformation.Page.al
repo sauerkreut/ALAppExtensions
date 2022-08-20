@@ -9,9 +9,10 @@
 page 8700 "Table Information"
 {
     Caption = 'Table Information';
+    AdditionalSearchTerms = 'Database,Size,Storage';
     PageType = List;
     ApplicationArea = All;
-    Extensible = false;
+    Extensible = true;
     UsageCategory = Lists;
     SourceTable = "Table Information";
     SourceTableView = sorting("Size (KB)") order(descending);
@@ -19,6 +20,7 @@ page 8700 "Table Information"
     InsertAllowed = false;
     ModifyAllowed = false;
     DeleteAllowed = false;
+    Permissions = tabledata "Table Information" = r;
 
     layout
     {
@@ -26,47 +28,62 @@ page 8700 "Table Information"
         {
             repeater(General)
             {
-                field("Company Name"; "Company Name")
+                field("Company Name"; Rec."Company Name")
                 {
                     ApplicationArea = All;
                     ToolTip = 'The name of the company the table belongs to';
                 }
 
-                field("Table Name"; "Table Name")
+                field("Table Name"; Rec."Table Name")
                 {
                     ApplicationArea = All;
                     ToolTip = 'The name of the table';
                 }
 
-                field("Table No."; "Table No.")
+                field("Table No."; Rec."Table No.")
                 {
                     ApplicationArea = All;
                     ToolTip = 'The ID number for the table';
                 }
 
-                field("No. of Records"; "No. of Records")
+                field("No. of Records"; Rec."No. of Records")
                 {
                     ApplicationArea = All;
                     ToolTip = 'The number of records in the table';
 
                     trigger OnDrillDown()
+                    var
+                        TableInformationCacheImpl: Codeunit "Table Information Cache Impl.";
                     begin
-                        Hyperlink(GetUrl(CLIENTTYPE::Web, CompanyName, ObjectType::Table, "Table No."));
+                        Hyperlink(TableInformationCacheImpl.GetTableUrl(Rec."Company Name", Rec."Table No."));
                     end;
                 }
 
-                field("Record Size (Byte)"; "Record Size")
+                field("Record Size (Byte)"; Rec."Record Size")
                 {
                     ApplicationArea = All;
                     ToolTip = 'The average size of a record (in bytes)';
                 }
 
-                field("Size (KB)"; "Size (KB)")
+                field("Size (KB)"; Rec."Size (KB)")
                 {
                     ApplicationArea = All;
                     ToolTip = 'How much space the table occupies in the database (in kilobytes)';
                 }
-                field("Compression"; "Compression")
+
+                field("Data Size (KB)"; Rec."Data Size (KB)")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'How much space the table data occupies in the database (in kilobytes)';
+                }
+
+                field("Index Size (KB)"; Rec."Index Size (KB)")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'How much space the table indexes occupy in the database (in kilobytes)';
+                }
+
+                field("Compression"; Rec."Compression")
                 {
                     ApplicationArea = All;
                     OptionCaption = 'None,Row,Page,,';
@@ -80,11 +97,23 @@ page 8700 "Table Information"
     var
         UserPermissions: codeunit "User Permissions";
     begin
-        FilterGroup(2);
+        Rec.FilterGroup(2);
         if UserPermissions.IsSuper(UserSecurityId()) then
-            SetRange("Company Name")
+            Rec.SetRange("Company Name")
         else
-            SetRange("Company Name", CompanyName);
-        FilterGroup(0);
+            Rec.SetFilter("Company Name", '%1|%2', '', CompanyName);
+        Rec.FilterGroup(0);
+    end;
+
+    local procedure GetTableUrl(TableInformation: Record "Table Information"): Text
+    var
+        Company: Text;
+    begin
+        Company := TableInformation."Company Name";
+
+        if Company = '' then
+            Company := CompanyName(); // use the current company for the URL for the cases when table is not per company
+
+        exit(GetUrl(ClientType::Web, Company, ObjectType::Table, TableInformation."Table No."));
     end;
 }

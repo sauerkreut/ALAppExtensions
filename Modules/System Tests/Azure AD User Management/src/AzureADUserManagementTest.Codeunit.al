@@ -5,9 +5,9 @@
 
 codeunit 132909 "Azure AD User Management Test"
 {
-    Permissions = TableData "User Property" = rimd;
+    Permissions = TableData "User Property" = rimd,
+                  TableData "User" = r;
     Subtype = Test;
-    TestPermissions = NonRestrictive;
     EventSubscriberInstance = Manual;
 
     trigger OnRun()
@@ -17,6 +17,7 @@ codeunit 132909 "Azure AD User Management Test"
 
     var
         EnvironmentInfoTestLibrary: Codeunit "Environment Info Test Library";
+        PermissionsMock: Codeunit "Permissions Mock";
         AzureADUserManagementImpl: Codeunit "Azure AD User Mgmt. Impl.";
         AzureADGraphUser: Codeunit "Azure AD Graph User";
         LibraryAssert: Codeunit "Library Assert";
@@ -49,6 +50,9 @@ codeunit 132909 "Azure AD User Management Test"
 
         // [GIVEN] The user record's state is disabled
         DisableUserAccount(UserSecurityId);
+
+        // Verify the module highest permission level is sufficient ignore non Tables
+        PermissionsMock.Set('AAD User Mgt Exec');
 
         // [WHEN] Running Azure AD User Management
         AzureADUserManagementImpl.Run(UserSecurityId);
@@ -108,6 +112,9 @@ codeunit 132909 "Azure AD User Management Test"
         // [GIVEN] It is the first time that the test user logs in
         UserLoginTestLibrary.DeleteAllLoginInformation(UserId);
 
+        // Verify the module highest permission level is sufficient ignore non Tables
+        PermissionsMock.Set('AAD User Mgt Exec');
+
         // [WHEN] Running Azure AD User Management on the user
         AzureADUserManagementTest.RunAzureADUserManagement(UserId);
 
@@ -155,7 +162,7 @@ codeunit 132909 "Azure AD User Management Test"
         AzureADPlanTestLibrary.AssignUserToPlan(UserSecurityId(), PlanId);
 
         // [GIVEN] There is an entry in the User Property table for the test user 
-        // [GIVEN] The User Authentication Object Id for the test user is not empty  
+        // [GIVEN] The User Authentication Object Id for the test user is not empty
         UserProperty.Init();
         UserProperty."User Security ID" := UserSecurityId();
         UserProperty."Authentication Object ID" := UserSecurityId();
@@ -163,6 +170,9 @@ codeunit 132909 "Azure AD User Management Test"
 
         // [GIVEN] It is not the first time that the test user logs in
         UserLoginTestLibrary.InsertUserLogin(UserSecurityId(), 0D, CurrentDateTime(), 0DT);
+
+        // Verify the module highest permission level is sufficient ignore non Tables
+        PermissionsMock.Set('AAD User Mgt Exec');
 
         // [WHEN] Running Azure AD User Management on the user
         AzureADUserManagementTest.RunAzureADUserManagement(UserSecurityId());
@@ -218,6 +228,9 @@ codeunit 132909 "Azure AD User Management Test"
 
         // [GIVEN] It is the first time that the test user logs in
         UserLoginTestLibrary.DeleteAllLoginInformation(UserId);
+
+        // Verify the module highest permission level is sufficient ignore non Tables
+        PermissionsMock.Set('AAD User Mgt Exec');
 
         // [WHEN] Running Azure AD User Management on the user
         AzureADUserManagementTest.RunAzureADUserManagement(UserId);
@@ -288,6 +301,9 @@ codeunit 132909 "Azure AD User Management Test"
 
         // [GIVEN] It is the first time that the test user logs in
         UserLoginTestLibrary.DeleteAllLoginInformation(UserId);
+
+        // Verify the module highest permission level is sufficient ignore non Tables
+        PermissionsMock.Set('AAD User Mgt Exec');
 
         // [WHEN] Running Azure AD User Management on the user
         AzureADUserManagementTest.RunAzureADUserManagement(UserId);
@@ -411,8 +427,6 @@ codeunit 132909 "Azure AD User Management Test"
         LibraryAssert.IsTrue(User.IsEmpty(), 'User got created');
 
         UnbindSubscription(AzureADUserManagementTest);
-
-
         // create new users + modify some of the old ones + remove some old ones
 
         // run the wizard to sync and verify changes
@@ -431,85 +445,75 @@ codeunit 132909 "Azure AD User Management Test"
         MockGraphQuery := MockGraphQuery.MockGraphQuery();
     end;
 
-    local procedure InsertUserProperty(UserSecurityId: Guid)
-    var
-        UserProperty: Record "User Property";
-    begin
-        UserProperty.Init();
-        UserProperty."User Security ID" := UserSecurityId;
-        UserProperty."Authentication Object ID" := UserSecurityId;
-        UserProperty.Insert();
-    end;
-
     procedure AddGraphUser(UserId: Text)
     var
-        GraphUser: DotNet UserInfo;
+        GraphUserInfo: DotNet UserInfo;
     begin
-        CreateGraphUser(GraphUser, UserId);
-        MockGraphQuery.AddUser(GraphUser);
+        CreateGraphUser(GraphUserInfo, UserId);
+        MockGraphQuery.AddUser(GraphUserInfo);
     end;
 
-    procedure AddGraphUser(var GraphUser: DotNet UserInfo)
+    procedure AddGraphUser(var GraphUserInfo: DotNet UserInfo)
     begin
-        CreateGraphUser(GraphUser, CreateGuid());
-        MockGraphQuery.AddUser(GraphUser);
+        CreateGraphUser(GraphUserInfo, CreateGuid());
+        MockGraphQuery.AddUser(GraphUserInfo);
     end;
 
-    local procedure CreateGraphUser(var GraphUser: DotNet UserInfo; UserId: Text)
+    local procedure CreateGraphUser(var GraphUserInfo: DotNet UserInfo; UserId: Text)
     begin
-        GraphUser := GraphUser.UserInfo();
-        GraphUser.ObjectId := UserId;
-        GraphUser.UserPrincipalName := 'email@microsoft.com';
-        GraphUser.Mail := 'email@microsoft.com';
-        GraphUser.AccountEnabled := true;
+        GraphUserInfo := GraphUserInfo.UserInfo();
+        GraphUserInfo.ObjectId := UserId;
+        GraphUserInfo.UserPrincipalName := 'email@microsoft.com';
+        GraphUserInfo.Mail := 'email@microsoft.com';
+        GraphUserInfo.AccountEnabled := true;
     end;
 
-    procedure AssignPlan(var GraphUser: DotNet UserInfo; AssignedPlanId: Guid; AssignedPlanService: Text; CapabilityStatus: Text)
+    procedure AssignPlan(var GraphUserInfo: DotNet UserInfo; AssignedPlanId: Guid; AssignedPlanService: Text; CapabilityStatus: Text)
     var
-        AssignedPlan: DotNet ServicePlanInfo;
-        GuidVar: Variant;
+        AssignedServicePlanInfo: DotNet ServicePlanInfo;
+        GuidVariant: Variant;
     begin
-        AssignedPlan := AssignedPlan.ServicePlanInfo();
-        GuidVar := AssignedPlanId;
-        AssignedPlan.ServicePlanId := GuidVar;
-        AssignedPlan.ServicePlanName := AssignedPlanService;
-        AssignedPlan.CapabilityStatus := CapabilityStatus;
+        AssignedServicePlanInfo := AssignedServicePlanInfo.ServicePlanInfo();
+        GuidVariant := AssignedPlanId;
+        AssignedServicePlanInfo.ServicePlanId := GuidVariant;
+        AssignedServicePlanInfo.ServicePlanName := AssignedPlanService;
+        AssignedServicePlanInfo.CapabilityStatus := CapabilityStatus;
 
-        MockGraphQuery.AddAssignedPlanToUser(GraphUser, AssignedPlan);
+        MockGraphQuery.AddAssignedPlanToUser(GraphUserInfo, AssignedServicePlanInfo);
     end;
 
-    procedure AssignDeviceGroup(var GraphUser: DotNet UserInfo)
+    procedure AssignDeviceGroup(var GraphUserInfo: DotNet UserInfo)
     var
         AssignedGroup: DotNet GroupInfo;
     begin
         AssignedGroup := AssignedGroup.GroupInfo();
         AssignedGroup.DisplayName := DeviceGroupNameTxt;
 
-        MockGraphQuery.AddUserGroup(GraphUser, AssignedGroup);
+        MockGraphQuery.AddUserGroup(GraphUserInfo, AssignedGroup);
     end;
 
-    local procedure SetValuesOnGraphUser(var GraphUser: DotNet UserInfo; PrincipalName: Text; ContactMail: Text; FirstName: Text; Surname: Text)
+    local procedure SetValuesOnGraphUser(var GraphUserInfo: DotNet UserInfo; PrincipalName: Text; ContactMail: Text; FirstName: Text; Surname: Text)
     begin
-        GraphUser.UserPrincipalName := PrincipalName;
-        GraphUser.Mail := ContactMail;
-        GraphUser.GivenName := FirstName;
-        GraphUser.Surname := Surname;
+        GraphUserInfo.UserPrincipalName := PrincipalName;
+        GraphUserInfo.Mail := ContactMail;
+        GraphUserInfo.GivenName := FirstName;
+        GraphUserInfo.Surname := Surname;
     end;
 
     procedure AddGraphUserPlan(UserId: Text; AssignedPlanId: Guid; AssignedPlanService: Text; CapabilityStatus: Text)
     var
-        GraphUser: DotNet UserInfo;
-        AssignedPlan: DotNet ServicePlanInfo;
-        GuidVar: Variant;
+        GraphUserInfo: DotNet UserInfo;
+        AssignedServicePlanInfo: DotNet ServicePlanInfo;
+        GuidVariant: Variant;
     begin
-        AssignedPlan := AssignedPlan.ServicePlanInfo();
-        GuidVar := AssignedPlanId;
-        AssignedPlan.ServicePlanId := GuidVar;
-        AssignedPlan.ServicePlanName := AssignedPlanService;
-        AssignedPlan.CapabilityStatus := CapabilityStatus;
+        AssignedServicePlanInfo := AssignedServicePlanInfo.ServicePlanInfo();
+        GuidVariant := AssignedPlanId;
+        AssignedServicePlanInfo.ServicePlanId := GuidVariant;
+        AssignedServicePlanInfo.ServicePlanName := AssignedPlanService;
+        AssignedServicePlanInfo.CapabilityStatus := CapabilityStatus;
 
-        GraphUser := MockGraphQuery.GetUserByObjectId(UserId);
-        MockGraphQuery.AddAssignedPlanToUser(GraphUser, AssignedPlan);
+        GraphUserInfo := MockGraphQuery.GetUserByObjectId(UserId);
+        MockGraphQuery.AddAssignedPlanToUser(GraphUserInfo, AssignedServicePlanInfo);
     end;
 
     local procedure DisableUserAccount(UserSecurityId: Guid)
@@ -530,14 +534,14 @@ codeunit 132909 "Azure AD User Management Test"
 
     procedure GetGraphUserAssignedPlans(var AssignedPlans: DotNet IEnumerable; UserId: Guid)
     var
-        GraphUser: DotNet UserInfo;
+        GraphUserInfo: DotNet UserInfo;
     begin
         AzureADGraphUser.SetTestInProgress(true);
-        AzureADGraphUser.GetGraphUser(UserId, GraphUser);
-        AssignedPlans := GraphUser.AssignedPlans();
+        AzureADGraphUser.GetGraphUser(UserId, GraphUserInfo);
+        AssignedPlans := GraphUserInfo.AssignedPlans();
     end;
 
-    [EventSubscriber(ObjectType::Codeunit, 9012, 'OnInitialize', '', false, false)]
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Azure AD Graph", 'OnInitialize', '', false, false)]
     local procedure OnGraphInitialization(var GraphQuery: DotNet GraphQuery)
     begin
         GraphQuery := GraphQuery.GraphQuery(MockGraphQuery);

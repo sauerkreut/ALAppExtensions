@@ -7,6 +7,7 @@ codeunit 4470 "Record Link Impl."
 {
     Access = Internal;
     SingleInstance = true;
+    Permissions = tabledata "Record Link" = rimd;
 
     var
         RecordLinkManagement: Codeunit "Record Link Management";
@@ -15,26 +16,26 @@ codeunit 4470 "Record Link Impl."
         RemovingStatusMsg: Label '@1@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@';
         ResultMsg: Label '%1 orphaned links were removed.', Comment = '%1 = number of orphaned record links found.';
 
-    local procedure ResetNotifyOnLinks(RecVar: Variant)
+    local procedure ResetNotifyOnLinks(RecVariant: Variant)
     var
         RecordLink: Record "Record Link";
-        RecRef: RecordRef;
+        RecordRef: RecordRef;
     begin
-        RecRef.GetTable(RecVar);
-        RecordLink.SetRange("Record ID", RecRef.RecordId());
+        RecordRef.GetTable(RecVariant);
+        RecordLink.SetRange("Record ID", RecordRef.RecordId());
         RecordLink.SetRange(Notify, true);
         if not RecordLink.IsEmpty() then
             RecordLink.ModifyAll(Notify, false);
     end;
 
-    procedure CopyLinks(FromRecord: Variant; ToRecord: Variant)
+    procedure CopyLinks(FromRecordVariant: Variant; ToRecordVariant: Variant)
     var
-        RecRefTo: RecordRef;
+        RecordRefTo: RecordRef;
     begin
-        RecRefTo.GetTable(ToRecord);
-        RecRefTo.CopyLinks(FromRecord);
-        ResetNotifyOnLinks(RecRefTo);
-        RecordLinkManagement.OnAfterCopyLinks(FromRecord, ToRecord);
+        RecordRefTo.GetTable(ToRecordVariant);
+        RecordRefTo.CopyLinks(FromRecordVariant);
+        ResetNotifyOnLinks(RecordRefTo);
+        RecordLinkManagement.OnAfterCopyLinks(FromRecordVariant, ToRecordVariant);
     end;
 
     procedure WriteNote(var RecordLink: Record "Record Link"; Note: Text)
@@ -87,36 +88,34 @@ codeunit 4470 "Record Link Impl."
         if GuiAllowed() then
             Window.Open(RemovingMsg + RemovingStatusMsg);
         TimeLocked := Time();
-        with RecordLink do begin
-            SetFilter(Company, '%1|%2', '', CompanyName());
-            SetCurrentKey("Record ID");
-            Total := Count();
-            if Total = 0 then
-                exit;
-            InTransaction := false;
-            if Find('-') then
-                repeat
-                    i := i + 1;
-                    if GuiAllowed() and ((i mod 1000) = 0) then
-                        Window.Update(1, Round(i / Total * 10000, 1));
-                    if Format("Record ID") <> Format(PrevRecID) then begin  // Direct comparison doesn't work.
-                        PrevRecID := "Record ID";
-                        RecordExists := RecordRef.Get("Record ID");
-                    end;
-                    if not RecordExists then begin
-                        Delete();
-                        NoOfRemovedLinks += 1;
-                        if not InTransaction then
-                            TimeLocked := Time();
-                        InTransaction := true;
-                    end;
-                    if InTransaction and (Time() > (TimeLocked + 1000)) then begin
-                        Commit();
+        RecordLink.SetFilter(Company, '%1|%2', '', CompanyName());
+        RecordLink.SetCurrentKey("Record ID");
+        Total := RecordLink.Count();
+        if Total = 0 then
+            exit;
+        InTransaction := false;
+        if RecordLink.Find('-') then
+            repeat
+                i := i + 1;
+                if GuiAllowed() and ((i mod 1000) = 0) then
+                    Window.Update(1, Round(i / Total * 10000, 1));
+                if Format(RecordLink."Record ID") <> Format(PrevRecID) then begin  // Direct comparison doesn't work.
+                    PrevRecID := RecordLink."Record ID";
+                    RecordExists := RecordRef.Get(RecordLink."Record ID");
+                end;
+                if not RecordExists then begin
+                    RecordLink.Delete();
+                    NoOfRemovedLinks += 1;
+                    if not InTransaction then
                         TimeLocked := Time();
-                        InTransaction := false;
-                    end;
-                until Next() = 0;
-        end;
+                    InTransaction := true;
+                end;
+                if InTransaction and (Time() > (TimeLocked + 1000)) then begin
+                    Commit();
+                    TimeLocked := Time();
+                    InTransaction := false;
+                end;
+            until RecordLink.Next() = 0;
         if GuiAllowed() then
             Window.Close();
     end;

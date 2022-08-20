@@ -15,6 +15,8 @@ page 2501 "Extension Details"
     SourceTable = "Published Application";
     SourceTableTemporary = true;
     ContextSensitiveHelpPage = 'ui-extensions';
+    Permissions = tabledata "Published Application" = r,
+                  tabledata "Windows Language" = r;
 
     layout
     {
@@ -62,6 +64,13 @@ page 2501 "Extension Details"
                         Caption = 'App ID';
                         ToolTip = 'Specifies the app ID of the extension.';
                     }
+                    field(In_PublishedAs; "Published As")
+                    {
+                        ApplicationArea = All;
+                        Caption = 'Published As';
+                        Editable = false;
+                        ToolTip = 'Specifies whether the extension is published as a per-tenant, development, or a global extension.';
+                    }
                     field(In_Url; UrlLbl)
                     {
                         ApplicationArea = All;
@@ -97,12 +106,12 @@ page 2501 "Extension Details"
                 group(UninstallGroup)
                 {
                     Caption = 'Uninstall Extension';
-                    Editable = false;
                     InstructionalText = 'Uninstall extension to remove added features.';
                     field(Un_Name; Name)
                     {
                         ApplicationArea = All;
                         Caption = 'Name';
+                        Editable = false;
                         ToolTip = 'Specifies the name of the extension.';
                     }
                     field(Un_Des; AppDescription)
@@ -118,18 +127,40 @@ page 2501 "Extension Details"
                         ApplicationArea = All;
                         Caption = 'Version';
                         ToolTip = 'Specifies the version of the extension.';
+                        Editable = false;
                     }
                     field(Un_Pub; Publisher)
                     {
                         ApplicationArea = All;
                         Caption = 'Publisher';
                         ToolTip = 'Specifies the publisher of the extension.';
+                        Editable = false;
                     }
                     field(Un_Id; AppIdDisplay)
                     {
                         ApplicationArea = All;
                         Caption = 'App ID';
                         ToolTip = 'Specifies the app ID of the extension.';
+                        Editable = false;
+                    }
+                    field(Un_PublishedAs; "Published As")
+                    {
+                        ApplicationArea = All;
+                        Caption = 'Published As';
+                        Editable = false;
+                        ToolTip = 'Specifies whether the extension is published as a per-tenant, development, or a global extension.';
+                    }
+                    field(Un_ClearSchema; ClearSchema)
+                    {
+                        ApplicationArea = All;
+                        Caption = 'Delete Extension Data';
+                        Editable = true;
+                        ToolTip = 'Specifies if the tables that contain data owned by this extension should be deleted on uninstall. This action cannot be undone.';
+
+                        trigger OnValidate()
+                        begin
+                            ExtensionInstallationImpl.GetClearExtensionSchemaConfirmation("Package ID", ClearSchema);
+                        end;
                     }
                     field(Un_Terms; TermsLbl)
                     {
@@ -275,6 +306,26 @@ page 2501 "Extension Details"
                     }
                 }
             }
+            group(Links)
+            {
+                Caption = 'Application operation best practices links';
+                ShowCaption = false;
+                Visible = true;
+                field(BestPractices; 'Read more about the best practices for installing and publishing extensions')
+                {
+                    ApplicationArea = All;
+                    ShowCaption = false;
+                    Editable = false;
+                    ToolTip = 'Read more about the best practices for installing and publishing extensions.';
+
+                    trigger OnDrillDown()
+                    var
+                        ExtensionInstallationImpl: Codeunit "Extension Installation Impl";
+                    begin
+                        Hyperlink(ExtensionInstallationImpl.GetInstallationBestPracticesURL());
+                    end;
+                }
+            }
         }
     }
 
@@ -343,7 +394,7 @@ page 2501 "Extension Details"
 
                 trigger OnAction()
                 begin
-                    ExtensionInstallationImpl.UninstallExtensionWithConfirmDialog("Package ID");
+                    ExtensionInstallationImpl.UninstallExtensionWithConfirmDialog("Package ID", false, ClearSchema);
                     CurrPage.Close();
                 end;
             }
@@ -378,6 +429,7 @@ page 2501 "Extension Details"
         IsInstalled: Boolean;
         Legal: Boolean;
         Step1Enabled: Boolean;
+        ClearSchema: Boolean;
         InstallationPageCaptionMsg: Label 'Extension Installation', Comment = 'Caption for when extension needs to be installed';
         UninstallationPageCaptionMsg: Label 'Extension Uninstallation', Comment = 'Caption for when extension needs to be uninstalled';
         TermsLbl: Label 'Terms and Conditions';

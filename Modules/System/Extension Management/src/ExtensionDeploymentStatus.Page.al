@@ -14,6 +14,7 @@ page 2508 "Extension Deployment Status"
     RefreshOnActivate = true;
     SourceTable = "NAV App Tenant Operation";
     ContextSensitiveHelpPage = 'ui-extensions';
+    Permissions = tabledata "Nav App Tenant Operation" = r;
 
     layout
     {
@@ -88,8 +89,9 @@ page 2508 "Extension Deployment Status"
                     ExtnDeploymentStatusDetail: Page "Extn Deployment Status Detail";
                 begin
                     ExtnDeploymentStatusDetail.SetRecord(Rec);
+                    ExtnDeploymentStatusDetail.SetOperationRecord(Rec);
+                    ExtnDeploymentStatusDetail.Update();
                     ExtnDeploymentStatusDetail.Run();
-                    CurrPage.Update();
                 end;
             }
         }

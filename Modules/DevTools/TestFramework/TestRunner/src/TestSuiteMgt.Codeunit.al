@@ -17,6 +17,8 @@ codeunit 130456 "Test Suite Mgt."
         SelectTestsToRunQst: Label '&All,Active &Codeunit,Active &Line', Locked = true;
         SelectCodeunitsToRunQst: Label '&All,Active &Codeunit', Locked = true;
         DefaultTestSuiteNameTxt: Label 'DEFAULT', Locked = true;
+        DialogUpdatingTestsMsg: Label 'Updating Tests: \#1#\#2#', Comment = '1 = Object being processed, 2 = Progress', Locked = true;
+        ErrorMessageWithCallStackErr: Label 'Error Message: %1 - Error Call Stack: ', Locked = true;
 
     procedure RunTestSuiteSelection(var TestMethodLine: Record "Test Method Line")
     var
@@ -148,6 +150,7 @@ codeunit 130456 "Test Suite Mgt."
         ALTestSuite.Get(TestMethodLine."Test Suite");
         LineNoFilter := '';
 
+        CurrentCodeunitNumber := 0;
         repeat
             if TestMethodLine."Test Codeunit" <> CurrentCodeunitNumber then begin
                 CurrentCodeunitNumber := TestMethodLine."Test Codeunit";
@@ -206,13 +209,12 @@ codeunit 130456 "Test Suite Mgt."
     procedure SelectTestMethodsByExtension(var ALTestSuite: Record "AL Test Suite"; ExtensionID: Text)
     var
         AllObjWithCaption: Record AllObjWithCaption;
-        NAVAppInstalledApp: Record "NAV App Installed App";
+        AppModuleInfo: ModuleInfo;
         AppExtensionId: Guid;
     begin
         Evaluate(AppExtensionId, ExtensionID);
-        NAVAppInstalledApp.SetRange("App ID", AppExtensionId);
-        NAVAppInstalledApp.FindFirst();
-        AllObjWithCaption.SetRange("App Package ID", NAVAppInstalledApp."Package ID");
+        NavApp.GetModuleInfo(ExtensionID, AppModuleInfo);
+        AllObjWithCaption.SetRange("App Package ID", AppModuleInfo.PackageID);
         AllObjWithCaption.SetRange("Object Type", AllObjWithCaption."Object Type"::Codeunit);
         AllObjWithCaption.SetRange("Object Subtype", GetTestObjectSubtype());
         GetTestMethods(ALTestSuite, AllObjWithCaption);
@@ -265,6 +267,9 @@ codeunit 130456 "Test Suite Mgt."
     var
         BackupTestMethodLine: Record "Test Method Line";
         TestRunnerGetMethods: Codeunit "Test Runner - Get Methods";
+        Counter: Integer;
+        TotalCount: Integer;
+        Dialog: Dialog;
     begin
         BackupTestMethodLine.Copy(TestMethodLine);
         TestMethodLine.Reset();
@@ -272,17 +277,35 @@ codeunit 130456 "Test Suite Mgt."
         TestMethodLine.SetRange("Line Type", TestMethodLine."Line Type"::Function);
         TestMethodLine.DeleteAll();
         TestMethodLine.SetRange("Line Type", TestMethodLine."Line Type"::Codeunit);
+
+        if GuiAllowed() then begin
+            Counter := 0;
+            TotalCount := TestMethodLine.Count();
+            Dialog.Open(DialogUpdatingTestsMsg);
+        end;
+
         if TestMethodLine.FindSet() then
             repeat
+                if GuiAllowed() then begin
+                    Counter += 1;
+                    Dialog.Update(1, format(TestMethodLine."Line Type") + ' ' + format(TestMethodLine."Test Codeunit") + ' - ' + TestMethodLine.Name);
+                    Dialog.Update(2, format(Counter) + '/' + format(TotalCount) + ' (' + format(round(Counter / TotalCount * 100, 1)) + '%)');
+                end;
+
                 TestRunnerGetMethods.SetUpdateTests(true);
                 TestRunnerGetMethods.Run(TestMethodLine);
             until TestMethodLine.Next() = 0;
 
+        if GuiAllowed() then
+            Dialog.Close();
+
         TestMethodLine.SetRange("Test Suite", BackupTestMethodLine."Test Suite");
         TestMethodLine.SetRange("Test Codeunit", BackupTestMethodLine."Test Codeunit");
         TestMethodLine.SetRange(Name, BackupTestMethodLine.Name);
-        if TestMethodLine.FindFirst() then
+        if TestMethodLine.FindFirst() then begin
+            TestMethodLine.SetView(BackupTestMethodLine.GetView());
             exit;
+        end;
 
         TestMethodLine.SetRange(Name);
         if TestMethodLine.FindFirst() then;
@@ -317,7 +340,9 @@ codeunit 130456 "Test Suite Mgt."
                     CodeunitTestMethodLine.SetRange("Test Suite", TestMethodLine."Test Suite");
                     CodeunitTestMethodLine.SetRange("Test Codeunit", TestMethodLine."Test Codeunit");
                     CodeunitTestMethodLine.FindFirst();
+#pragma warning disable AA0217                    
                     LineNoFilter := StrSubstNo('%1|%2', CodeunitTestMethodLine."Line No.", TestMethodLine."Line No.");
+#pragma warning restore
                 end;
             DummyALTestSuite."Run Type"::"Active Codeunit":
                 begin
@@ -327,8 +352,10 @@ codeunit 130456 "Test Suite Mgt."
                     CodeunitTestMethodLine.FindFirst();
                     MinNumber := CodeunitTestMethodLine."Line No.";
                     CodeunitTestMethodLine.FindLast();
+#pragma warning disable AA0217
                     LineNoFilter :=
                       StrSubstNo('%1..%2', MinNumber, CodeunitTestMethodLine."Line No.");
+#pragma warning restore                      
                 end;
         end;
     end;
@@ -401,7 +428,9 @@ codeunit 130456 "Test Suite Mgt."
         if not AllObjWithCaption.Get(AllObjWithCaption."Object Type"::Codeunit, ALTestSuite."Test Runner Id") then
             exit(NoTestRunnerSelectedTxt);
 
+#pragma warning disable AA0217
         exit(StrSubstNo('%1 - %2', ALTestSuite."Test Runner Id", AllObjWithCaption."Object Name"));
+#pragma warning restore        
     end;
 
     procedure UpdateRunValueOnChildren(var TestMethodLine: Record "Test Method Line")
@@ -553,7 +582,7 @@ codeunit 130456 "Test Suite Mgt."
             exit('');
 
         NewLine[1] := 10;
-        FullErrorMessage := StrSubstNo('Error Message: %1 - Error Call Stack: ', FullErrorMessage);
+        FullErrorMessage := StrSubstNo(ErrorMessageWithCallStackErr, FullErrorMessage);
         FullErrorMessage += NewLine + NewLine + GetErrorCallStack(TestMethodLine);
         exit(FullErrorMessage);
     end;

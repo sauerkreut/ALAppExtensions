@@ -13,6 +13,9 @@ codeunit 2504 "Extension Management"
     var
         ExtensionInstallationImpl: Codeunit "Extension Installation Impl";
         ExtensionOperationImpl: Codeunit "Extension Operation Impl";
+#if not CLEAN17
+        ExtensionMarketplace: Codeunit "Extension Marketplace";
+#endif
 
     /// <summary>
     /// Installs an extension, based on its PackageId and Locale Identifier.
@@ -35,6 +38,17 @@ codeunit 2504 "Extension Management"
     procedure UninstallExtension(PackageId: Guid; IsUIEnabled: Boolean): Boolean
     begin
         exit(ExtensionInstallationImpl.UninstallExtension(PackageId, IsUIEnabled));
+    end;
+
+    /// <summary>
+    /// Uninstalls an extension, based on its PackageId and permanently deletes the tables that contain data for the extension.
+    /// </summary>
+    /// <param name="PackageId">The ID of the extension package.</param>
+    /// <param name="IsUIEnabled">Indicates if the uninstall operation is invoked through the UI.</param>
+    /// <returns>True if the extention is uninstalled successfully; false otherwise.</returns>
+    procedure UninstallExtensionAndDeleteExtensionData(PackageId: Guid; IsUIEnabled: Boolean): Boolean
+    begin
+        exit(ExtensionInstallationImpl.UninstallExtension(PackageId, IsUIEnabled, true));
     end;
 
     /// <summary>
@@ -82,6 +96,19 @@ codeunit 2504 "Extension Management"
     end;
 
     /// <summary>
+    /// Retrives the source of an extension, based on its PackageId.
+    /// </summary>
+    /// <param name="PackageId">The PackageId of the extension.</param>
+    /// <param name="ExtensionSourceTempBlob">TempBlob where the zip is stored.</param>
+    /// <returns>True if the operation was successful; false otherwise.</returns>
+    procedure GetExtensionSource(PackageId: Guid; var ExtensionSourceTempBlob: Codeunit "Temp Blob"): Boolean
+    var
+        FileName: Text;
+    begin
+        exit(ExtensionOperationImpl.GetExtensionSource(PackageId, ExtensionSourceTempBlob, FileName));
+    end;
+
+    /// <summary>
     /// Checks whether an extension is installed, based on its PackageId.
     /// </summary>
     /// <param name="PackageId">The ID of the extension package.</param>
@@ -101,13 +128,27 @@ codeunit 2504 "Extension Management"
         exit(ExtensionInstallationImpl.IsInstalledByAppId(AppId));
     end;
 
+#if not CLEAN17
+#pragma warning disable AL0432
     /// <summary>
     /// Retrieves a list of all the Deployment Status Entries
     /// </summary>
     /// <param name="NavAppTenantOperation">Gets the list of all the Deployment Status Entries.</param>
+    [Obsolete('Required parameter is not accessible for Cloud development', '17.0')]
     procedure GetAllExtensionDeploymentStatusEntries(var NavAppTenantOperation: Record "NAV App Tenant Operation")
     begin
         ExtensionOperationImpl.GetAllExtensionDeploymentStatusEntries(NavAppTenantOperation);
+    end;
+#pragma warning restore
+#endif
+
+    /// <summary>
+    /// Retrieves a list of all the Deployment Status Entries
+    /// </summary>
+    /// <param name="TempExtensionDeploymentStatus">Gets the list of all the Deployment Status Entries in a temporary record.</param>
+    procedure GetAllExtensionDeploymentStatusEntries(var TempExtensionDeploymentStatus: Record "Extension Deployment Status" temporary)
+    begin
+        ExtensionOperationImpl.GetAllExtensionDeploymentStatusEntries(TempExtensionDeploymentStatus);
     end;
 
     /// <summary>
@@ -184,10 +225,132 @@ codeunit 2504 "Extension Management"
     /// Gets the logo of an extension.
     /// </summary>
     /// <param name="AppId">The App ID of the extension.</param>
-    /// <param name="Logo">Out parameter holding the logo of the extension.</param> 
-    procedure GetExtensionLogo(AppId: Guid; var Logo: Codeunit "Temp Blob")
+    /// <param name="LogoTempBlob">Out parameter holding the logo of the extension.</param> 
+    procedure GetExtensionLogo(AppId: Guid; var LogoTempBlob: Codeunit "Temp Blob")
     begin
-        ExtensionOperationImpl.GetExtensionLogo(AppId, Logo);
+        ExtensionOperationImpl.GetExtensionLogo(AppId, LogoTempBlob);
+    end;
+
+    /// <summary>
+    /// Uploads an extension to current version, next minor or next major, using a File Stream and based on the Locale Identifier.
+    /// This method is only applicable in SaaS environment.
+    /// </summary>
+    /// <param name="FileInStream">The File Stream containing the extension to be uploaded.</param>
+    /// <param name="lcid">The Locale Identifier.</param>
+    /// <param name="DeployTo">The version that the extension will be deployed to.</param>
+    procedure UploadExtensionToVersion(FileInStream: InStream; lcid: Integer; DeployTo: Enum "Extension Deploy To")
+    begin
+        UploadExtensionToVersion(FileInStream, lcid, DeployTo, "Extension Sync Mode"::Add);
+    end;
+
+    /// <summary>
+    /// Uploads an extension to current version, next minor or next major, using a File Stream and based on the Locale Identifier.
+    /// This method is only applicable in SaaS environment.
+    /// </summary>
+    /// <param name="FileInStream">The File Stream containing the extension to be uploaded.</param>
+    /// <param name="lcid">The Locale Identifier.</param>
+    /// <param name="DeployTo">The version that the extension will be deployed to.</param>
+    /// <param name="SyncMode">The desired sync mode.</param>
+    procedure UploadExtensionToVersion(FileInStream: InStream; lcid: Integer; DeployTo: Enum "Extension Deploy To"; SyncMode: Enum "Extension Sync Mode")
+    begin
+        ExtensionOperationImpl.DeployAndUploadExtension(FileInStream, lcid, DeployTo, SyncMode);
+    end;
+
+#if not CLEAN17
+    /// <summary>
+    /// Returns a link to appsource market page
+    /// </summary>
+    /// <returns></returns>
+    [Obsolete('Replaced by "Extension Marketplace".GetMarketplaceEmbeddedUrl procedure.', '17.0')]
+    PROCEDURE GetMarketplaceEmbeddedUrl(): Text;
+    begin
+        exit(ExtensionMarketplace.GetMarketplaceEmbeddedUrl());
+    end;
+
+    /// <summary>
+    /// Extraxts the message type from appsource response.
+    /// </summary>
+    /// <param name="JObject">Appsourece response payload as a json object</param>
+    /// <returns></returns>
+    [Obsolete('Replaced by "Extension Marketplace".GetMessageType procedure.', '17.0')]
+    procedure GetMessageType(JObject: DotNet JObject): Text;
+    begin
+        exit(ExtensionMarketplace.GetMessageType(JObject));
+    end;
+
+    /// <summary>
+    /// Extraxts the appsource application ID from appsource response.
+    /// </summary>
+    /// <param name="JObject">Appsourece response payload as a json object</param>
+    /// <returns>Application Id in text format</returns>
+    [Obsolete('Replaced by "Extension Marketplace".GetApplicationIdFromData procedure.', '17.0')]
+    procedure GetApplicationIdFromData(JObject: DotNet JObject): Text;
+    begin
+        exit(ExtensionMarketplace.GetApplicationIdFromData(JObject));
+    end;
+
+    /// <summary>
+    /// Extraxts the package ID from appsource response.
+    /// </summary>
+    /// <param name="ApplicationId">Appsource market application ID</param>
+    /// <returns>Package ID as a GUID</returns>
+    [Obsolete('Replaced by "Extension Marketplace".MapMarketplaceIdToPackageId procedure.', '17.0')]
+    procedure MapMarketplaceIdToPackageId(ApplicationId: Text): GUID;
+    begin
+        exit(ExtensionMarketplace.MapMarketplaceIdToPackageId(ApplicationId));
+    end;
+
+    /// <summary>
+    /// Extracts the telemetry URL from appsource response.
+    /// </summary>
+    /// <param name="JObject">Appsourece response payload as a json object</param>
+    /// <returns></returns>
+    [Obsolete('Replaced by "Extension Marketplace".GetTelementryUrlFromData procedure.', '17.0')]
+    procedure GetTelementryUrlFromData(JObject: DotNet JObject): Text;
+    begin
+        exit(ExtensionMarketplace.GetTelementryUrlFromData(JObject));
+    end;
+
+    /// <summary>
+    /// Extracts the app ID from appsource response.
+    /// </summary>
+    /// <param name="ApplicationId">Appsource market application ID</param>
+    /// <returns></returns>
+    [Obsolete('Replaced by "Extension Marketplace".MapMarketplaceIdToAppId procedure.', '17.0')]
+    procedure MapMarketplaceIdToAppId(ApplicationId: Text): GUID;
+    begin
+        exit(ExtensionMarketplace.MapMarketplaceIdToAppId(ApplicationId));
+    end;
+#endif
+
+    /// <summary>
+    /// Returns the Name of the app given the App Id.
+    /// </summary>
+    /// <param name="AppId">The unique identifier of the app.</param>
+    /// <returns>The name of the app.</returns>
+    procedure GetAppName(AppId: Guid): Text
+    begin
+        exit(ExtensionOperationImpl.GetAppName(AppId))
+    end;
+
+    /// <summary>
+    /// Returns the detailed message from a deployment operation
+    /// </summary>
+    /// <param name="OperationId">The Id of the operation to get the detailed message from.</param>
+    /// <returns>The detailed message as text</returns>
+    procedure GetDeploymentDetailedStatusMessage(OperationId: Guid): Text
+    begin
+        exit(ExtensionOperationImpl.GetDeploymentDetailedStatusMessage(OperationId));
+    end;
+
+    /// <summary>
+    /// Writes the detailed message from a deployment operation to a stream
+    /// </summary>
+    /// <param name="OperationId">The Id of the operation to get the detailed message from.</param>
+    /// <param name="OutStream">An OutStream to write the message to.</param>
+    /// <returns></returns>
+    procedure GetDeploymentDetailedStatusMessageAsStream(OperationId: Guid; OutStream: OutStream)
+    begin
+        ExtensionOperationImpl.GetDeploymentDetailedStatusMessageAsStream(OperationId, OutStream);
     end;
 }
-

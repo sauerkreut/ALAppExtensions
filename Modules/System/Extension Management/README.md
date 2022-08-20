@@ -11,6 +11,87 @@ Use this module to do the following:
 - Retrieve an extension's logo
 
 # Public Objects
+## Extension Deployment Status (Table 2508)
+This temporary table is used to mirror the "NAV App Tenant Operation" system table and present details about the extension deployment status.///
+
+
+## Data Out Of Geo. App (Codeunit 2506)
+
+ Provides functions for adding, removing or checking if an App ID is within the list of apps that send data out of the Geolocation.
+ 
+
+### Add (Method) <a name="Add"></a> 
+
+ Adds an App ID to the list of apps that have data out of the geolocation.
+ 
+
+#### Syntax
+```
+[Scope('OnPrem')]
+procedure Add(AppID: Guid): Boolean
+```
+#### Parameters
+*AppID ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The App ID of the extension.
+
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+The result of adding to the list. True if the data was added; false otherwise.
+### Remove (Method) <a name="Remove"></a> 
+
+ Removes an App ID from the list of apps that have data out of the geolocation.
+ 
+
+#### Syntax
+```
+[Scope('OnPrem')]
+procedure Remove(AppID: Guid): Boolean
+```
+#### Parameters
+*AppID ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The App ID of the extension.
+
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+The result of removing from the list. True if the data was removed; false otherwise.
+### Contains (Method) <a name="Contains"></a> 
+
+ Checks if an App ID is in the list of apps that have data out of the geolocation.
+ 
+
+#### Syntax
+```
+[Scope('OnPrem')]
+procedure Contains(AppID: Guid): Boolean
+```
+#### Parameters
+*AppID ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The App ID of the extension.
+
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+The result of checking whether an AppID is the list. True if the AppID was found; false otherwise.
+### AlreadyInstalled (Method) <a name="AlreadyInstalled"></a> 
+
+ Checks if any of the already installed extensions are in the list of apps that have data out of the geolocation.
+ 
+
+#### Syntax
+```
+[Scope('OnPrem')]
+procedure AlreadyInstalled(): Boolean
+```
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+The result of checking whether an already installed extension is in the list apps that have data out of the geolocation. True if at least one installed extension was found in the list; false otherwise.
+
 ## Extension Management (Codeunit 2504)
 
  Provides features for installing and uninstalling, downloading and uploading, configuring and publishing extensions and their dependencies.
@@ -50,6 +131,28 @@ True if the extention is installed successfully; false otherwise.
 #### Syntax
 ```
 procedure UninstallExtension(PackageId: Guid; IsUIEnabled: Boolean): Boolean
+```
+#### Parameters
+*PackageId ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The ID of the extension package.
+
+*IsUIEnabled ([Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type))* 
+
+Indicates if the uninstall operation is invoked through the UI.
+
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+True if the extention is uninstalled successfully; false otherwise.
+### UninstallExtensionAndDeleteExtensionData (Method) <a name="UninstallExtensionAndDeleteExtensionData"></a> 
+
+ Uninstalls an extension, based on its PackageId and permanently deletes the tables that contain data for the extension.
+ 
+
+#### Syntax
+```
+procedure UninstallExtensionAndDeleteExtensionData(PackageId: Guid; IsUIEnabled: Boolean): Boolean
 ```
 #### Parameters
 *PackageId ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
@@ -108,7 +211,7 @@ Indicates whether the install operation is invoked through the UI.
 
 ### UnpublishExtension (Method) <a name="UnpublishExtension"></a> 
 
- Unpublishes an extension, based on its PackageId. 
+ Unpublishes an extension, based on its PackageId.
  An extension can only be unpublished, if it is a per-tenant one and it has been uninstalled first.
  
 
@@ -138,6 +241,28 @@ procedure DownloadExtensionSource(PackageId: Guid): Boolean
 *PackageId ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
 
 The PackageId of the extension.
+
+#### Return Value
+*[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
+
+True if the operation was successful; false otherwise.
+### GetExtensionSource (Method) <a name="GetExtensionSource"></a> 
+
+ Retrives the source of an extension, based on its PackageId.
+ 
+
+#### Syntax
+```
+procedure GetExtensionSource(PackageId: Guid; var ExtensionSourceTempBlob: Codeunit "Temp Blob"): Boolean
+```
+#### Parameters
+*PackageId ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The PackageId of the extension.
+
+*ExtensionSourceTempBlob ([Codeunit "Temp Blob"]())* 
+
+TempBlob where the zip is stored.
 
 #### Return Value
 *[Boolean](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/boolean/boolean-data-type)*
@@ -186,12 +311,27 @@ The result of checking whether an extension is installed.
 
 #### Syntax
 ```
+[Obsolete('Required parameter is not accessible for Cloud development', '17.0')]
 procedure GetAllExtensionDeploymentStatusEntries(var NavAppTenantOperation: Record "NAV App Tenant Operation")
 ```
 #### Parameters
 *NavAppTenantOperation ([Record "NAV App Tenant Operation"]())* 
 
 Gets the list of all the Deployment Status Entries.
+
+### GetAllExtensionDeploymentStatusEntries (Method) <a name="GetAllExtensionDeploymentStatusEntries"></a> 
+
+ Retrieves a list of all the Deployment Status Entries
+ 
+
+#### Syntax
+```
+procedure GetAllExtensionDeploymentStatusEntries(var TempExtensionDeploymentStatus: Record "Extension Deployment Status" temporary)
+```
+#### Parameters
+*TempExtensionDeploymentStatus ([Record "Extension Deployment Status" temporary]())* 
+
+Gets the list of all the Deployment Status Entries in a temporary record.
 
 ### GetDeployOperationInfo (Method) <a name="GetDeployOperationInfo"></a> 
 
@@ -355,6 +495,183 @@ The App ID of the extension.
 
 Out parameter holding the logo of the extension.
 
+### UploadExtensionToVersion (Method) <a name="UploadExtensionToVersion"></a> 
+
+ Uploads an extension to current version, next minor or next major, using a File Stream and based on the Locale Identifier.
+ This method is only applicable in SaaS environment.
+ 
+
+#### Syntax
+```
+procedure UploadExtensionToVersion(FileStream: InStream; lcid: Integer; DeployTo: Enum "Extension Deploy To")
+```
+#### Parameters
+*FileStream ([InStream](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/instream/instream-data-type))* 
+
+The File Stream containing the extension to be uploaded.
+
+*lcid ([Integer](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/integer/integer-data-type))* 
+
+The Locale Identifier.
+
+*DeployTo ([Enum "Extension Deploy To"]())* 
+
+The version that the extension will be deployed to.
+
+### UploadExtensionToVersion (Method) <a name="UploadExtensionToVersion"></a> 
+
+ Uploads an extension to current version, next minor or next major, using a File Stream and based on the Locale Identifier.
+ This method is only applicable in SaaS environment.
+ 
+
+#### Syntax
+```
+procedure UploadExtensionToVersion(FileStream: InStream; lcid: Integer; DeployTo: Enum "Extension Deploy To"; SyncMode: Enum "Extension Sync Mode")
+```
+#### Parameters
+*FileStream ([InStream](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/instream/instream-data-type))* 
+
+The File Stream containing the extension to be uploaded.
+
+*lcid ([Integer](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/integer/integer-data-type))* 
+
+The Locale Identifier.
+
+*DeployTo ([Enum "Extension Deploy To"]())* 
+
+The version that the extension will be deployed to.
+
+*SyncMode ([Enum "Extension Sync Mode"]())* 
+
+The desired sync mode.
+
+### GetMarketplaceEmbeddedUrl (Method) <a name="GetMarketplaceEmbeddedUrl"></a> 
+
+ Returns a link to appsource market page
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".GetMarketplaceEmbeddedUrl procedure.', '17.0')]
+PROCEDURE GetMarketplaceEmbeddedUrl(): Text
+```
+#### Return Value
+*[Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type)*
+
+
+### GetMessageType (Method) <a name="GetMessageType"></a> 
+
+ Extraxts the message type from appsource response.
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".GetMessageType procedure.', '17.0')]
+procedure GetMessageType(JObject: DotNet JObject): Text
+```
+#### Parameters
+*JObject ([DotNet JObject]())* 
+
+Appsourece response payload as a json object
+
+#### Return Value
+*[Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type)*
+
+
+### GetApplicationIdFromData (Method) <a name="GetApplicationIdFromData"></a> 
+
+ Extraxts the appsource application ID from appsource response.
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".GetApplicationIdFromData procedure.', '17.0')]
+procedure GetApplicationIdFromData(JObject: DotNet JObject): Text
+```
+#### Parameters
+*JObject ([DotNet JObject]())* 
+
+Appsourece response payload as a json object
+
+#### Return Value
+*[Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type)*
+
+Application Id in text format
+### MapMarketplaceIdToPackageId (Method) <a name="MapMarketplaceIdToPackageId"></a> 
+
+ Extraxts the package ID from appsource response.
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".MapMarketplaceIdToPackageId procedure.', '17.0')]
+procedure MapMarketplaceIdToPackageId(ApplicationId: Text): GUID
+```
+#### Parameters
+*ApplicationId ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
+
+Appsource market application ID
+
+#### Return Value
+*[GUID]()*
+
+Package ID as a GUID
+### GetTelementryUrlFromData (Method) <a name="GetTelementryUrlFromData"></a> 
+
+ Extracts the telemetry URL from appsource response.
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".GetTelementryUrlFromData procedure.', '17.0')]
+procedure GetTelementryUrlFromData(JObject: DotNet JObject): Text
+```
+#### Parameters
+*JObject ([DotNet JObject]())* 
+
+Appsourece response payload as a json object
+
+#### Return Value
+*[Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type)*
+
+
+### MapMarketplaceIdToAppId (Method) <a name="MapMarketplaceIdToAppId"></a> 
+
+ Extracts the app ID from appsource response.
+ 
+
+#### Syntax
+```
+[Obsolete('Replaced by "Extension Marketplace".MapMarketplaceIdToAppId procedure.', '17.0')]
+procedure MapMarketplaceIdToAppId(ApplicationId: Text): GUID
+```
+#### Parameters
+*ApplicationId ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
+
+Appsource market application ID
+
+#### Return Value
+*[GUID]()*
+
+
+### GetAppName (Method) <a name="GetAppName"></a> 
+
+ Returns the Name of the app given the App Id.
+ 
+
+#### Syntax
+```
+procedure GetAppName(AppId: Guid): Text
+```
+#### Parameters
+*AppId ([Guid](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/guid/guid-data-type))* 
+
+The unique identifier of the app.
+
+#### Return Value
+*[Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type)*
+
+The name of the app.
 
 ## Extension Deployment Status (Page 2508)
 
@@ -392,6 +709,22 @@ Out parameter holding the logo of the extension.
  
 
 
+## Extension Marketplace (Page 2502)
+
+ Shows the Extension Marketplace.
+ 
+
+### PerformAction (Method) <a name="PerformAction"></a> 
+#### Syntax
+```
+LOCAL PROCEDURE PerformAction(ActionName: Text)
+```
+#### Parameters
+*ActionName ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
+
+
+
+
 ## Extension Settings (Page 2511)
 
  Displays settings for the selected extension, and allows users to edit them.
@@ -413,5 +746,56 @@ Out parameter holding the logo of the extension.
 ## Upload And Deploy Extension (Page 2507)
 
  Allows users to upload an extension and schedule its deployment.
+ 
+
+
+## Extension Deploy To (Enum 2504)
+
+ Specifies the version in which the extension is deployed.
+ 
+
+### Current version (value: 0)
+
+
+ Current version.
+ 
+
+### Next minor version (value: 1)
+
+
+ Next minor version
+ 
+
+### Next major version (value: 2)
+
+
+ Next major version
+ 
+
+
+## Extension Sync Mode (Enum 2505)
+
+ Specifies how to sync the extension.
+ 
+
+### Add (value: 0)
+
+
+ Modifies the database schema by creating or extending the tables required to
+ satisfy the app's metadata. This mode considers existing versions of the specified
+ app in its calculations.
+ 
+
+### Force Sync (value: 3)
+
+
+ A destructive sync mode which makes the resulting schema match the extension in question
+ regardless of its starting state. This means no change is off limits. This also means
+ that changes which delete things (tables, fields, etc.) also delete the data they contain.
+ 
+
+
+ This mode is intended for use when e.g. renaming tables. It can lead to data loss if used
+ without caution.
  
 

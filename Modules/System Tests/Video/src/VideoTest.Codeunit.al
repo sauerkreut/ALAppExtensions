@@ -11,6 +11,7 @@ codeunit 135038 "Video Test"
 
     var
         Assert: Codeunit "Library Assert";
+        PermissionsMock: Codeunit "Permissions Mock";
         UrlTxt: Label 'https://www.youtube.com/watch?v=CH1XGdu-hzQ';
         SourceVideoTableNum: Integer;
         SourceVideoSystemID: Guid;
@@ -23,6 +24,7 @@ codeunit 135038 "Video Test"
         Video: Codeunit Video;
     begin
         // [SCENARIO] Calling play on a link opens the player
+        PermissionsMock.Set('Video Read');
 
         // [GIVEN, WHEN] A link is passed to Play
         Video.Play(UrlTxt);
@@ -59,8 +61,7 @@ codeunit 135038 "Video Test"
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::Video, 'OnRegisterVideo', '', false, false)]
-    [Scope('OnPrem')]
-    procedure HandleOnRegisterManualSetup(var Sender: Codeunit Video)
+    local procedure HandleOnRegisterManualSetup(var Sender: Codeunit Video)
     var
         MyVideoSource: Record "My Video Source";
         EmptyGuid: Guid;
@@ -75,8 +76,7 @@ codeunit 135038 "Video Test"
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::Video, 'OnVideoPlayed', '', false, false)]
-    [Scope('OnPrem')]
-    procedure HandleOnVideoPlayed(TableNum: Integer; SystemID: Guid)
+    local procedure HandleOnVideoPlayed(TableNum: Integer; SystemID: Guid)
     begin
         Assert.AreEqual(SourceVideoTableNum, TableNum, 'Table num for the played video does not match.');
         Assert.AreEqual(SourceVideoSystemID, SystemID, 'System ID for the played video does not match.');

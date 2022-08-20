@@ -15,6 +15,7 @@ page 4690 "Recurrence Schedule Card"
     PageType = Card;
     ShowFilter = false;
     SourceTable = "Recurrence Schedule";
+    Permissions = tabledata "Recurrence Schedule" = rmd;
 
     layout
     {
@@ -130,7 +131,7 @@ page 4690 "Recurrence Schedule Card"
             {
                 Caption = 'Monthly';
                 Visible = "Pattern" = RecurrencePatterns::Monthly;
-                field(MontlyFrequency; "Recurs Every")
+                field(MonthlyFrequency; "Recurs Every")
                 {
                     ApplicationArea = All;
                     Caption = 'Months Between';

@@ -16,14 +16,15 @@ codeunit 1907 Camera
     /// <summary>
     /// Takes a picture from a camera on the client device and returns the data in the InStream.
     /// </summary>
-    /// <param name="PictureStream">An InStream object that will hold the image in case taking a picture was successful.</param>
+    /// <param name="PictureInStream">An InStream object that will hold the image in case taking a picture was successful.</param>
     /// <param name="PictureName">A generated name for the taken picture. It will include the current date and time (for example, "Picture_05_03_2020_12_49_23.jpeg").</param>
     /// <returns>True if the camera is available, the user took a picture and decided to use it, false otherwise.</returns>
-    procedure GetPicture(PictureStream: InStream; var PictureName: Text): Boolean
+    procedure GetPicture(PictureInStream: InStream; var PictureName: Text): Boolean
     begin
-        exit(CameraImpl.GetPicture(PictureStream, PictureName));
+        exit(CameraImpl.GetPicture(PictureInStream, PictureName));
     end;
 
+#if not CLEAN20
     /// <summary>
     /// Adds a picture from the camera to the field of type 'Media'or 'MediaSet' on the provided record. 
     /// </summary>
@@ -39,10 +40,12 @@ codeunit 1907 Camera
     /// <error>The provided variant is not of type record.</error>
     /// <error>Unsupported field type</error>
     /// <returns>True if the camera is available, the user took a picture and decided to use it, false otherwise.</returns>
+    [Obsolete('This function does not populate the Media/MediaSet record correctly. Use GetPicture instead.', '20.0')]
     procedure AddPicture(RecordVariant: Variant; FieldNo: Integer): Boolean
     begin
         exit(CameraImpl.AddPicture(RecordVariant, FieldNo));
     end;
+#endif
 
     /// <summary>
     /// Checks whether the camera on the client device is available.

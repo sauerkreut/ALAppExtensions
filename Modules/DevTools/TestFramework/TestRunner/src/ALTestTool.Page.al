@@ -53,24 +53,26 @@ page 130451 "AL Test Tool"
                 IndentationControls = Name;
                 ShowAsTree = true;
                 ShowCaption = false;
-                field(LineType; "Line Type")
+                field(LineType; Rec."Line Type")
                 {
                     ApplicationArea = All;
+                    Tooltip = 'Specified the line type.';
                     Caption = 'Line Type';
                     Editable = false;
                     Style = Strong;
                     StyleExpr = LineTypeEmphasize;
                 }
-                field(TestCodeunit; "Test Codeunit")
+                field(TestCodeunit; Rec."Test Codeunit")
                 {
                     ApplicationArea = All;
+                    Tooltip = 'Specifies the ID of the test codeunit.';
                     BlankZero = true;
                     Caption = 'Codeunit ID';
                     Editable = false;
                     Style = Strong;
                     StyleExpr = TestCodeunitEmphasize;
                 }
-                field(Name; Name)
+                field(Name; Rec.Name)
                 {
                     ApplicationArea = All;
                     Caption = 'Name';
@@ -79,9 +81,10 @@ page 130451 "AL Test Tool"
                     StyleExpr = NameEmphasize;
                     ToolTip = 'Specifies the name of the test tool.';
                 }
-                field(Run; Run)
+                field(Run; Rec.Run)
                 {
                     ApplicationArea = All;
+                    Tooltip = 'Specifies whether the tests should be executed.';
                     Caption = 'Run';
 
                     trigger OnValidate()
@@ -89,9 +92,10 @@ page 130451 "AL Test Tool"
                         CurrPage.Update(true);
                     end;
                 }
-                field(Result; Result)
+                field(Result; Rec.Result)
                 {
                     ApplicationArea = All;
+                    Tooltip = 'Specifies whether the tests passed, failed or were skipped.';
                     BlankZero = true;
                     Caption = 'Result';
                     Editable = false;
@@ -182,30 +186,55 @@ page 130451 "AL Test Tool"
     {
         area(processing)
         {
-            group("Manage Tests")
+            group("Run Tests")
             {
-                Caption = 'Manage Tests';
-                action(DeleteLines)
+                Caption = 'Run Tests';
+                action(RunTests)
                 {
                     ApplicationArea = All;
-                    Caption = '&Delete Lines';
-                    Image = Delete;
+                    Caption = '&Run Tests';
+                    Image = Start;
                     Promoted = true;
                     PromotedCategory = Process;
                     PromotedIsBig = true;
                     PromotedOnly = true;
-                    ToolTip = 'Delete the selected lines.';
+                    ToolTip = 'Runs tests.';
+
+                    trigger OnAction()
+                    var
+                        TestSuiteMgt: Codeunit "Test Suite Mgt.";
+                        TestRunnerProgessDialog: Codeunit "Test Runner - Progress Dialog";
+                    begin
+                        BindSubscription(TestRunnerProgessDialog);
+                        TestSuiteMgt.RunTestSuiteSelection(Rec);
+                        CurrPage.Update(true);
+                    end;
+                }
+                action(RunSelectedTests)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Run Se&lected Tests';
+                    Image = TestFile;
+                    Promoted = true;
+                    PromotedCategory = Process;
+                    PromotedIsBig = true;
+                    PromotedOnly = true;
+                    ToolTip = 'Runs selected tests.';
 
                     trigger OnAction()
                     var
                         TestMethodLine: Record "Test Method Line";
                         TestSuiteMgt: Codeunit "Test Suite Mgt.";
                     begin
+                        TestMethodLine.Copy(Rec);
                         CurrPage.SetSelectionFilter(TestMethodLine);
-                        TestMethodLine.DeleteAll(true);
-                        TestSuiteMgt.CalcTestResults(Rec, Success, Failure, Skipped, NotExecuted);
+                        TestSuiteMgt.RunSelectedTests(TestMethodLine);
                     end;
                 }
+            }
+            group("Manage Tests")
+            {
+                Caption = 'Manage Tests';
                 action(GetTestCodeunits)
                 {
                     ApplicationArea = All;
@@ -263,50 +292,45 @@ page 130451 "AL Test Tool"
                         CurrPage.Update(false);
                     end;
                 }
-            }
-            group("Run Tests")
-            {
-                Caption = 'Run Tests';
-                action(RunTests)
+                action(DeleteLines)
                 {
                     ApplicationArea = All;
-                    Caption = '&Run Tests';
-                    Image = Start;
+                    Caption = '&Delete Lines';
+                    Image = Delete;
                     Promoted = true;
                     PromotedCategory = Process;
                     PromotedIsBig = true;
                     PromotedOnly = true;
-                    ToolTip = 'Runs selected tests.';
-
-                    trigger OnAction()
-                    var
-                        TestSuiteMgt: Codeunit "Test Suite Mgt.";
-                        TestRunnerProgessDialog: Codeunit "Test Runner - Progress Dialog";
-                    begin
-                        BindSubscription(TestRunnerProgessDialog);
-                        TestSuiteMgt.RunTestSuiteSelection(Rec);
-                        CurrPage.Update(true);
-                    end;
-                }
-                action(RunSelectedTests)
-                {
-                    ApplicationArea = All;
-                    Caption = 'Run Se&lected Tests';
-                    Image = TestFile;
-                    Promoted = true;
-                    PromotedCategory = Process;
-                    PromotedIsBig = true;
-                    PromotedOnly = true;
+                    ToolTip = 'Delete the selected lines.';
 
                     trigger OnAction()
                     var
                         TestMethodLine: Record "Test Method Line";
                         TestSuiteMgt: Codeunit "Test Suite Mgt.";
                     begin
-                        TestMethodLine.Copy(Rec);
+                        if GuiAllowed() then
+                            if not Confirm(DeleteQst, false) then
+                                exit;
+
                         CurrPage.SetSelectionFilter(TestMethodLine);
-                        TestSuiteMgt.RunSelectedTests(TestMethodLine);
-                        CurrPage.Update(true);
+                        TestMethodLine.DeleteAll(true);
+                        TestSuiteMgt.CalcTestResults(Rec, Success, Failure, Skipped, NotExecuted);
+                    end;
+                }
+                action(InvertRun)
+                {
+                    ApplicationArea = All;
+                    Caption = '&Invert Run Selection';
+                    Image = Change;
+                    Promoted = true;
+                    PromotedCategory = Process;
+                    PromotedIsBig = true;
+                    PromotedOnly = true;
+                    ToolTip = 'Invert Run Selection on selected lines.';
+
+                    trigger OnAction()
+                    begin
+                        InvertRunSelection();
                     end;
                 }
             }
@@ -369,6 +393,7 @@ page 130451 "AL Test Tool"
         RunDuration: Duration;
         TestRunnerDisplayName: Text;
         ErrorMessageWithStackTraceTxt: Text;
+        DeleteQst: Label 'Are you sure you want to delete the selected lines?';
 
     local procedure ChangeTestSuite()
     var
@@ -379,9 +404,9 @@ page 130451 "AL Test Tool"
 
         CurrPage.SaveRecord();
 
-        FilterGroup(2);
-        SetRange("Test Suite", CurrentSuiteName);
-        FilterGroup(0);
+        Rec.FilterGroup(2);
+        Rec.SetRange("Test Suite", CurrentSuiteName);
+        Rec.FilterGroup(0);
 
         CurrPage.Update(false);
 
@@ -403,28 +428,41 @@ page 130451 "AL Test Tool"
                 GlobalALTestSuite.Get(CurrentSuiteName);
             end;
 
-        FilterGroup(2);
-        SetRange("Test Suite", CurrentSuiteName);
-        FilterGroup(0);
+        Rec.FilterGroup(2);
+        Rec.SetRange("Test Suite", CurrentSuiteName);
+        Rec.FilterGroup(0);
 
-        if Find('-') then;
+        if Rec.Find('-') then;
 
         TestRunnerDisplayName := TestSuiteMgt.GetTestRunnerDisplayName(GlobalALTestSuite);
     end;
 
     local procedure UpdateDisplayPropertiesForLine()
     begin
-        NameIndent := "Line Type";
-        LineTypeEmphasize := "Line Type" = "Line Type"::Codeunit;
-        TestCodeunitEmphasize := "Line Type" = "Line Type"::Codeunit;
-        ResultEmphasize := Result = Result::Success;
+        NameIndent := Rec."Line Type";
+        LineTypeEmphasize := Rec."Line Type" = Rec."Line Type"::Codeunit;
+        TestCodeunitEmphasize := Rec."Line Type" = Rec."Line Type"::Codeunit;
+        ResultEmphasize := Rec.Result = Rec.Result::Success;
     end;
 
     local procedure UpdateCalculatedFields()
     var
         TestSuiteMgt: Codeunit "Test Suite Mgt.";
     begin
-        RunDuration := "Finish Time" - "Start Time";
+        RunDuration := Rec."Finish Time" - Rec."Start Time";
         ErrorMessageWithStackTraceTxt := TestSuiteMgt.GetErrorMessageWithStackTrace(Rec);
+    end;
+
+    local procedure InvertRunSelection()
+    var
+        TestMethodLine: Record "Test Method Line";
+    begin
+        CurrPage.SetSelectionFilter(TestMethodLine);
+
+        if TestMethodLine.FindSet(true, false) then
+            repeat
+                TestMethodLine.Validate(Run, not TestMethodLine.Run);
+                TestMethodLine.Modify(true);
+            until TestMethodLine.Next() = 0;
     end;
 }

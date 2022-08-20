@@ -6,15 +6,11 @@
 codeunit 139043 "Web Service Management Test"
 {
     Subtype = Test;
-    TestPermissions = NonRestrictive;
-
-    trigger OnRun()
-    begin
-    end;
 
     var
         WebServiceManagement: Codeunit "Web Service Management";
         Assert: Codeunit "Library Assert";
+        PermissionsMock: Codeunit "Permissions Mock";
         ClientType: Enum "Client Type";
         Initialized: Boolean;
         PageServiceTxt: Label 'PageService';
@@ -25,7 +21,7 @@ codeunit 139043 "Web Service Management Test"
         PageBTxt: Label 'PageB';
         PageCTxt: Label 'PageC';
         PageDTxt: Label 'PageD';
-
+        ODataUnboundActionHelpUrlLbl: Label 'https://go.microsoft.com/fwlink/?linkid=2138827';
 
     [Test]
     [Scope('OnPrem')]
@@ -34,6 +30,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         WebServiceAggregate: Record "Web Service Aggregate";
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageServiceTxt, true);
         WebServiceManagement.CreateWebService(WebService."Object Type"::Codeunit, Codeunit::"Dummy Codeunit", CodeunitServiceTxt, true);
@@ -55,7 +52,7 @@ codeunit 139043 "Web Service Management Test"
 
         if WebServiceAggregate.Get(WebService."Object Type"::Codeunit, CodeunitServiceTxt) then begin
             VerifyUrlMissingServiceName(WebServiceManagement.GetWebServiceUrl(WebServiceAggregate, ClientType::ODataV3), CodeunitServiceTxt);
-            VerifyUrlMissingServiceName(WebServiceManagement.GetWebServiceUrl(WebServiceAggregate, ClientType::ODataV4), CodeunitServiceTxt);
+            VerifyODataV4CodeunitHelpUrl(WebServiceManagement.GetWebServiceUrl(WebServiceAggregate, ClientType::ODataV4), CodeunitServiceTxt);
             VerifyUrlHasServiceName(WebServiceManagement.GetWebServiceUrl(WebServiceAggregate, ClientType::SOAP), CodeunitServiceTxt);
         end;
 
@@ -73,6 +70,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         WebServiceAggregate: Record "Web Service Aggregate";
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageServiceTxt, true);
         WebServiceManagement.LoadRecords(WebServiceAggregate);
@@ -90,6 +88,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         WebServiceAggregate: Record "Web Service Aggregate";
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageATxt, true);
         WebServiceManagement.CreateTenantWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageATxt, true);
@@ -109,6 +108,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         WebServiceAggregate: Record "Web Service Aggregate";
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageATxt, true);
         WebServiceManagement.CreateTenantWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageBTxt, true);
@@ -136,6 +136,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         WebServiceAggregate: Record "Web Service Aggregate";
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageATxt, true);
         WebServiceManagement.CreateTenantWebService(WebService."Object Type"::Page, Page::"Dummy Page", PageBTxt, false);
@@ -166,6 +167,7 @@ codeunit 139043 "Web Service Management Test"
         Any: Codeunit Any;
         AutoServiceName: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Test that inserting a record for all tenants correctly writes a system record.
         AutoServiceName := Any.GuidValue();
@@ -201,6 +203,7 @@ codeunit 139043 "Web Service Management Test"
         Any: Codeunit Any;
         AutoServiceName: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Test that inserting a record for a single tenant correctly writes a tenant record.
         AutoServiceName := Any.GuidValue();
@@ -232,6 +235,8 @@ codeunit 139043 "Web Service Management Test"
         Any: Codeunit Any;
         AutoServiceName: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
+
         Initialize();
         // Test that adding a new web service with the same Object Type and Service Name as an existing record
         // (system or tenant record) will result in a duplicate service error.
@@ -239,7 +244,7 @@ codeunit 139043 "Web Service Management Test"
 
         TempWebServiceAggregate.Init();
         TempWebServiceAggregate."Object Type" := TempWebServiceAggregate."Object Type"::Page;
-        TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page";
+        TempWebServiceAggregate."Object ID" := Page::"Dummy Page";
         TempWebServiceAggregate."Service Name" := AutoServiceName;
         TempWebServiceAggregate."All Tenants" := true;
         TempWebServiceAggregate.Published := true;
@@ -247,12 +252,13 @@ codeunit 139043 "Web Service Management Test"
 
         TempWebServiceAggregate.Init();
         TempWebServiceAggregate."Object Type" := TempWebServiceAggregate."Object Type"::Page;
-        TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page2";
+        TempWebServiceAggregate."Object ID" := Page::"Dummy Page2";
         TempWebServiceAggregate."Service Name" := AutoServiceName;
         TempWebServiceAggregate."All Tenants" := false;
         TempWebServiceAggregate.Published := true;
 
         asserterror TempWebServiceAggregate.Insert(true);
+        Assert.ExpectedError('The web service cannot be added because it conflicts with an unpublished system web service for the object.');
     end;
 
     [Test]
@@ -263,6 +269,7 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate: Record "Web Service Aggregate" temporary;
         Any: Codeunit Any;
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Test that adding a new tenant web service for an object (type and ID) that has an unpublished
         // system record will give an error.
@@ -282,6 +289,7 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate.Published := true;
 
         asserterror TempWebServiceAggregate.Insert(true);
+        Assert.ExpectedError('The web service cannot be added because it conflicts with an unpublished system web service for the object.');
 
         // Test that adding a new web service for an object (type and ID) that has an unpublished
         // system record will give an error.
@@ -301,6 +309,7 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate.Published := true;
 
         asserterror TempWebServiceAggregate.Insert(true);
+        Assert.ExpectedError('The web service cannot be added because it conflicts with an unpublished system web service for the object.');
     end;
 
     [Test]
@@ -313,6 +322,7 @@ codeunit 139043 "Web Service Management Test"
         AutoServiceName: Text[240];
         AutoServiceName2: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Test that changing the Object Type, Object ID, Service Name, and Publish fields
         // of a system record will change the value of the system record.
@@ -322,6 +332,8 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate."Object Type" := TempWebServiceAggregate."Object Type"::Page;
         TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page";
         TempWebServiceAggregate."Service Name" := AutoServiceName;
+        TempWebServiceAggregate.ExcludeFieldsOutsideRepeater := false;
+        TempWebServiceAggregate.ExcludeNonEditableFlowFields := false;
         TempWebServiceAggregate."All Tenants" := true;
         TempWebServiceAggregate.Published := true;
         TempWebServiceAggregate.Insert(true);
@@ -329,9 +341,11 @@ codeunit 139043 "Web Service Management Test"
         Assert.IsTrue(
           WebService.Get(WebService."Object Type"::Page, AutoServiceName), AutoServiceName + ' should exist in the Web Service table');
 
-        // Change 'Object ID' and 'Publish'
+        // Change 'Object ID', 'Publish', 'ExcludeFieldsOutsideRepeater' and 'ExcludeNonEditableFlowFields'
         TempWebServiceAggregate.Get(TempWebServiceAggregate."Object Type"::Page, AutoServiceName);
         TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page2";
+        TempWebServiceAggregate.ExcludeFieldsOutsideRepeater := true;
+        TempWebServiceAggregate.ExcludeNonEditableFlowFields := true;
         TempWebServiceAggregate.Published := false;
         TempWebServiceAggregate.Modify(true);
 
@@ -339,6 +353,12 @@ codeunit 139043 "Web Service Management Test"
           WebService.Get(WebService."Object Type"::Page, AutoServiceName), AutoServiceName + ' should exist in the Web Service table');
         Assert.AreEqual(WebService."Object Type"::Page, WebService."Object Type", AutoServiceName + ' object type should be page.');
         Assert.IsFalse(WebService.Published, AutoServiceName + ' should not be published');
+        Assert.IsTrue(
+          WebService.ExcludeFieldsOutsideRepeater,
+          AutoServiceName + ' should exclude fields outside repeater');
+        Assert.IsTrue(
+          WebService.ExcludeNonEditableFlowFields,
+          AutoServiceName + ' should exclude non-editable flow fields');
 
         // Change 'Object Type'
         TempWebServiceAggregate."Object ID" := QUERY::"Dummy Query";
@@ -375,6 +395,7 @@ codeunit 139043 "Web Service Management Test"
         AutoServiceName: Text[240];
         AutoServiceName2: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebService.DeleteAll();
         // Test that changing the Object Type, Object ID, Service Name, and Publish fields
@@ -385,6 +406,8 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate."Object Type" := TempWebServiceAggregate."Object Type"::Page;
         TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page";
         TempWebServiceAggregate."Service Name" := AutoServiceName;
+        TempWebServiceAggregate.ExcludeFieldsOutsideRepeater := false;
+        TempWebServiceAggregate.ExcludeNonEditableFlowFields := false;
         TempWebServiceAggregate."All Tenants" := false;
         TempWebServiceAggregate.Published := true;
         TempWebServiceAggregate.Insert(true);
@@ -393,9 +416,11 @@ codeunit 139043 "Web Service Management Test"
           TenantWebService.Get(WebService."Object Type"::Page, AutoServiceName),
           AutoServiceName + ' should exist in the Tenant Web Service table');
 
-        // Change 'Object ID' and 'Publish'
+        // Change 'Object ID', 'Publish', 'ExcludeFieldsOutsideRepeater' and 'ExcludeNonEditableFlowFields'
         TempWebServiceAggregate.Get(TempWebServiceAggregate."Object Type"::Page, AutoServiceName);
         TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page2";
+        TempWebServiceAggregate.ExcludeFieldsOutsideRepeater := true;
+        TempWebServiceAggregate.ExcludeNonEditableFlowFields := true;
         TempWebServiceAggregate.Published := false;
         TempWebServiceAggregate.Modify(true);
 
@@ -405,6 +430,12 @@ codeunit 139043 "Web Service Management Test"
         Assert.AreEqual(
           TenantWebService."Object Type"::Page, TenantWebService."Object Type", AutoServiceName + ' object type should be page.');
         Assert.IsFalse(TenantWebService.Published, AutoServiceName + ' should not be published');
+        Assert.IsTrue(
+          TenantWebService.ExcludeFieldsOutsideRepeater,
+          AutoServiceName + ' should exclude fields outside repeater');
+        Assert.IsTrue(
+          TenantWebService.ExcludeNonEditableFlowFields,
+          AutoServiceName + ' should exclude non-editable flow fields');
 
         // Change 'Object Type'
         TempWebServiceAggregate."Object ID" := QUERY::"Dummy Query";
@@ -445,6 +476,7 @@ codeunit 139043 "Web Service Management Test"
         TempWebServiceAggregate.Get(TempWebServiceAggregate."Object Type"::Query, AutoServiceName2);
         TempWebServiceAggregate."Object ID" := PAGE::"Dummy Page";
         asserterror TempWebServiceAggregate.Rename(TempWebServiceAggregate."Object Type"::Page, AutoServiceName2);
+        Assert.ExpectedError('The web service cannot be modified because it conflicts with an unpublished system web service for the object.');
 
         // Changing the web service to have the same Object Type and Service Name as an existing record
         // (system or tenant record) will result in an error.
@@ -471,6 +503,7 @@ codeunit 139043 "Web Service Management Test"
         Any: Codeunit Any;
         AutoServiceName: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Deleting a system record will delete the system record
         AutoServiceName := Any.GuidValue();
@@ -508,6 +541,7 @@ codeunit 139043 "Web Service Management Test"
         Any: Codeunit Any;
         AutoServiceName: Text[240];
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         // Deleting a tenant record will delete the tenant record
         // Deleting a system record will delete the system record
@@ -543,6 +577,7 @@ codeunit 139043 "Web Service Management Test"
         WebService: Record "Web Service";
         ObjectNameLbl: Label 'TestWebService';
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateTenantWebService(WebService."Object Type"::Page, Page::"Dummy Page", ObjectNameLbl, true);
 
@@ -557,11 +592,64 @@ codeunit 139043 "Web Service Management Test"
         TenantWebService: Record "Tenant Web Service";
         ObjectNameLbl: Label 'TestTenantWebService';
     begin
+        PermissionsMock.Set('Web Service Admin');
         Initialize();
         WebServiceManagement.CreateTenantWebService(TenantWebService."Object Type"::Page, Page::"Dummy Page", ObjectNameLbl, true);
 
         if TenantWebService.Get(TenantWebService."Object Type"::Page, ObjectNameLbl) then
             Assert.IsTrue(TenantWebService.Published, ObjectNameLbl + ' tenant web service record "Published" field should be checked.');
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
+    procedure TestDeleteTenantWebService()
+    var
+        TenantWebService: Record "Tenant Web Service";
+        WebServiceAggregate: Record "Web Service Aggregate";
+        ObjectNameLbl: Label 'TestTenantWebService';
+    begin
+        PermissionsMock.Set('Web Service Admin');
+        Initialize();
+        WebServiceManagement.CreateTenantWebService(TenantWebService."Object Type"::Page, Page::"Dummy Page", ObjectNameLbl, true);
+
+        WebServiceManagement.LoadRecords(WebServiceAggregate);
+        Assert.IsTrue(WebServiceAggregate.Get(WebServiceAggregate."Object Type"::Page, ObjectNameLbl), 'Web Service should be present');
+
+        ClearLastError();
+        // Delete tenant web service
+        WebServiceManagement.DeleteWebService(WebServiceAggregate);
+        Assert.AreEqual('', GetLastErrorText(), 'No error should have occurred when deleting a tenant web service');
+
+        WebServiceManagement.LoadRecords(WebServiceAggregate);
+        Assert.IsFalse(WebServiceAggregate.Get(WebServiceAggregate."Object Type"::Page, ObjectNameLbl), 'Web Service should not be present');
+
+        Assert.IsFalse(TenantWebService.Get(TenantWebService."Object Type"::Page, ObjectNameLbl), 'Tenant web service should not be present');
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
+    procedure TestDeleteWebService()
+    var
+        WebService: Record "Web Service";
+        WebServiceAggregate: Record "Web Service Aggregate";
+        ObjectNameLbl: Label 'TestWebService';
+    begin
+        PermissionsMock.Set('Web Service Admin');
+        Initialize();
+        WebServiceManagement.CreateTenantWebService(WebService."Object Type"::Page, Page::"Dummy Page", ObjectNameLbl, true);
+
+        WebServiceManagement.LoadRecords(WebServiceAggregate);
+        Assert.IsTrue(WebServiceAggregate.Get(WebServiceAggregate."Object Type"::Page, ObjectNameLbl), 'Web Service should be present');
+
+        ClearLastError();
+        // Delete web service
+        WebServiceManagement.DeleteWebService(WebServiceAggregate);
+        Assert.AreEqual('', GetLastErrorText(), 'No error should have occurred when deleting a web service');
+
+        WebServiceManagement.LoadRecords(WebServiceAggregate);
+        Assert.IsFalse(WebServiceAggregate.Get(WebServiceAggregate."Object Type"::Page, ObjectNameLbl), 'Web Service should not be present');
+
+        Assert.IsFalse(WebService.Get(WebService."Object Type"::Page, ObjectNameLbl), 'Web service should not be present');
     end;
 
     local procedure VerifyUrlHasServiceName(Url: Text; ServiceName: Text[240])
@@ -574,6 +662,11 @@ codeunit 139043 "Web Service Management Test"
     local procedure VerifyUrlMissingServiceName(Url: Text; ServiceName: Text[240])
     begin
         Assert.AreEqual('Not applicable', Url, StrSubstNo('Url was ''%1'' but should be "Not applicable" for ''%2''.', Url, ServiceName));
+    end;
+
+    local procedure VerifyODataV4CodeunitHelpUrl(Url: Text; ServiceName: Text[240])
+    begin
+        Assert.AreEqual(ODataUnboundActionHelpUrlLbl, Url, StrSubstNo('Url was ''%1'' but should be "Not applicable" for ''%2''.', Url, ServiceName));
     end;
 
     local procedure Initialize()

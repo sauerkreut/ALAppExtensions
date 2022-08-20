@@ -8,11 +8,6 @@ codeunit 130045 "System Initialization Test"
     // Tests for the System Initialization codeunit
 
     Subtype = Test;
-    TestPermissions = NonRestrictive;
-
-    trigger OnRun()
-    begin
-    end;
 
     [Test]
     [HandlerFunctions('PasswordDialogModalPageHandler')]
@@ -21,11 +16,19 @@ codeunit 130045 "System Initialization Test"
     var
         CompanyTriggers: Codeunit "Company Triggers";
         PasswordDialog: Codeunit "Password Dialog Management";
+        PermissionsMock: Codeunit "Permissions Mock";
         OldPassword: Text;
         NewPassword: Text;
     begin
+        PermissionsMock.Set('System Init Exec');
         // [WHEN] Calling CompanyTriggers.OnCompanyOpen()
+#if not CLEAN20
+#pragma warning disable AL0432
+#endif
         CompanyTriggers.OnCompanyOpen();
+#if not CLEAN20
+#pragma warning restore AL0432
+#endif
 
         // [THEN] Calling PasswordDialog.OpenChangePasswordDialog should NOT results in an error
         PasswordDialog.OpenChangePasswordDialog(OldPassword, NewPassword);

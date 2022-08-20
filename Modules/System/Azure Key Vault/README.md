@@ -17,6 +17,7 @@ This is a try function.
 ```
 [TryFunction]
 [Scope('OnPrem')]
+[NonDebuggable]
 procedure GetAzureKeyVaultSecret(SecretName: Text; var Secret: Text)
 ```
 #### Parameters
@@ -27,4 +28,27 @@ The name of the secret to retrieve.
 *Secret ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
 
 Out parameter that holds the secret that was retrieved from the key vault.
+
+### GetAzureKeyVaultCertificate (Method) <a name="GetAzureKeyVaultCertificate"></a> 
+
+ Retrieves a certificate from the key vault.
+ 
+
+This is a try function.
+
+#### Syntax
+```
+[TryFunction]
+[Scope('OnPrem')]
+[NonDebuggable]
+procedure GetAzureKeyVaultCertificate(CertificateName: Text; var Certificate: Text)
+```
+#### Parameters
+*CertificateName ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
+
+The name of the secret to retrieve.
+
+*Certificate ([Text](https://docs.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/methods-auto/text/text-data-type))* 
+
+Out parameter that holds the certificate as a base 64 encoded string that was retrieved from the key vault.
 

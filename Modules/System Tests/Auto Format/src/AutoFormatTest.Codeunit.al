@@ -85,7 +85,7 @@ codeunit 132584 "Auto Format Test"
         // [GIVEN] The function ResolveAutoFormat
         // [WHEN] Calling the function with AutoFormatType=1000 and AutoFormatExpr=''
         // [THEN] A data formatting expression is returned ('<Precision,1:1><Standard Format,0>' in this case)
-        LibraryAssert.AreEqual('<Precision,1:1><Standard Format,0>', AutoFormat.ResolveAutoFormat(1000, ''), 'The return value should be "<Precision,1:1><Standard Format,0>"');
+        LibraryAssert.AreEqual('<Precision,1:1><Standard Format,0>', AutoFormat.ResolveAutoFormat("Auto Format"::"1 decimal", ''), 'The return value should be "<Precision,1:1><Standard Format,0>"');
 
         UnbindSubscription(AutoFormatTest);
     end;
@@ -111,7 +111,7 @@ codeunit 132584 "Auto Format Test"
         // [GIVEN] The function ResolveAutoFormat
         // [WHEN] Calling the function with a non valid AutoFormatType value and AutoFormatExpr=whatever value
         // [THEN] The empty string is returned
-        LibraryAssert.AreEqual('', AutoFormat.ResolveAutoFormat(100, 'RandomText'), 'The return value should be an empty string');
+        LibraryAssert.AreEqual('', AutoFormat.ResolveAutoFormat("Auto Format"::Whatever, 'RandomText'), 'The return value should be an empty string');
 
         UnbindSubscription(AutoFormatTest);
     end;
@@ -133,9 +133,9 @@ codeunit 132584 "Auto Format Test"
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Auto Format", 'OnResolveAutoFormat', '', true, true)]
     [Normal]
-    procedure HandleOnResolveAutoFormat(AutoFormatType: Enum "Auto Format"; AutoFormatExpr: Text[80]; VAR Result: Text[80]; VAR Resolved: Boolean)
+    local procedure HandleOnResolveAutoFormat(AutoFormatType: Enum "Auto Format"; AutoFormatExpr: Text[80]; VAR Result: Text[80]; VAR Resolved: Boolean)
     begin
-        if AutoFormatType = 1000 then begin
+        if AutoFormatType = AutoFormatType::"1 Decimal" then begin
             Result := '<Precision,1:1><Standard Format,0>';
             Resolved := true;
         end;
@@ -143,7 +143,7 @@ codeunit 132584 "Auto Format Test"
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Auto Format", 'OnReadRounding', '', true, true)]
     [Normal]
-    procedure HandleOnReadRounding(VAR AmountRoundingPrecision: Decimal)
+    local procedure HandleOnReadRounding(VAR AmountRoundingPrecision: Decimal)
     begin
         AmountRoundingPrecision := 0.0001;
     end;

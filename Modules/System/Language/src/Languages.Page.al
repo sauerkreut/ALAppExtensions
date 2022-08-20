@@ -8,11 +8,12 @@
 /// </summary>
 page 9 Languages
 {
+    Caption = 'Languages';
     AdditionalSearchTerms = 'multilanguage';
     ApplicationArea = All;
     PageType = List;
     SourceTable = Language;
-    UsageCategory = Lists;
+    UsageCategory = Administration;
     ContextSensitiveHelpPage = 'ui-change-basic-settings#language';
 
     layout

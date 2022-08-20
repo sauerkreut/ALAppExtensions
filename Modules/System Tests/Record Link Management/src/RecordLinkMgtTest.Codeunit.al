@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
@@ -6,11 +6,12 @@
 codeunit 132508 "Record Link Mgt. Test"
 {
     Subtype = Test;
-    TestPermissions = Disabled;
+    Permissions = tabledata "Record Link" = rmd;
 
     var
         RecordLinkManagement: Codeunit "Record Link Management";
         Assert: Codeunit "Library Assert";
+        PermissionsMock: Codeunit "Permissions Mock";
 
     trigger OnRun()
     begin
@@ -20,25 +21,44 @@ codeunit 132508 "Record Link Mgt. Test"
     [Test]
     procedure TestWriteNote();
     var
-        RecordLink: Record 2000000068;
+        RecordLink: Record "Record Link";
+        Any: Codeunit Any;
         Instream: InStream;
+        LongText: Text;
         Text: Text;
+        Byte: Byte;
     begin
+        PermissionsMock.Set('Record Link View');
         // [WHEN] WriteNote is invoked with a text
         RecordLinkManagement.WriteNote(RecordLink, 'My note for the link');
 
         // [THEN] The Record Link variable has the text as a note
-        RecordLink.Note.CREATEINSTREAM(Instream, TEXTENCODING::UTF8);
-        Assert.IsTrue(Instream.READTEXT(Text) > 0, 'There are characters to read.');
-        Assert.IsTrue(STRPOS(Text, 'My note for the link') > 0, 'Mismatch in the text written.');
+        // [THEN] The Note contains a single special byte before the actual message.
+        RecordLink.Note.CreateInStream(Instream, TextEncoding::UTF8);
+        Assert.AreEqual(1, Instream.Read(Byte), 'A special byte was expected.');
+        Instream.ReadText(Text);
+        Assert.AreEqual('My note for the link', Text, 'Mismatch in the text written.');
+
+        // [WHEN] The text is bigger of 128 characters
+        LongText := Any.AlphanumericText(128 + Any.IntegerInRange(512));
+        RecordLinkManagement.WriteNote(RecordLink, LongText);
+
+        // [THEN] The Note contains 2 special bytes before the actual message
+        RecordLink.Note.CreateInStream(Instream, TextEncoding::UTF8);
+        Assert.AreEqual(1, Instream.Read(Byte), 'A special byte was expected.');
+        Assert.AreEqual(1, Instream.Read(Byte), 'A special byte was expected.');
+
+        Instream.ReadText(Text);
+        Assert.AreEqual(LongText, Text, 'Mismatch in the text written.');
     end;
 
     [Test]
     procedure TestReadNote();
     var
-        RecordLink: Record 2000000068;
+        RecordLink: Record "Record Link";
         Text: Text;
     begin
+        PermissionsMock.Set('Record Link View');
         // [GIVEN] Some text is written to the record Link
         RecordLinkManagement.WriteNote(RecordLink, 'My note for the link');
 
@@ -53,14 +73,15 @@ codeunit 132508 "Record Link Mgt. Test"
     [TransactionModel(TransactionModel::AutoRollback)]
     procedure TestCopyLinks();
     var
-        RecordLink: Record 2000000068;
-        FromRecordLinkRecordTest: Record 132508;
-        ToRecordLinkRecordTest: Record 132508;
-        NewRecordLink: Record 2000000068;
+        RecordLink: Record "Record Link";
+        FromRecordLinkRecordTest: Record "Record Link Record Test";
+        ToRecordLinkRecordTest: Record "Record Link Record Test";
+        NewRecordLink: Record "Record Link";
         OnAfterCopyLinksMonitor: Codeunit "OnAfterCopyLinks Monitor";
         RecLinkCount: Integer;
     begin
         BindSubscription(OnAfterCopyLinksMonitor);
+        PermissionsMock.Set('Record Link View');
 
         // [GIVEN] A new record is created to set record links on
         FromRecordLinkRecordTest.DeleteAll();
@@ -74,12 +95,16 @@ codeunit 132508 "Record Link Mgt. Test"
         // [GIVEN] Assign the record link to a record
         RecordLink."Record ID" := FromRecordLinkRecordTest.RecordId();
         RecordLinkManagement.WriteNote(RecordLink, 'My note for Rec A');
+
         // [GIVEN] The record link has Notify set to TRUE
         RecordLink.Validate(Notify, true);
         RecordLink.Validate(Created, CurrentDateTime());
         RecordLink.Validate("User ID", UserId());
         RecordLink.Validate(Company, CompanyName());
+        PermissionsMock.Stop();
         RecordLink.Insert(true);
+        PermissionsMock.Start();
+        PermissionsMock.Set('Record Link View');
 
         // [GIVEN] A different instance of the table
         ToRecordLinkRecordTest.Init();
@@ -97,8 +122,8 @@ codeunit 132508 "Record Link Mgt. Test"
         Assert.AreNotEqual(NewRecordLink."Link ID", RecordLink."Link ID", 'New record link should be created with anew id.');
 
         // [THEN] The record link on the other instance has the same text
-        NewRecordLink.SETRANGE("Record ID", ToRecordLinkRecordTest.RecordId());
-        NewRecordLink.FINDFIRST();
+        NewRecordLink.SetRange("Record ID", ToRecordLinkRecordTest.RecordId());
+        NewRecordLink.FindFirst();
         Assert.AreEqual('', RecordLinkManagement.ReadNote(NewRecordLink), 'Mismatch in the text read.');
 
         // [THEN] The record link on the other instance has Notify set to False
@@ -109,15 +134,20 @@ codeunit 132508 "Record Link Mgt. Test"
     [HandlerFunctions('HandleConfirm,HandleMessage')]
     procedure TestRemoveOrphanedLinks();
     var
-        RecordLink: Record 2000000068;
+        RecordLink: Record "Record Link";
         EmptyRecordId: RecordID;
     begin
+        PermissionsMock.Set('Record Link View');
         // [GIVEN] Some text is written to the record Link
         RecordLink.DeleteAll();
+
         RecordLinkManagement.WriteNote(RecordLink, 'My note for the link');
 
         // [GIVEN] Insert the record link
+        PermissionsMock.Stop();
         RecordLink.Insert(true);
+        PermissionsMock.Start();
+        PermissionsMock.Set('Record Link View');
 
         // [GIVEN] Ensure that Record link has no record id
         RecordLink.VALIDATE("Record ID", EmptyRecordId);
