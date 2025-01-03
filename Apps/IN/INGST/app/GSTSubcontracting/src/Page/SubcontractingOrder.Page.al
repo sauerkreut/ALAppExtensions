@@ -1,3 +1,23 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Subcontracting;
+
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Foundation.Reporting;
+using Microsoft.Inventory;
+using Microsoft.Purchases.Comment;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Purchases.Posting;
+using Microsoft.Purchases.Setup;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Utilities;
+using Microsoft.Warehouse.Document;
+using Microsoft.Warehouse.Request;
+
 page 18491 "Subcontracting Order"
 {
     Caption = 'Subcontracting Order';
@@ -658,8 +678,12 @@ page 18491 "Subcontracting Order"
                     PromotedCategory = Process;
                     PromotedIsBig = true;
                     ApplicationArea = Basic, Suite;
-                    RunObject = Codeunit "Purch.-Post (Yes/No)";
                     ShortCutKey = 'F9';
+
+                    trigger OnAction()
+                    begin
+                        PostDocument(CODEUNIT::"Purch.-Post (Yes/No)");
+                    end;
                 }
                 action("Post and &Print")
                 {
@@ -745,6 +769,15 @@ page 18491 "Subcontracting Order"
     local procedure ShortcutDimension2CodeOnAfterV()
     begin
         CurrPage.PurchLines.Page.UpdateForm(true);
+    end;
+
+    local procedure PostDocument(PostingCodeunitID: Integer)
+    var
+        LinesInstructionMgt: Codeunit "Lines Instruction Mgt.";
+    begin
+        LinesInstructionMgt.PurchaseCheckAllLinesHaveQuantityAssigned(Rec);
+        Rec.SendToPosting(PostingCodeunitID);
+        CurrPage.Update(false);
     end;
 
     var

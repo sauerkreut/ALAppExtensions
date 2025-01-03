@@ -434,7 +434,6 @@ codeunit 134270 "Bank Pmt. Appl. Algorithm DK"
         BankAccReconciliationLine.Validate("Additional Transaction Info", AdditionalTransactionInfo);
         BankAccReconciliationLine.Validate("Transaction Date", WorkDate());
         BankAccReconciliationLine.Validate("Statement Amount", Amount);
-        BankAccReconciliationLine.Validate(Type, BankAccReconciliationLine.Type::"Bank Account Ledger Entry");
         BankAccReconciliationLine.Modify(true);
     end;
 
@@ -511,11 +510,11 @@ codeunit 134270 "Bank Pmt. Appl. Algorithm DK"
     local procedure VerifyMatchDetailsData(BankAccReconciliation: Record "Bank Acc. Reconciliation"; BankPmtApplRule: Record "Bank Pmt. Appl. Rule"; AccountType: Enum "Gen. Journal Account Type"; Amount: Decimal; Tolerance: Decimal; ExpectedNumberOfEntriesWithinTolerance: Integer; ExpectedNumberOfEntriesOutsideTolerance: Integer)
     var
         BankAccount: Record "Bank Account";
-        TempBankPmtApplRule: Record "Bank Pmt. Appl. Rule" temporary;
+        TempBankPmtApplRuleLocal: Record "Bank Pmt. Appl. Rule" temporary;
     begin
-        TempBankPmtApplRule.LoadRules();
-        TempBankPmtApplRule.GetBestMatchScore(BankPmtApplRule);
-        BankPmtApplRule."Match Confidence" := TempBankPmtApplRule."Match Confidence";
+        TempBankPmtApplRuleLocal.LoadRules();
+        TempBankPmtApplRuleLocal.GetBestMatchScore(BankPmtApplRule);
+        BankPmtApplRule."Match Confidence" := TempBankPmtApplRuleLocal."Match Confidence";
 
         VerifyMatchDetailsData2(BankAccReconciliation, BankPmtApplRule, AccountType,
           Amount, Tolerance, BankAccount."Match Tolerance Type"::Amount, ExpectedNumberOfEntriesWithinTolerance,

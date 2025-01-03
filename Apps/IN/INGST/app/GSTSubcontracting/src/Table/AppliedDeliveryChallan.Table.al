@@ -1,3 +1,13 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Subcontracting;
+
+using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Tracking;
+
 table 18466 "Applied Delivery Challan"
 {
     Caption = 'Applied Delivery Challan';
@@ -107,6 +117,7 @@ table 18466 "Applied Delivery Challan"
         field(10; "Qty. to Receive"; Decimal)
         {
             Caption = 'Qty. to Receive';
+            DecimalPlaces = 0 : 3;
             DataClassification = CustomerContent;
 
             trigger OnValidate()
@@ -128,6 +139,7 @@ table 18466 "Applied Delivery Challan"
         field(11; "Qty. to Consume"; Decimal)
         {
             Caption = 'Qty. to Consume';
+            DecimalPlaces = 0 : 3;
             DataClassification = CustomerContent;
 
             trigger OnValidate()
@@ -151,6 +163,7 @@ table 18466 "Applied Delivery Challan"
         field(12; "Qty. to Return (C.E.)"; Decimal)
         {
             Caption = 'Qty. to Return (C.E.)';
+            DecimalPlaces = 0 : 3;
             Editable = true;
             DataClassification = CustomerContent;
 
@@ -175,6 +188,7 @@ table 18466 "Applied Delivery Challan"
         field(13; "Qty. To Return (V.E.)"; Decimal)
         {
             Caption = 'Qty. To Return (V.E.)';
+            DecimalPlaces = 0 : 3;
             Editable = true;
             DataClassification = CustomerContent;
 
@@ -349,7 +363,7 @@ table 18466 "Applied Delivery Challan"
     begin
         if DeliveryChallanLine.Get("Applied Delivery Challan No.", "App. Delivery Challan Line No.") then begin
             DeliveryChallanLine.CalcFields("Remaining Quantity");
-            if (DeliveryChallanLine."Remaining Quantity" * DeliveryChallanLine."Quantity per") <
+            if (DeliveryChallanLine."Remaining Quantity") <
                ("Qty. to Receive" + "Qty. to Consume" + "Qty. to Return (C.E.)" + "Qty. To Return (V.E.)")
             then
                 Error(RemainingQtyErr)
@@ -382,7 +396,7 @@ table 18466 "Applied Delivery Challan"
             TrackingSpecification."Item No." := "Item No.";
             TrackingSpecification."Location Code" := DeliveryChallanLn."Vendor Location";
             TrackingSpecification.Description := Item.Description;
-            TrackingSpecification."Variant Code" := DeliveryChallanLine."Variant Code";
+            TrackingSpecification."Variant Code" := DeliveryChallanLn."Variant Code";
             TrackingSpecification."Source ID" := '';
             TrackingSpecification."Source Batch Name" := '';
             TrackingSpecification."Source Prod. Order Line" := 0;
@@ -394,13 +408,14 @@ table 18466 "Applied Delivery Challan"
             TrackingSpecification."Qty. to Invoice (Base)" := Quantity_;
             TrackingSpecification."Quantity Handled (Base)" := 0;
             TrackingSpecification."Quantity Invoiced (Base)" := 0;
-            TrackingSpecification."Qty. per Unit of Measure" := DeliveryChallanLine."Quantity per";
+            TrackingSpecification."Qty. per Unit of Measure" := DeliveryChallanLn."Quantity per";
         end;
     end;
 
     procedure OpenItemTrackingLinesSubcon(Type_: Option Consume,RejectVE,RejectCE,Receive,Rework)
     var
         TrackingSpecification: Record "Tracking Specification";
+        ApplyDeliveryChallanMgt: Codeunit "Apply Delivery Challan Mgt.";
         ItemTrackingForm: Page "Item Tracking Lines";
     begin
         TestField("Item No.");
@@ -432,8 +447,10 @@ table 18466 "Applied Delivery Challan"
         end;
 
         Clear(ItemTrackingForm);
+        ApplyDeliveryChallanMgt.SetAppDelChallan(true, "Applied Delivery Challan No.");
         ItemTrackingForm.SetSourceSpec(TrackingSpecification, WorkDate());
         ItemTrackingForm.RunModal();
+        ApplyDeliveryChallanMgt.SetAppDelChallan(false, '');
     end;
 
     procedure InsertAppDelChLnEntry(Quantity_: Decimal; Type_: Option Consume,RejectVE,RejectCE,Receive,Rework)

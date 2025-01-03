@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.JsonExchange;
+
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Finance.TaxEngine.UseCaseBuilder;
+using Microsoft.RoleCenters;
+using System.Environment.Configuration;
+using System.Globalization;
+using System.Media;
+
 codeunit 20366 "Tax Engine Assisted Setup"
 {
     Permissions = tabledata "Tax Engine Notification" = rmi;
@@ -127,14 +140,14 @@ codeunit 20366 "Tax Engine Assisted Setup"
         GlobalLanguage(CurrentGlobalLanguage);
     end;
 
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Import Config. Package Files", 'OnBeforeImportConfigurationFile', '', false, false)]
-    local procedure OnBeforeImportConfigurationFile()
-    var
-        TaxType: Record "Tax Type";
-    begin
-        if TaxType.IsEmpty() then
-            SetupTaxEngineWithUseCases();
-    end;
+    // [EventSubscriber(ObjectType::Codeunit, Codeunit::"Import Config. Package Files", 'OnBeforeImportConfigurationFile', '', false, false)]
+    // local procedure OnBeforeImportConfigurationFile()
+    // var
+    //     TaxType: Record "Tax Type";
+    // begin
+    //     if TaxType.IsEmpty() then
+    //         SetupTaxEngineWithUseCases();
+    // end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Role Center Notification Mgt.", 'OnBeforeShowNotifications', '', false, false)]
     local procedure OnBeforeShowNotifications()

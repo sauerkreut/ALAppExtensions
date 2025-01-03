@@ -4,11 +4,13 @@ codeunit 139665 "GP Item Transaction Tests"
 
     EventSubscriberInstance = Manual;
     Subtype = Test;
+    Permissions = tableData "Item Ledger Entry" = rimd;
     TestPermissions = Disabled;
 
     var
         Assert: Codeunit Assert;
         ItemDataMigrationFacade: Codeunit "Item Data Migration Facade";
+        GPTestHelperFunctions: Codeunit "GP Test Helper Functions";
         FIFOItemNoLbl: Label 'FIFO Item', MaxLength = 50, Locked = true;
         FIFOSerialItemNoLbl: Label 'FIFO SERIAL Item', MaxLength = 50, Locked = true;
         StandardItemNoLbl: Label 'STANDARD Item', MaxLength = 50, Locked = true;
@@ -26,6 +28,7 @@ codeunit 139665 "GP Item Transaction Tests"
         GPItemLocation: Record "GP Item Location";
         Item: Record "Item";
         ItemLedgerEntry: Record "Item Ledger Entry";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
         HelperFunctions: Codeunit "Helper Functions";
     begin
         // [SCENARIO] Items are migrated from GP
@@ -36,7 +39,6 @@ codeunit 139665 "GP Item Transaction Tests"
         CreateLocations();
         CreateGLAccount();
         CreateGenPostingGroups();
-        HelperFunctions.CreateItemTrackingCodes();
 
         // [GIVEN] Some records are created in the staging tables
         CreateGPItemStagingTableEntries(GPItem);
@@ -44,14 +46,29 @@ codeunit 139665 "GP Item Transaction Tests"
         CreateGPPostingAccountsStagingTableEntries(GPPostingAccount);
         CreateGPItemLocationsStagingTableEntries(GPItemLocation);
 
+        // [GIVEN] The migration is configured to migrate inventory
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Inventory Module", true);
+        GPCompanyAdditionalSettings.Validate("Migrate Only Inventory Master", false);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
+        HelperFunctions.CreateItemTrackingCodes();
+
         // [WHEN] Migration is called
         GPItem.FindSet();
         repeat
             Migrate(GPItem);
         until GPItem.Next() = 0;
 
+        HelperFunctions.PostGLTransactions();
+
         // [THEN] A Item is created for all staging table entries
         Assert.RecordCount(Item, GPItem.Count());
+
+        // [THEN] Item Ledger Entries exist
+        Assert.IsTrue(ItemLedgerEntry.Count() > 0, 'There are no Item Ledger Entries');
 
         // [THEN] Correct Item Ledger Entries get created for each type of item
         GPItem.FindSet();
@@ -137,6 +154,57 @@ codeunit 139665 "GP Item Transaction Tests"
         until GPItem.Next() = 0;
     end;
 
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure TestInventoryMasterDataOnly()
+    var
+        GPItem: Record "GP Item";
+        GPItemTransaction: Record "GP Item Transactions";
+        GPPostingAccount: Record "GP Posting Accounts";
+        GPItemLocation: Record "GP Item Location";
+        Item: Record "Item";
+        ItemLedgerEntry: Record "Item Ledger Entry";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+        HelperFunctions: Codeunit "Helper Functions";
+    begin
+        // [SCENARIO] Items are migrated from GP
+        // [GIVEN] There are no records in Item and ItemTransaction staging tables
+        ClearTables();
+
+        // [GIVEN] Some sample data is created
+        CreateLocations();
+        CreateGLAccount();
+        CreateGenPostingGroups();
+
+        // [GIVEN] Some records are created in the staging tables
+        CreateGPItemStagingTableEntries(GPItem);
+        CreateGPItemTransactionStagingTableEntries(GPItemTransaction);
+        CreateGPPostingAccountsStagingTableEntries(GPPostingAccount);
+        CreateGPItemLocationsStagingTableEntries(GPItemLocation);
+
+        // [GIVEN] The migration is configured to migrate inventory, but with master data only
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Inventory Module", true);
+        GPCompanyAdditionalSettings.Validate("Migrate Only Inventory Master", true);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
+        HelperFunctions.CreateItemTrackingCodes();
+
+        // [WHEN] Migration is called
+        GPItem.FindSet();
+        repeat
+            Migrate(GPItem);
+        until GPItem.Next() = 0;
+
+        // [THEN] A Item is created for all staging table entries
+        Assert.RecordCount(Item, GPItem.Count());
+
+        // [THEN] Item Ledger Entries are not created
+        Assert.RecordCount(ItemLedgerEntry, 0);
+    end;
+
     local procedure CheckItemLedgerEntryFields(ItemLedgerEntry: Record "Item Ledger Entry"; LocationCode: Code[10]; Quantity: Decimal; CostAmount: Decimal; PostingDate: Date)
     begin
         Assert.AreEqual(LocationCode, ItemLedgerEntry."Location Code", 'Location code not set.');
@@ -163,6 +231,8 @@ codeunit 139665 "GP Item Transaction Tests"
         GLAccount: Record "G/L Account";
         GenProductPostingGroup: Record "Gen. Product Posting Group";
         GeneralPostingSetup: Record "General Posting Setup";
+        ItemJournalBatch: Record "Item Journal Batch";
+        ItemJournalLine: Record "Item Journal Line";
     begin
         GPItem.DeleteAll();
         GPItemTransaction.DeleteAll();
@@ -179,15 +249,20 @@ codeunit 139665 "GP Item Transaction Tests"
         GLAccount.DeleteAll();
         GenProductPostingGroup.DeleteAll();
         GeneralPostingSetup.DeleteAll();
+        ItemJournalLine.DeleteAll();
+        ItemJournalBatch.DeleteAll();
     end;
 
     local procedure Migrate(GPItem: Record "GP Item")
     var
         GPItemMigrator: Codeunit "GP Item Migrator";
     begin
-        GPItemMigrator.OnMigrateItem(ItemDataMigrationFacade, GPItem.RecordId());
-        GPItemMigrator.OnMigrateItemPostingGroups(ItemDataMigrationFacade, GPItem.RecordId(), true);
-        GPItemMigrator.OnMigrateInventoryTransactions(ItemDataMigrationFacade, GPItem.RecordId(), true);
+        if not GPTestHelperFunctions.MigrationConfiguredForTable(Database::Item) then
+            exit;
+
+        GPItemMigrator.MigrateItem(ItemDataMigrationFacade, GPItem.RecordId());
+        GPItemMigrator.MigrateItemPostingGroups(ItemDataMigrationFacade, GPItem.RecordId(), true);
+        GPItemMigrator.MigrateInventoryTransactions(ItemDataMigrationFacade, GPItem.RecordId(), true);
     end;
 
     local procedure CreateLocations()
@@ -212,7 +287,7 @@ codeunit 139665 "GP Item Transaction Tests"
         GLAccount.Init();
         GLAccount."No." := '1300';
         GLAccount.Name := 'Inventory - Retail/Parts';
-        GLAccount."Account Type" := 0;
+        GLAccount."Account Type" := "G/L Account Type"::Posting;
         GLAccount.Insert();
     end;
 

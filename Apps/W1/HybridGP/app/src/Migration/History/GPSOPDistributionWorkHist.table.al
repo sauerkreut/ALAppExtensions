@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4070 "GPSOPDistributionWorkHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

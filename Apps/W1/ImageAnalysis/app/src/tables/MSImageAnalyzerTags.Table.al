@@ -1,3 +1,7 @@
+namespace Microsoft.Utility.ImageAnalysis;
+
+using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Item.Attribute;
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved. 
 // Licensed under the MIT License. See License.txt in the project root for license information. 
@@ -72,6 +76,9 @@ table 2028 "MS - Image Analyzer Tags"
         key(PK; "Detected On Item No", "Tag Name")
         {
             Clustered = true;
+        }
+        key(Key1; "Action To Perform")
+        {
         }
     }
 
@@ -201,7 +208,7 @@ table 2028 "MS - Image Analyzer Tags"
                 "Item Attribute Value Id" := ItemAttributeValue.id;
                 "Item Attribute Value Name" := ItemAttributeValue.Value;
             end else
-                Error(StrSubstNo(AttributeAlreadyAssignedErr, ItemAttribute.Name));
+                Error(AttributeAlreadyAssignedErr, ItemAttribute.Name);
         end;
     end;
 

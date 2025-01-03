@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Purchases.History;
+
+using Microsoft.Finance.TDS.TDSBase;
+
 pageextension 18724 "Posted Purch. Cr Memo Stats." extends "Purch. Credit Memo Statistics"
 {
     layout
@@ -13,13 +21,29 @@ pageextension 18724 "Posted Purch. Cr Memo Stats." extends "Purch. Credit Memo S
             }
         }
     }
+
     trigger OnAfterGetRecord()
-    var
-        TDSStatistics: Codeunit "TDS Statistics";
     begin
-        TDSStatistics.GetStatisticsPostedPurchCrMemoAmount(Rec, TDSAmount);
+        FormatLine();
+    end;
+
+    local procedure GetTDSAmount()
+    var
+        TDSStatsManagement: Codeunit "TDS Stats Management";
+    begin
+        TDSAmount := TDSStatsManagement.GetTDSStatsAmount();
+        Calculated := true;
+        TDSStatsManagement.ClearSessionVariable();
+    end;
+
+    local procedure FormatLine()
+    begin
+        if not Calculated then
+            GetTDSAmount();
     end;
 
     var
+
         TDSAmount: Decimal;
+        Calculated: Boolean;
 }

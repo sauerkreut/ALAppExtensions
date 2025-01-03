@@ -1,9 +1,12 @@
+namespace Microsoft.Integration.Shopify;
+
+using Microsoft.Inventory.Location;
+
 /// <summary>
 /// Table Shpfy Shop Location (ID 30113).
 /// </summary>
 table 30113 "Shpfy Shop Location"
 {
-    Access = Internal;
     Caption = 'Shopify Shop Location';
     DataClassification = CustomerContent;
     DrillDownPageId = "Shpfy Shop Locations Mapping";
@@ -44,6 +47,8 @@ table 30113 "Shpfy Shop Location"
         field(5; "Location Filter"; Text[250])
         {
             Caption = 'Location Filter';
+            TableRelation = Location.Code;
+            ValidateTableRelation = false;
             DataClassification = CustomerContent;
             Description = 'Filter on location for calculating the stock.';
 
@@ -65,23 +70,77 @@ table 30113 "Shpfy Shop Location"
             Caption = 'Default Location Code';
             DataClassification = CustomerContent;
             Description = 'The default location code for use on a sales document.';
-            TableRelation = Location;
+            TableRelation = Location.Code where("Use as In-Transit" = const(false));
+            trigger OnValidate()
+            begin
+                if Rec."Location Filter" = '' then
+                    Rec."Location Filter" := Rec."Default Location Code";
+            end;
         }
-
+#if not CLEANSCHEMA25
         field(7; Disabled; Boolean)
         {
             Caption = 'Disabled';
             DataClassification = CustomerContent;
+            ObsoleteReason = 'Replaced by Stock Calculation field.';
+            ObsoleteTag = '25.0';
+            ObsoleteState = Removed;
             Description = 'This disabled the synchronisation of the stock to Shopify.';
-            InitValue = true;
         }
-
+#endif
         field(8; Active; Boolean)
         {
             Caption = 'Active';
             DataClassification = SystemMetadata;
             Description = 'Active in Shopfy';
             Editable = false;
+        }
+        field(9; "Is Primary"; Boolean)
+        {
+            Caption = 'Is Primary';
+            DataClassification = SystemMetadata;
+            Description = 'Is primary location in Shopify';
+            Editable = false;
+        }
+        field(10; "Stock Calculation"; Enum "Shpfy Stock Calculation")
+        {
+            Caption = 'Stock calculation';
+            DataClassification = SystemMetadata;
+            InitValue = Disabled;
+            Description = 'Select the stock calculation used for this location.';
+        }
+        field(11; "Is Fulfillment Service"; Boolean)
+        {
+            Caption = 'Is Fulfillment Service';
+            DataClassification = SystemMetadata;
+            Editable = false;
+            Description = 'Check if this a fulfillment service location.';
+        }
+        field(12; "Default Product Location"; Boolean)
+        {
+            Caption = 'Default Product Location';
+            DataClassification = SystemMetadata;
+            Description = 'The default product locations will be added to new products in Shopify.';
+
+            trigger OnValidate()
+            var
+                ShopLocation: Record "Shpfy Shop Location";
+                ErrorInfo: ErrorInfo;
+                MixLocationTypeErr: Label 'You can not use standard Shopify Locations with FulFillment Service Locations.';
+            begin
+                if Rec."Default Product Location" then begin
+                    ShopLocation.SetRange("Is Fulfillment Service", not Rec."Is Fulfillment Service");
+                    ShopLocation.SetRange("Default Product Location", true);
+                    if not ShopLocation.IsEmpty then begin
+                        ErrorInfo.Message(MixLocationTypeErr);
+                        ErrorInfo.ErrorType := ErrorType::Client;
+                        ErrorInfo.FieldNo := CurrFieldNo;
+                        ErrorInfo.RecordId := Rec.RecordId;
+                        ErrorInfo.SystemId := Rec.SystemId;
+                        Error(ErrorInfo);
+                    end;
+                end;
+            end;
         }
     }
 
@@ -108,13 +167,13 @@ table 30113 "Shpfy Shop Location"
     internal procedure CreateLocationFilter()
     var
         Location: Record Location;
-        LocationFilter: Report "Shpfy Create Location Filter";
+        CreateLocationFilter: Report "Shpfy Create Location Filter";
     begin
         if "Location Filter" <> '' then
             Location.SetFilter(Code, "Location Filter");
-        LocationFilter.SetTableView(Location);
-        LocationFilter.RunModal();
-        "Location Filter" := CopyStr(LocationFilter.GetLocationFilter(), 1, MaxStrLen("Location Filter"));
+        CreateLocationFilter.SetTableView(Location);
+        CreateLocationFilter.RunModal();
+        "Location Filter" := CopyStr(CreateLocationFilter.GetLocationFilter(), 1, MaxStrLen("Location Filter"));
     end;
 
 }

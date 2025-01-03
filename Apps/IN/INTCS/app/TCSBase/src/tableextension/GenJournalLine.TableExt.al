@@ -1,3 +1,15 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GeneralLedger.Journal;
+
+using Microsoft.Finance.TaxBase;
+using Microsoft.Finance.TCS.TCSBase;
+using Microsoft.Sales.History;
+using Microsoft.Sales.Receivables;
+using System.Utilities;
+
 tableextension 18808 "Gen. Journal Line" extends "Gen. Journal Line"
 {
     fields
@@ -144,6 +156,8 @@ tableextension 18808 "Gen. Journal Line" extends "Gen. Journal Line"
         CustLedgerEntry.SetRange("Customer No.", "Account No.");
         CustLedgerEntry.SetRange(Open, true);
         CustLedgerEntry.SetRange("Document Type", CustLedgerEntry."Document Type"::Invoice);
+        GSTBaseAmount := 0;
+        GSTAmount := 0;
         if CustLedgerEntry.FindSet() then
             repeat
                 SalesInvoiceLine.SetRange("Document No.", CustLedgerEntry."Document No.");
@@ -158,7 +172,7 @@ tableextension 18808 "Gen. Journal Line" extends "Gen. Journal Line"
                             SalesLineBuferTCSOnPmt."Customer No." := CustLedgerEntry."Customer No.";
                             SalesLineBuferTCSOnPmt."Posted Invoice No." := SalesInvoiceLine."Document No.";
                             SalesLineBuferTCSOnPmt."Invoice Line No." := SalesInvoiceLine."Line No.";
-                            SalesLineBuferTCSOnPmt."User ID" := UserId;
+                            SalesLineBuferTCSOnPmt."User ID" := CopyStr(UserId(), 1, 50);
                             SalesLineBuferTCSOnPmt.Type := SalesInvoiceLine.Type;
                             SalesLineBuferTCSOnPmt."No." := SalesInvoiceLine."No.";
                             SalesLineBuferTCSOnPmt.Description := SalesInvoiceLine.Description;

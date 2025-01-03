@@ -1,3 +1,19 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Subcontracting;
+
+using Microsoft.Finance.Dimension;
+using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Inventory.Item;
+using Microsoft.Warehouse.Structure;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Location;
+using Microsoft.Inventory.Tracking;
+using Microsoft.Manufacturing.Document;
+using Microsoft.Purchases.Document;
+
 table 18479 "Sub Order Component List"
 {
     Caption = 'Sub Order Component List';
@@ -64,6 +80,7 @@ table 18479 "Sub Order Component List"
         field(11; "Quantity To Send"; Decimal)
         {
             Caption = 'Quantity To Send';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
 
             trigger OnValidate()
@@ -76,11 +93,13 @@ table 18479 "Sub Order Component List"
         field(12; "Quantity (Base)"; Decimal)
         {
             Caption = 'Quantity (Base)';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
         }
         field(13; "Quantity To Send (Base)"; Decimal)
         {
             Caption = 'Quantity To Send (Base)';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
         }
         field(14; Description; Text[100])
@@ -159,12 +178,14 @@ table 18479 "Sub Order Component List"
                 where("Location Code" = field("Vendor Location"),
                 "Item No." = field("Item No.")));
             Caption = 'Total Qty at Vendor Location';
+            DecimalPlaces = 0 : 3;
             Editable = false;
             FieldClass = FlowField;
         }
         field(53; "Total Scrap Quantity"; Decimal)
         {
             Caption = 'Total Scrap Quantity';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
 
             trigger OnValidate()
@@ -187,12 +208,14 @@ table 18479 "Sub Order Component List"
                 "Order Line No." = field("Production Order Line No."),
                 "Prod. Order Comp. Line No." = field("Line No.")));
             Caption = 'Qty. at Vendor Location';
+            DecimalPlaces = 0 : 3;
             Editable = false;
             FieldClass = FlowField;
         }
         field(55; "Qty. for Rework"; Decimal)
         {
             Caption = 'Qty. for Rework';
+            DecimalPlaces = 0 : 3;
             Editable = false;
             DataClassification = EndUserIdentifiableInformation;
         }
@@ -230,6 +253,12 @@ table 18479 "Sub Order Component List"
         field(60; "Identification Mark"; Text[20])
         {
             Caption = 'Identification Mark';
+            DataClassification = EndUserIdentifiableInformation;
+        }
+        field(61; "Bin Code"; Code[20])
+        {
+            Caption = 'Bin Code';
+            TableRelation = if ("Quantity To Send" = filter(> 0)) "Bin Content"."Bin Code" where("Location Code" = field("Company Location"), "Item No." = field("Item No."), "Variant Code" = field("Variant Code"));
             DataClassification = EndUserIdentifiableInformation;
         }
         field(480; "Dimension Set ID"; Integer)
@@ -308,7 +337,7 @@ table 18479 "Sub Order Component List"
         SubOrderComponents.FindSet();
         repeat
             SubOrderComponents.Validate(
-              "Quantity To Send", ("Deliver Comp. For" * SubOrderComponents."Quantity per"));
+              "Quantity To Send", PurchLine.GetQuantityToSendForSubOrderCompList(SubOrderComponents, "Deliver Comp. For"));
             SubOrderComponents.Validate(
               "Qty. for Rework", (SubOrderComponents."Quantity per" * "Qty. to Reject (Rework)"));
             if SubOrderComponents."Scrap %" <> 0 then begin

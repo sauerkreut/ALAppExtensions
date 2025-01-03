@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.Reports;
+
+using Microsoft.Finance.GST.Base;
+
 query 18040 "GST Amount GSTR3B"
 {
     QueryType = Normal;
@@ -81,6 +89,9 @@ query 18040 "GST Amount GSTR3B"
                 {
                 }
                 filter(Component_Calc__Type; "Component Calc. Type")
+                {
+                }
+                filter(e_Comm__Merchant_Id; "e-Comm. Merchant Id")
                 {
                 }
             }

@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TDS.TDSBase;
+
+using Microsoft.Finance.TaxEngine.PostingHandler;
+using Microsoft.Purchases.Payables;
+using Microsoft.Finance.GeneralLedger.Ledger;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.TaxBase;
+
 codeunit 18685 "TDS Entity Management"
 {
     procedure AddTDSSubSection(TDSSection: Record "TDS Section")
@@ -147,6 +160,7 @@ codeunit 18685 "TDS Entity Management"
         ParentSectionCode: Code[10];
         PresentationOrder: Integer;
     begin
+        ParentSectionCode := '';
         ReAssignPresentationOrder(ParentSectionCode, PresentationOrder);
     end;
 
@@ -165,6 +179,7 @@ codeunit 18685 "TDS Entity Management"
     begin
         TDSEntryUpdateMgt.SetSuggetVendorPayment();
     end;
+
     local procedure ReAssignPresentationOrder(ParentSectionCode: Code[10]; var PresentationOrder: Integer)
     var
         TDSSection: Record "TDS Section";

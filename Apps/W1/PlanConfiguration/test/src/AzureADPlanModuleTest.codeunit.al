@@ -1,4 +1,4 @@
-codeunit 132913 "Azure AD Plan Module Test"
+codeunit 139509 "Azure AD Plan Module Test"
 {
     Subtype = Test;
     TestPermissions = Restrictive;
@@ -10,18 +10,22 @@ codeunit 132913 "Azure AD Plan Module Test"
 
     var
         Assert: Codeunit Assert;
-        LibraryAzureADUserMgmt: Codeunit "Library - Azure AD User Mgmt.";
         LibraryLowerPermissions: Codeunit "Library - Lower Permissions";
         LibraryPermissions: Codeunit "Library - Permissions";
         EnvironmentInfoTestLibrary: Codeunit "Environment Info Test Library";
-        InformationWorkerUserGroupTxt: Label 'Information Worker';
-        MixedPlansNonAdminErr: Label 'All users must be assigned to the same license, either Basic, Essential, or Premium. %1 and %2 are assigned to different licenses, for example, but there may be other mismatches. Your system administrator or Microsoft partner can verify license assignments in your Microsoft 365 admin portal.\\We will sign you out when you choose the OK button.';
-        MixedPlansMsg: Label 'One or more users are not assigned to the same Business Central license. For example, we found that users %1 and %2 are assigned to different licenses, but there may be other mismatches. In your Microsoft 365 admin center, make sure that all users are assigned to the same Business Central license, either Basic, Essential, or Premium.  Afterward, update Business Central by opening the Users page and using the ''Update Users from Office 365'' action.', Comment = '%1 = %2 = Authnetication email.';
+        AzureADGraphTestLibrary: Codeunit "Azure AD Graph Test Library";
+        MockGraphQueryTestLibrary: Codeunit "MockGraphQuery Test Library";
         FirstUserAuthenticationEmail: Text;
         SecondUserAuthenticationEmail: Text;
+        TestPlanIdTxt: Label '{6fe0b5b8-d2df-4741-8d03-f57ac1101851}';
+        TestRoleIdTxt: Label 'TEST PS';
+        MixedPlansExpectedErr: Label 'Expected mixed plans';
+        MixedPlansNotExpectedErr: Label 'Did not expected mixed plans';
+
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
     [Scope('OnPrem')]
     procedure TestEssentialUserIsNotSuperIfSuperExistsInFirstLoginFlow()
     var
@@ -31,7 +35,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] User should get SUPER revoked if there is another SUPER in the system
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -52,6 +55,7 @@ codeunit 132913 "Azure AD Plan Module Test"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
     [Scope('OnPrem')]
     procedure TestEssentialUsersSuperIsNotRevokedInGetUserFromO365Flow()
     var
@@ -62,7 +66,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] SUPER on the User should not be revoked if user pulled from non first login flow
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -93,9 +96,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         Plan: Query Plan;
         RoleCenterID: Integer;
     begin
-        // [SCENARIO] When singning in, if the plan is disabled, no role center is returned from Azure AD management
+        // [SCENARIO] When signing in, if the plan is disabled, no role center is returned from Azure AD management
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
 
         LibraryLowerPermissions.SetOutsideO365Scope();
 
@@ -103,8 +105,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         while Plan.Read() do begin
             // [GIVEN] A user with a plan exists, plan status = disabled
             CreateUserWithSubscriptionPlan(User, Plan.Plan_ID, Plan.Plan_Name, 'Disabled');
-            // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first userlogin)
-            // [THEN] Rolecenter ID 0 is returned
+            // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first user login)
+            // [THEN] Role center ID 0 is returned
             LibraryLowerPermissions.SetO365Basic();
 
             AzureADPlan.TryGetAzureUserPlanRoleCenterId(RoleCenterID, User."User Security ID");
@@ -122,20 +124,21 @@ codeunit 132913 "Azure AD Plan Module Test"
     var
         User: Record User;
         AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
         Plan: Query Plan;
         RoleCenterID: Integer;
     begin
-        // [SCENARIO] When singning in you get the role center matching your plan, if the plan is enabled
+        // [SCENARIO] When signing in you get the role center matching your plan, if the plan is enabled
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
+        BindSubscription(AzureADPlanTestLibrary);
 
         Plan.Open();
         while Plan.Read() do begin
             // [GIVEN] A user with a plan exists, plan status = enabled
             LibraryLowerPermissions.SetOutsideO365Scope();
             CreateUserWithSubscriptionPlan(User, Plan.Plan_ID, Plan.Plan_Name, 'Enabled');
-            // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first userlogin)
-            // [THEN] Rolecenter for the plan is returned, only if the plan is enabled
+            // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first user login)
+            // [THEN] Role center for the plan is returned, only if the plan is enabled
             LibraryLowerPermissions.SetO365Basic();
 
             AzureADPlan.TryGetAzureUserPlanRoleCenterId(RoleCenterID, User."User Security ID");
@@ -155,10 +158,9 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] No users yet in the system, when signing in, no role center is returned from Azure AD management
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
 
         // [GIVEN] No users in the system
-        // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first userlogin)
+        // [WHEN] GetAzureUserPlanRoleCenterId invoked (at first user login)
         // [THEN] No role center return from Azure AD management
         LibraryLowerPermissions.SetO365Basic();
         ;
@@ -178,9 +180,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         AzureADPlan: Codeunit "Azure AD Plan";
         RoleCenterID: Integer;
     begin
-        // [SCENARIO] Codeunit AzureADPlan.TryGetAzureUserPlanRoleCenterId exits immediatelly if the user is not found in azure
+        // [SCENARIO] Codeunit AzureADPlan.TryGetAzureUserPlanRoleCenterId exits immediately if the user is not found in azure
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
 
         // [GIVEN] Running in SaaS
         EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(true);
@@ -203,44 +204,13 @@ codeunit 132913 "Azure AD Plan Module Test"
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestRefreshUserPlanAssignments()
-    var
-        User: Record User;
-        UserGroupPlan: Record "User Group Plan";
-        AzureADPlan: Codeunit "Azure AD Plan";
-    begin
-        // [SCENARIO] User should get the User Grops of the plan
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] A user with a plan that contains user groups
-        CreateUserWithPlanAndUserGroups(User, UserGroupPlan, 'Test User');
-
-        // [WHEN] RefreshUserPlanAssignments is invoked
-        LibraryLowerPermissions.SetO365BusFull();
-        LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] User gets the User Groups of the plan
-        ValidateUserGetsTheUserGroupsOfThePlan(User, UserGroupPlan);
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure TestRefreshUserPlanAssignmentsInternalAdmin()
     var
         User: Record User;
         AzureADPlan: Codeunit "Azure AD Plan";
     begin
-        // [SCENARIO] The User shoudl be able to invoke Refresh user on the internal admin without getting an error
+        // [SCENARIO] The User should be able to invoke Refresh user on the internal admin without getting an error
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
 
         // [GIVEN] A admin user with no plan
@@ -266,7 +236,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] Calling Refresh User Plan Assignments for non-existing user doesn't throw err
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetO365BusFull();
         // [GIVEN] Non-existing user security ID
         // [WHEN] RefreshUserPlanAssignments is called with non-existing user security ID
@@ -280,187 +249,18 @@ codeunit 132913 "Azure AD Plan Module Test"
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestRemovePlanFromUserAtRefresh()
-    var
-        User: Record User;
-        UserGroupPlan: Record "User Group Plan";
-        AzureADPlan: Codeunit "Azure AD Plan";
-        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
-        PlanID: Guid;
-        PlanName: Text[50];
-    begin
-        // [SCENARIO] When user plans are updated in the Azure Graph, old plans are removed from the user
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] A user with a plan that contains user groups
-        CreateUserWithPlanAndUserGroups(User, UserGroupPlan, 'Test User');
-
-        // [GIVEN] Only in NAV, the user has an additional plan assigned
-        PlanName := 'TestPlan';
-        PlanID := AzureADPlanTestLibrary.CreatePlan(PlanName);
-        LibraryPermissions.AddUserToPlan(User."User Security ID", PlanID);
-        Assert.IsTrue(
-            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"), 'Test prerequisite failed.');
-
-        // [WHEN] RefreshUserPlanAssignments invoked
-        LibraryLowerPermissions.SetO365BusFull();
-        LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] The additional plan is removed from the user
-        Assert.IsFalse(
-            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"),
-            StrSubstNo('Plan %1 should not be assigned to the user.', PlanName));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestRemoveUserGroupsFromUserAtRefresh()
-    var
-        User: Record User;
-        UserGroupPlan: Record "User Group Plan";
-        AzureADPlan: Codeunit "Azure AD Plan";
-        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
-        PlanID: Guid;
-    begin
-        // [SCENARIO] When users are updated from the Azure Graph,
-        // [SCENARIO] Only the user groups allowed by the plan remain assigned to the user
-        // [SCENARIO] i.e. the user groups from old plans are removed from the user
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] A user with a plan that contains user groups
-        CreateUserWithPlanAndUserGroups(User, UserGroupPlan, 'Test User');
-
-        // [GIVEN] Only in NAV, the user has an additional plan assigned
-        PlanID := AzureADPlanTestLibrary.CreatePlan('TestPlan');
-        LibraryPermissions.AddUserToPlan(User."User Security ID", PlanID);
-        Assert.IsTrue(
-            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"), 'Test prerequisite failed.');
-
-        // [GIVEN] The user is also assigned some user groups
-        AddUserToUserGroupNAVOnly(User, InformationWorkerUserGroupTxt, PlanID);
-
-        // [WHEN] RefreshUserPlanAssignments invoked
-        LibraryLowerPermissions.SetO365BusFull();
-        LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] The user should be removed from InformationWorker user group. Only the user groups allowed by the plan remain
-        Assert.IsFalse(
-          IsUserInUserGroup(User."User Security ID", InformationWorkerUserGroupTxt),
-          StrSubstNo('User Group %1 should not be assigned to the user.', InformationWorkerUserGroupTxt));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestRemoveExtraUserGroupsFromUserAtRefresh()
-    var
-        User: Record User;
-        UserGroupPlan: Record "User Group Plan";
-        AzureADPlan: Codeunit "Azure AD Plan";
-    begin
-        // [SCENARIO] When users are updated from the Azure Graph,
-        // [SCENARIO] The manually assigned user groups remain assigned to the user
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] A user with a plan that contains user groups
-        CreateUserWithPlanAndUserGroups(User, UserGroupPlan, 'Test User');
-
-        // [GIVEN] The user is also assigned some user groups, but those user groups are not part of any plan
-        AddUserToUserGroupNAVOnly(User, InformationWorkerUserGroupTxt, CreateGuid());
-
-        // [WHEN] RefreshUserPlanAssignments invoked
-        LibraryLowerPermissions.SetO365BusFull();
-        LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] The user should not be removed from InformationWorker user group
-        Assert.IsTrue(
-          IsUserInUserGroup(User."User Security ID", InformationWorkerUserGroupTxt),
-          StrSubstNo('User Group %1 should be assigned to the user.', InformationWorkerUserGroupTxt));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestUpdateUserPlansAllUsers()
-    var
-        UserCassie: Record User;
-        UserAdmin: Record User;
-        UserDebra: Record User;
-        UserGroupPlan: Record "User Group Plan";
-        AzureADPlan: Codeunit "Azure AD Plan";
-        Plan: Query Plan;
-    begin
-        // [SCENARIO] Multiple users get the User Grops of the plan when created
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] SUPER User
-        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
-
-        // [GIVEN] Two users with a plan that contains user groups
-        UserGroupPlan.FindFirst();
-        Plan.SetRange(Plan_ID, UserGroupPlan."Plan ID");
-        Plan.Open();
-        Plan.Read();
-
-        UserCassie."User Name" := 'Test User 1 - Cassie';
-        CreateUserWithSubscriptionPlan(UserCassie, Plan.Plan_ID, Plan.Plan_Name, 'Enabled');
-        UserDebra."User Name" := 'Test User 2 - Debra';
-        CreateUserWithSubscriptionPlan(UserDebra, Plan.Plan_ID, Plan.Plan_Name, 'Enabled');
-        LibraryPermissions.CreateAzureActiveDirectoryUser(UserAdmin, '');
-        UserDebra."User Name" := 'Test User 3 - Admin';
-
-        // [WHEN] UpdateUserPlans for all users is invoked
-        LibraryLowerPermissions.SetO365BusFull();
-        LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.UpdateUserPlans();
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] Both users get the User Groups of the plan
-        ValidateUserGetsTheUserGroupsOfThePlan(UserCassie, UserGroupPlan);
-        ValidateUserGetsTheUserGroupsOfThePlan(UserDebra, UserGroupPlan);
-    end;
-
-    [Test]
-    [HandlerFunctions('HandleAndVerifyChangedPlanMessageOK')]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndGroupsBasicAndEssentials()
+    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndPermissionsBasicAndEssentials()
     var
         BasicUser: Record User;
         EssentialUser: Record User;
         AzureADPlan: Codeunit "Azure AD Plan";
         PlanIds: Codeunit "Plan Ids";
+        TestUserPermissionsSubs: Codeunit "Test User Permissions Subs.";
     begin
         // [SCENARIO] CheckMixedPlans show a message when user has access to the user management tables
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
+        BindSubscription(TestUserPermissionsSubs);
+        TestUserPermissionsSubs.SetCanManageUser(UserSecurityId());
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -478,7 +278,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         LibraryLowerPermissions.AddSecurity();
         FirstUserAuthenticationEmail := BasicUser."Authentication Email";
         SecondUserAuthenticationEmail := EssentialUser."Authentication Email";
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsTrue(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -487,26 +288,27 @@ codeunit 132913 "Azure AD Plan Module Test"
     end;
 
     [Test]
-    [HandlerFunctions('HandleAndVerifyChangedPlanMessageOK')]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndGroupsBasicAndPremium()
+    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndPermissionsBasicAndPremium()
     var
         BasicUser: Record User;
         PremiumUser: Record User;
         AzureADPlan: Codeunit "Azure AD Plan";
         PlanIds: Codeunit "Plan Ids";
+        TestUserPermissionsSubs: Codeunit "Test User Permissions Subs.";
     begin
         // [SCENARIO] CheckMixedPlans show a message when user has access to the user management tables
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
+        BindSubscription(TestUserPermissionsSubs);
+        TestUserPermissionsSubs.SetCanManageUser(UserSecurityId());
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
         // [GIVEN] SUPER User
         CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
 
-        // [GIVEN] A user with basic and a user with premuim plans are added
+        // [GIVEN] A user with basic and a user with premium plans are added
         LibraryPermissions.CreateAzureActiveDirectoryUser(BasicUser, '');
         LibraryPermissions.CreateAzureActiveDirectoryUser(PremiumUser, '');
         LibraryPermissions.AddUserToPlan(BasicUser."User Security ID", PlanIds.GetBasicPlanId());
@@ -518,7 +320,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         LibraryLowerPermissions.AddSecurity();
         FirstUserAuthenticationEmail := BasicUser."Authentication Email";
         SecondUserAuthenticationEmail := PremiumUser."Authentication Email";
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsTrue(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -527,19 +330,20 @@ codeunit 132913 "Azure AD Plan Module Test"
     end;
 
     [Test]
-    [HandlerFunctions('HandleAndVerifyChangedPlanMessageOK')]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndGroupsEssentialAndPremium()
+    procedure TestCheckMixedPlansWhenUserHasAccessToEditUserPlanAndPermissionsEssentialAndPremium()
     var
         PremiumUser: Record User;
         EssentialUser: Record User;
         AzureADPlan: Codeunit "Azure AD Plan";
         PlanIds: Codeunit "Plan Ids";
+        TestUserPermissionsSubs: Codeunit "Test User Permissions Subs.";
     begin
         // [SCENARIO] CheckMixedPlans show a message when user has access to the user management tables
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
+        BindSubscription(TestUserPermissionsSubs);
+        TestUserPermissionsSubs.SetCanManageUser(UserSecurityId());
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -557,7 +361,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         LibraryLowerPermissions.AddSecurity();
         FirstUserAuthenticationEmail := EssentialUser."Authentication Email";
         SecondUserAuthenticationEmail := PremiumUser."Authentication Email";
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsTrue(AzureADPlan.CheckMixedPlansExist(), MixedPlansNotExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -568,7 +373,7 @@ codeunit 132913 "Azure AD Plan Module Test"
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndGroupsEssentialAndPremium()
+    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndPermissionsEssentialAndPremium()
     var
         PremiumUser: Record User;
         EssentialUser: Record User;
@@ -579,7 +384,6 @@ codeunit 132913 "Azure AD Plan Module Test"
         if not LibraryLowerPermissions.CanLowerPermission() then
             exit;
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -594,20 +398,17 @@ codeunit 132913 "Azure AD Plan Module Test"
 
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365Basic();
-        ;
-        asserterror AzureADPlan.CheckMixedPlans();
+
+        Assert.IsTrue(AzureADPlan.CheckMixedPlansExist(), MixedPlansNotExpectedErr);
 
         // Rollback SaaS test
         TearDown();
-
-        // [THEN] Error is thrown
-        Assert.ExpectedError(StrSubstNo(MixedPlansNonAdminErr, EssentialUser."Authentication Email", PremiumUser."Authentication Email"));
     end;
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndGroupsEssentialISVAndPremiumISV()
+    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndPermissionsEssentialISVAndPremiumISV()
     var
         PremiumUser: Record User;
         EssentialUser: Record User;
@@ -618,7 +419,6 @@ codeunit 132913 "Azure AD Plan Module Test"
         if not LibraryLowerPermissions.CanLowerPermission() then
             exit;
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -634,7 +434,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365Basic();
         ;
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -645,7 +446,7 @@ codeunit 132913 "Azure AD Plan Module Test"
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndGroupsPremiumAndPremiumISV()
+    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndPermissionsPremiumAndPremiumISV()
     var
         PremiumUser: Record User;
         PremiumISVUser: Record User;
@@ -656,7 +457,6 @@ codeunit 132913 "Azure AD Plan Module Test"
         if not LibraryLowerPermissions.CanLowerPermission() then
             exit;
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -672,7 +472,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365Basic();
         ;
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -683,7 +484,7 @@ codeunit 132913 "Azure AD Plan Module Test"
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
     [Scope('OnPrem')]
-    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndGroupsBasicAndPremium()
+    procedure TestCheckMixedPlansWhenUserHasNoAccessToEditUserPlanAndPermissionsBasicAndPremium()
     var
         PremiumUser: Record User;
         BasicUser: Record User;
@@ -694,7 +495,6 @@ codeunit 132913 "Azure AD Plan Module Test"
         if not LibraryLowerPermissions.CanLowerPermission() then
             exit;
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -710,155 +510,10 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365Basic();
         ;
-        asserterror AzureADPlan.CheckMixedPlans();
+        Assert.IsTrue(AzureADPlan.CheckMixedPlansExist(), MixedPlansNotExpectedErr);
 
         // Rollback SaaS test
         TearDown();
-
-        // [THEN] Error is thrown
-        Assert.ExpectedError(StrSubstNo(MixedPlansNonAdminErr, BasicUser."Authentication Email", PremiumUser."Authentication Email"));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestCheckMixedPlans_EssentialAndIncomingPremium()
-    var
-        PremiumUser: Record User;
-        EssentialUser: Record User;
-        AzureADPlan: Codeunit "Azure AD Plan";
-        PlanIds: Codeunit "Plan Ids";
-        AzureADGraphUser: Codeunit "Azure AD Graph User";
-        IncomingPlansPerUser: Dictionary of [Text, List of [Text]];
-        PlansForUser: List of [Text];
-    begin
-        // [SCENARIO] CheckMixedPlans
-        if not LibraryLowerPermissions.CanLowerPermission() then
-            exit;
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] SUPER User
-        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
-
-        // [GIVEN] A user with essential plan is added
-        LibraryPermissions.CreateAzureActiveDirectoryUser(EssentialUser, '');
-        LibraryPermissions.AddUserToPlan(EssentialUser."User Security ID", PlanIds.GetEssentialPlanId());
-
-        // [GIVEN] Another user got a premium license assigned in the Office portal
-        LibraryPermissions.CreateAzureActiveDirectoryUser(PremiumUser, '');
-        PlansForUser.Add('Dynamics 365 Business Central Premium');
-        IncomingPlansPerUser.Add(AzureADGraphUser.GetUserAuthenticationObjectId(PremiumUser."User Security ID"), PlansForUser);
-
-        // [WHEN] CheckMixedPlans invoked
-        LibraryLowerPermissions.SetO365Basic();
-        ;
-        asserterror AzureADPlan.CheckMixedPlans(IncomingPlansPerUser, true);
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] Error is thrown
-        Assert.ExpectedError(StrSubstNo(MixedPlansNonAdminErr, EssentialUser."Authentication Email", PremiumUser."Authentication Email"));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestCheckMixedPlans_EssentialAndEssentialUpgradedToPremium()
-    var
-        EssentialUser1: Record User;
-        EssentialUser2: Record User;
-        AzureADPlan: Codeunit "Azure AD Plan";
-        PlanIds: Codeunit "Plan Ids";
-        AzureADGraphUser: Codeunit "Azure AD Graph User";
-        IncomingPlansPerUser: Dictionary of [Text, List of [Text]];
-        PlansForUser: List of [Text];
-    begin
-        // [SCENARIO] CheckMixedPlans
-        if not LibraryLowerPermissions.CanLowerPermission() then
-            exit;
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] SUPER User
-        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
-
-        // [GIVEN] Two users with essential plan are added
-        LibraryPermissions.CreateAzureActiveDirectoryUser(EssentialUser1, '');
-        LibraryPermissions.CreateAzureActiveDirectoryUser(EssentialUser2, '');
-        LibraryPermissions.AddUserToPlan(EssentialUser1."User Security ID", PlanIds.GetEssentialPlanId());
-        LibraryPermissions.AddUserToPlan(EssentialUser2."User Security ID", PlanIds.GetEssentialPlanId());
-
-        // [GIVEN] One of the users got their licence changed to premium in the office portal
-        PlansForUser.Add('Dynamics 365 Business Central Premium');
-        IncomingPlansPerUser.Add(AzureADGraphUser.GetUserAuthenticationObjectId(EssentialUser2."User Security ID"), PlansForUser);
-
-        // [WHEN] CheckMixedPlans invoked
-        LibraryLowerPermissions.SetO365Basic();
-        ;
-        asserterror AzureADPlan.CheckMixedPlans(IncomingPlansPerUser, true);
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] Error is thrown
-        Assert.ExpectedError(StrSubstNo(MixedPlansNonAdminErr, EssentialUser1."Authentication Email", EssentialUser2."Authentication Email"));
-    end;
-
-    [Test]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
-    procedure TestCheckMixedPlans_NewEssentialAndPremiumUsers()
-    var
-        EssentialUser: Record User;
-        PlanIds: Codeunit "Plan Ids";
-        AzureADPlan: Codeunit "Azure AD Plan";
-        AzureADGraphUser: Codeunit "Azure AD Graph User";
-        IncomingPlansPerUser: Dictionary of [Text, List of [Text]];
-        PlansForPremiumUser: List of [Text];
-        PlansForEssentialUser: List of [Text];
-        EssentialUserAADObjectID: Guid;
-        PremiumUserAADObjectID: Guid;
-    begin
-        // [SCENARIO] CheckMixedPlans
-        if not LibraryLowerPermissions.CanLowerPermission() then
-            exit;
-        Initialize();
-        AzureADPlan.SetTestInProgress(true);
-        LibraryLowerPermissions.SetOutsideO365Scope();
-        LibraryLowerPermissions.AddSecurity();
-
-        // [GIVEN] SUPER User
-        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
-
-        LibraryPermissions.CreateAzureActiveDirectoryUser(EssentialUser, '');
-        LibraryPermissions.AddUserToPlan(EssentialUser."User Security ID", PlanIds.GetEssentialPlanId());
-
-        // [GIVEN] One of the users got their licence changed to premium in the office portal
-        EssentialUserAADObjectID := AzureADGraphUser.GetUserAuthenticationObjectId(EssentialUser."User Security ID");
-        PremiumUserAADObjectID := CreateGuid();
-        PlansForPremiumUser.Add('Dynamics 365 Business Central Premium');
-        PlansForEssentialUser.Add('Dynamics 365 Business Central Essential');
-        IncomingPlansPerUser.Add(EssentialUserAADObjectID, PlansForPremiumUser);
-        IncomingPlansPerUser.Add(PremiumUserAADObjectID, PlansForEssentialUser);
-
-        LibraryLowerPermissions.SetO365Basic();
-        ;
-        LibraryAzureADUserMgmt.AddGraphUserWithoutPlan(PremiumUserAADObjectID, 'Incoming', 'User', 'user@test.com');
-
-        // [WHEN] CheckMixedPlans invoked
-        asserterror AzureADPlan.CheckMixedPlans(IncomingPlansPerUser, true);
-
-        // Rollback SaaS test
-        TearDown();
-
-        // [THEN] Error is thrown
-        Assert.ExpectedError(StrSubstNo(MixedPlansNonAdminErr, 'user@test.com', EssentialUser."Authentication Email"));
     end;
 
     [Test]
@@ -873,7 +528,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] CheckMixedPlans does not show a message nor error if all users are on same SKU
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -889,7 +543,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365BusFull();
         LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -909,7 +564,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] CheckMixedPlans does not show a message nor error if all users are on same SKU
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -925,7 +579,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365BusFull();
         LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -946,7 +601,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] CheckMixedPlans does not show a message nor error if all users are on same SKU
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -966,7 +620,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365BusFull();
         LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -985,7 +640,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] CheckMixedPlans does not show a message nor error if all users are on same SKU
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -1007,7 +661,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         // [WHEN] CheckMixedPlans invoked
         LibraryLowerPermissions.SetO365BusFull();
         LibraryLowerPermissions.AddSecurity();
-        AzureADPlan.CheckMixedPlans();
+
+        Assert.IsFalse(AzureADPlan.CheckMixedPlansExist(), MixedPlansExpectedErr);
 
         // Rollback SaaS test
         TearDown();
@@ -1025,7 +680,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] Test MixedPlansExist user's plans are mixed
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -1059,7 +713,6 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         // [SCENARIO] Test MixedPlansExist user's plans are not mixed
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -1083,6 +736,7 @@ codeunit 132913 "Azure AD Plan Module Test"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
     [Scope('OnPrem')]
     procedure TestDelegatedAdminIsSuperIfSuperExists()
     var
@@ -1090,9 +744,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         AzureADPlan: Codeunit "Azure AD Plan";
         PlanIds: Codeunit "Plan Ids";
     begin
-        // [SCENARIO] User should get the User Grops of the plan
+        // [SCENARIO] User should get the User Groups of the plan
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -1115,6 +768,7 @@ codeunit 132913 "Azure AD Plan Module Test"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
     [Scope('OnPrem')]
     procedure TestInternalAdminIsSuperIfSuperExists()
     var
@@ -1122,9 +776,8 @@ codeunit 132913 "Azure AD Plan Module Test"
         AzureADPlan: Codeunit "Azure AD Plan";
         PlanIds: Codeunit "Plan Ids";
     begin
-        // [SCENARIO] User should get the User Grops of the plan
+        // [SCENARIO] User should get the User Groups of the plan
         Initialize();
-        AzureADPlan.SetTestInProgress(true);
         LibraryLowerPermissions.SetOutsideO365Scope();
         LibraryLowerPermissions.AddSecurity();
 
@@ -1132,7 +785,7 @@ codeunit 132913 "Azure AD Plan Module Test"
         CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
 
         // [WHEN] A user with an internal admin plan is created
-        CreateUserWithPlan(User, PlanIds.GetInternalAdminPlanId());
+        CreateUserWithPlan(User, PlanIds.GetGlobalAdminPlanId());
 
         // [WHEN] RefreshUserPlanAssignments is invoked
         LibraryLowerPermissions.SetO365BusFull();
@@ -1145,13 +798,248 @@ codeunit 132913 "Azure AD Plan Module Test"
         TearDown();
     end;
 
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestD365AdminIsSuperIfSuperExists()
+    var
+        User: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        PlanIds: Codeunit "Plan Ids";
+    begin
+        // [SCENARIO] User should get the User Groups of the plan
+        Initialize();
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+
+        // [GIVEN] A super user
+        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
+
+        // [WHEN] A user with an internal admin plan is created
+        CreateUserWithPlan(User, PlanIds.GetD365AdminPlanId());
+
+        // [WHEN] RefreshUserPlanAssignments is invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
+
+        Assert.IsTrue(IsUserInPermissionSet(User."User Security ID", 'SUPER'), '');
+
+        // Rollback SaaS test
+        TearDown();
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestRefreshUserPlanAssignments()
+    var
+        User: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
+    begin
+        // [SCENARIO] User should get the permission sets associated with the plan
+        Initialize();
+        BindSubscription(AzureADPlanTestLibrary);
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+
+        // [GIVEN] A user with a plan that contains permissions
+        CreateUserWithPlanAndDefaultPermissions(User, 'Test User', TestPlanIdTxt);
+
+        // [WHEN] RefreshUserPlanAssignments is invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
+
+        // Rollback SaaS test
+        TearDown();
+
+        // [THEN] User gets the default permissions of the plan
+        ValidateUserGetsDefaultPermissionsOfThePlan(User, TestPlanIdTxt);
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestRemovePlanFromUserAtRefresh()
+    var
+        User: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
+        PlanID: Guid;
+        PlanName: Text[50];
+    begin
+        // [SCENARIO] When user plans are updated in the Azure Graph, old plans are removed from the user
+        Initialize();
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+
+        // [GIVEN] A user with a plan that contains permissions
+        CreateUserWithPlanAndDefaultPermissions(User, 'Test User', TestPlanIdTxt);
+
+        // [GIVEN] Only in NAV, the user has an additional plan assigned
+        PlanName := 'TestPlan';
+        PlanID := AzureADPlanTestLibrary.CreatePlan(PlanName);
+        LibraryPermissions.AddUserToPlan(User."User Security ID", PlanID);
+        Assert.IsTrue(
+            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"), 'Test prerequisite failed.');
+
+        // [WHEN] RefreshUserPlanAssignments invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
+
+        // Rollback SaaS test
+        TearDown();
+
+        // [THEN] The additional plan is removed from the user
+        Assert.IsFalse(
+            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"),
+            StrSubstNo('Plan %1 should not be assigned to the user.', PlanName));
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestRemoveDefaultPermissionsFromUserAtRefresh()
+    var
+        User: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
+        PlanConfiguration: Codeunit "Plan Configuration";
+        PlanID: Guid;
+        NullGuid: Guid;
+    begin
+        // [SCENARIO] When users are updated from the Azure Graph,
+        // [SCENARIO] Only the permission sets allowed by the plan remain assigned to the user
+        // [SCENARIO] i.e. the permission sets from old plans are removed from the user
+        Initialize();
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+
+        // [GIVEN] A user with a plan that contains permissions
+        CreateUserWithPlanAndDefaultPermissions(User, 'Test User', TestPlanIdTxt);
+
+        // [GIVEN] Only in NAV, the user has an additional plan assigned
+        PlanID := AzureADPlanTestLibrary.CreatePlan('TestPlan');
+        LibraryPermissions.AddUserToPlan(User."User Security ID", PlanID);
+        Assert.IsTrue(
+            AzureADPlan.IsPlanAssignedToUser(PlanID, User."User Security ID"), 'Test prerequisite failed.');
+
+        // [GIVEN] The user is also assigned some permission sets
+        AddDummyPermissionSetToUser(User."User Security ID");
+        PlanConfiguration.AddDefaultPermissionSetToPlan(PlanID, 'Test', NullGuid, 0);
+
+        // [WHEN] RefreshUserPlanAssignments invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
+
+        // Rollback SaaS test
+        TearDown();
+
+        // [THEN] The user should be removed the permissions associated with Test plan. Only the permissions allowed by the plan remain
+        Assert.IsFalse(
+          DoesUserOnlyHaveDefaultPermissionsForPlan(User."User Security ID", TestPlanIdTxt),
+          StrSubstNo('Permission sets associated with plan %1 should not be assigned to the user.', TestPlanIdTxt));
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestRemoveExtraPermissionsFromUserAtRefresh()
+    var
+        AccessControl: Record "Access Control";
+        User: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
+    begin
+        // [SCENARIO] When users are updated from the Azure Graph,
+        // [SCENARIO] The manually assigned permission sets remain assigned to the user
+        Initialize();
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+        BindSubscription(AzureADPlanTestLibrary);
+
+        // [GIVEN] A user with a plan that contains permissions
+        CreateUserWithPlanAndDefaultPermissions(User, 'Test User', TestPlanIdTxt);
+
+        // [GIVEN] The user is also assigned some permission sets, but they are not part of any plan
+        AddDummyPermissionSetToUser(User."User Security ID");
+
+        // [WHEN] RefreshUserPlanAssignments invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.RefreshUserPlanAssignments(User."User Security ID");
+
+        // Rollback SaaS test
+        TearDown();
+
+        // [THEN] The permission sets associated with the Test plan should not be removed  
+        AccessControl.SetRange("User Security ID", User."User Security ID");
+        Assert.RecordCount(AccessControl, 2);
+
+        AccessControl.SetRange("Role ID", 'Test');
+        Assert.RecordIsNotEmpty(AccessControl);
+
+        AccessControl.SetRange("Role ID", TestRoleIdTxt);
+        Assert.RecordIsNotEmpty(AccessControl);
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoRollback)]
+    [CommitBehavior(CommitBehavior::Ignore)]
+    [Scope('OnPrem')]
+    procedure TestUpdateUserPlansAllUsers()
+    var
+        UserCassie: Record User;
+        UserDebra: Record User;
+        AzureADPlan: Codeunit "Azure AD Plan";
+        AzureADPlanTestLibrary: Codeunit "Azure AD Plan Test Library";
+    begin
+        // [SCENARIO] Multiple users get the permission sets associated with their plans when created
+        Initialize();
+        LibraryLowerPermissions.SetOutsideO365Scope();
+        LibraryLowerPermissions.AddSecurity();
+        BindSubscription(AzureADPlanTestLibrary);
+
+        // [GIVEN] SUPER User
+        CODEUNIT.Run(CODEUNIT::"Users - Create Super User");
+
+        // [GIVEN] Two users with a plan that contains permissions
+        CreateUserWithPlanAndDefaultPermissions(UserCassie, 'Cassie', TestPlanIdTxt);
+        CreateUserWithPlanAndDefaultPermissions(UserDebra, 'Debra', TestPlanIdTxt);
+
+        // [WHEN] UpdateUserPlans for all users is invoked
+        LibraryLowerPermissions.SetO365BusFull();
+        LibraryLowerPermissions.AddSecurity();
+        AzureADPlan.UpdateUserPlans();
+
+        // Rollback SaaS test
+        TearDown();
+
+        // [THEN] Both users get the default permissions of the plan
+        ValidateUserGetsDefaultPermissionsOfThePlan(UserCassie, TestPlanIdTxt);
+        ValidateUserGetsDefaultPermissionsOfThePlan(UserDebra, TestPlanIdTxt);
+    end;
+
     local procedure Initialize()
     begin
         EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService := true;
 
-        Clear(LibraryAzureADUserMgmt);
-        LibraryAzureADUserMgmt.SetupMockGraphQuery();
-        BindSubscription(LibraryAzureADUserMgmt);
+        Clear(MockGraphQueryTestLibrary);
+        Clear(AzureADGraphTestLibrary);
+
+        MockGraphQueryTestLibrary.SetupMockGraphQuery();
+        AzureADGraphTestLibrary.SetMockGraphQuery(MockGraphQueryTestLibrary);
+        BindSubscription(AzureADGraphTestLibrary);
+
         SetupAzureADMockPlans();
 
         FirstUserAuthenticationEmail := '';
@@ -1161,13 +1049,13 @@ codeunit 132913 "Azure AD Plan Module Test"
     local procedure TearDown()
     begin
         EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService := false;
-        UnbindSubscription(LibraryAzureADUserMgmt);
+        UnbindSubscription(AzureADGraphTestLibrary);
     end;
 
     local procedure CreateUserWithSubscriptionPlan(var User: Record User; PlanID: Guid; PlanName: Text; PlanStatus: Text)
     begin
         LibraryPermissions.CreateAzureActiveDirectoryUser(User, '');
-        LibraryAzureADUserMgmt.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', PlanID, PlanName, PlanStatus);
+        MockGraphQueryTestLibrary.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', PlanID, PlanName, PlanStatus);
     end;
 
     local procedure GetUserAuthenticationId(User: Record User): Guid
@@ -1184,30 +1072,54 @@ codeunit 132913 "Azure AD Plan Module Test"
     begin
         Plan.Open();
         while Plan.Read() do
-            LibraryAzureADUserMgmt.AddSubscribedSkuWithServicePlan(CreateGuid(), Plan.Plan_ID, Plan.Plan_Name);
+            MockGraphQueryTestLibrary.AddSubscribedSkuWithServicePlan(CreateGuid(), Plan.Plan_ID, Plan.Plan_Name);
     end;
 
-    local procedure ValidateUserGetsTheUserGroupsOfThePlan(User: Record User; UserGroupPlan: Record "User Group Plan")
-    var
-        UserGroupMember: Record "User Group Member";
-    begin
-        UserGroupMember.SetRange("User Security ID", User."User Security ID");
-        UserGroupMember.FindSet();
-        UserGroupPlan.SetRange("Plan ID", UserGroupPlan."Plan ID");
-        UserGroupPlan.FindSet();
-
-        Assert.RecordCount(UserGroupMember, UserGroupPlan.Count);
-        repeat
-            Assert.AreEqual(UserGroupPlan."User Group Code", UserGroupMember."User Group Code", 'Only the enabled plan should be returned');
-            UserGroupMember.Next();
-        until UserGroupPlan.Next() = 0;
-    end;
-
-    local procedure CreateUserWithPlanAndUserGroups(var User: Record User; var UserGroupPlan: Record "User Group Plan"; UserName: Text[50])
+    local procedure CreateUserWithPlanAndDefaultPermissions(var User: Record User; UserName: Text[50]; PlanId: Guid)
     begin
         LibraryPermissions.CreateAzureActiveDirectoryUser(User, UserName);
-        UserGroupPlan.FindFirst();
-        LibraryAzureADUserMgmt.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', UserGroupPlan."Plan ID", '', 'Enabled');
+        MockGraphQueryTestLibrary.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', PlanId, '', 'Enabled');
+        LibraryPermissions.CreatePermissionSetInPlan(TestRoleIdTxt, PlanID);
+    end;
+
+    local procedure ValidateUserGetsDefaultPermissionsOfThePlan(User: Record User; PlanId: Guid)
+    begin
+        Assert.IsTrue(DoesUserOnlyHaveDefaultPermissionsForPlan(User."User Security ID", PlanId), 'Expected the default permissions and the assigned permissions to be the same.');
+    end;
+
+    local procedure DoesUserOnlyHaveDefaultPermissionsForPlan(UserID: Guid; PlanId: Guid): Boolean
+    var
+        AccessControl: Record "Access Control";
+        PermissionSetInPlanBuffer: Record "Permission Set In Plan Buffer";
+        PlanConfiguration: Codeunit "Plan Configuration";
+    begin
+        PlanConfiguration.GetDefaultPermissions(PermissionSetInPlanBuffer);
+
+        AccessControl.SetRange("User Security ID", UserID);
+        PermissionSetInPlanBuffer.SetRange("Plan ID", PlanId);
+        if AccessControl.Count() > PermissionSetInPlanBuffer.Count() then
+            exit(false);
+
+        if PermissionSetInPlanBuffer.FindSet() then
+            repeat
+                AccessControl.SetRange("User Security ID", UserID);
+                AccessControl.SetRange("Role ID", PermissionSetInPlanBuffer."Role ID");
+                AccessControl.SetRange(Scope, PermissionSetInPlanBuffer.Scope);
+                AccessControl.SetRange("App ID", PermissionSetInPlanBuffer."App ID");
+                if AccessControl.IsEmpty() then
+                    exit(false)
+            until PermissionSetInPlanBuffer.Next() = 0;
+
+        exit(true);
+    end;
+
+    local procedure AddDummyPermissionSetToUser(UserSecId: Guid)
+    var
+        AccessControl: Record "Access Control";
+    begin
+        AccessControl."User Security ID" := UserSecId;
+        AccessControl."Role ID" := 'Test';
+        AccessControl.Insert();
     end;
 
     local procedure CreateUserWithPlan(var User: Record User; PlanID: Guid)
@@ -1223,16 +1135,7 @@ codeunit 132913 "Azure AD Plan Module Test"
         Plan.Open();
         Plan.Read();
 
-        LibraryAzureADUserMgmt.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', Plan.Plan_ID, Plan.Plan_Name, 'Enabled');
-    end;
-
-    local procedure IsUserInUserGroup(UserID: Guid; UserGroupCode: Text): Boolean
-    var
-        UserGroupMember: Record "User Group Member";
-    begin
-        UserGroupMember.SetRange("User Group Code", UserGroupCode);
-        UserGroupMember.SetRange("User Security ID", UserID);
-        exit(not UserGroupMember.IsEmpty());
+        MockGraphQueryTestLibrary.AddGraphUser(GetUserAuthenticationId(User), User."User Name", '', '', Plan.Plan_ID, Plan.Plan_Name, 'Enabled');
     end;
 
     local procedure IsUserInPermissionSet(UserID: Guid; PermissionSetCode: Text): Boolean
@@ -1244,25 +1147,5 @@ codeunit 132913 "Azure AD Plan Module Test"
         exit(not AccessControl.IsEmpty());
     end;
 
-    local procedure AddUserToUserGroupNAVOnly(User: Record User; UserGroupCode: Code[20]; PlanId: Guid)
-    begin
-        LibraryPermissions.CreateUserGroupInPlan(UserGroupCode, PlanId);
-        LibraryPermissions.AddUserToUserGroupByCode(User."User Security ID", UserGroupCode);
-        Assert.IsTrue(
-          IsUserInUserGroup(User."User Security ID", UserGroupCode), 'Test prerequisite failed.');
-    end;
-
-    [MessageHandler]
-    [Scope('OnPrem')]
-    procedure HandleAndVerifyChangedPlanMessageOK(Message: Text[1024])
-    begin
-        Assert.ExpectedMessage(Message, StrSubstNo(MixedPlansMsg, FirstUserAuthenticationEmail, SecondUserAuthenticationEmail));
-    end;
-
-    [MessageHandler]
-    [Scope('OnPrem')]
-    procedure MessageHandler(MessageText: Text)
-    begin
-    end;
 }
 

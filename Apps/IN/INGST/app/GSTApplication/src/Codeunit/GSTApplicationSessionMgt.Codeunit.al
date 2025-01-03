@@ -1,3 +1,19 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Application;
+
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Posting;
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.TaxBase;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.Payables;
+using Microsoft.Sales.Receivables;
+using Microsoft.Utilities;
+
 codeunit 18434 "GST Application Session Mgt."
 {
     SingleInstance = true;
@@ -10,10 +26,18 @@ codeunit 18434 "GST Application Session Mgt."
         OnlineCustomerLedgerEntryNo: Integer;
         OnlineVendorLedgerEntryNo: Integer;
         OnlinePostApplicationLastEntryNo: Integer;
+        SubcontractingLastGLEntryNo: Integer;
         GLRegisterLastEntryNo: Integer;
+        LastUsedItemLedgEntryNo: Integer;
+        LastUsedItemApplnEntryNo: Integer;
+        LastUsedValueEntryNo: Integer;
+        IsSubcontracting: Boolean;
+        SubConReceiving: Boolean;
+        SubConReceivingMultiple: Boolean;
         IsOnlinePostApplication: Boolean;
         IsCopyDocument: Boolean;
         TransactionNo: Integer;
+        AppliestoIDReceipt: Code[50];
         VendorNo: Code[20];
         CustomerNo: Code[20];
         AppliedAmount: Decimal;
@@ -141,6 +165,72 @@ codeunit 18434 "GST Application Session Mgt."
         exit(GLRegisterLastEntryNo);
     end;
 
+    procedure SetSubcontractingEntryNo(ItemLedgEntryNo: Integer; ItemApplnEntryNo: Integer; ValueEntryNo: Integer)
+    begin
+        LastUsedItemLedgEntryNo := ItemLedgEntryNo;
+        LastUsedItemApplnEntryNo := ItemApplnEntryNo;
+        LastUsedValueEntryNo := ValueEntryNo;
+    end;
+
+    procedure SetSubcontractingItemLedgEntryNo(pItemLedgEntryNo: Integer)
+    begin
+        LastUsedItemLedgEntryNo := pItemLedgEntryNo;
+    end;
+
+    procedure SetSubcontractingItemApplnEntryNo(pItemApplnEntryNo: Integer)
+    begin
+        LastUsedItemApplnEntryNo := pItemApplnEntryNo;
+    end;
+
+    procedure GetSubcontractingEntryNo(var LastItemLedgEntryNo: Integer; var LastItemApplnEntryNo: Integer; var LastValueEntryNo: Integer)
+    begin
+        LastItemLedgEntryNo := LastUsedItemLedgEntryNo;
+        LastItemApplnEntryNo := LastUsedItemApplnEntryNo;
+        LastValueEntryNo := LastUsedValueEntryNo;
+    end;
+
+    procedure SetSubcontractingLastGLEntryNo(SubconLastGLEntryNo: Integer)
+    begin
+        SubcontractingLastGLEntryNo := SubconLastGLEntryNo;
+    end;
+
+    procedure GetSubcontractingLastGLEntryNo(): Integer
+    begin
+        exit(SubcontractingLastGLEntryNo);
+    end;
+
+    procedure SetSubContractingReceiving(SubConReceive: Boolean)
+    begin
+        SubConReceiving := SubConReceive;
+    end;
+
+    procedure GetSubContractingReceiving(): Boolean
+    begin
+        exit(SubConReceiving);
+    end;
+
+    procedure SetSubContractingReceivingMultiple(SubConReceiveMultiple: Boolean; AppliestoID: Code[50])
+    begin
+        SubConReceivingMultiple := SubConReceiveMultiple;
+        AppliestoIDReceipt := AppliestoID;
+    end;
+
+    procedure SetSubcontracting(IsSubcon: Boolean)
+    begin
+        IsSubcontracting := IsSubcon;
+    end;
+
+    procedure GetSubcontracting(): Boolean
+    begin
+        exit(IsSubcontracting);
+    end;
+
+    procedure GetSubContractingReceivingMultiple(var AppliestoID: Code[50]): Boolean
+    begin
+        AppliestoID := AppliestoIDReceipt;
+        exit(SubConReceivingMultiple);
+    end;
+
     procedure CreateApplicationGenJournallLine(
         var GenJournalLine: Record "Gen. Journal Line";
         GLAccountNo: Code[20];
@@ -187,13 +277,13 @@ codeunit 18434 "GST Application Session Mgt."
             repeat
                 TempGenJnlLine := TempGenJournalLine;
                 TempGenJnlLine."Line No." := 0;
-                GenJnlPostLine.RunWithCheck(TempGenJnlLine);
+                GenJnlPostLine.RunWithoutCheck(TempGenJnlLine);
                 TempGenJournalLine.Delete();
             until TempGenJournalLine.Next() = 0;
 
             ClearApplicationGenJnlLine();
-            ClearAllSessionVariables();
         end;
+        ClearAllSessionVariables();
     end;
 
     procedure ClearApplicationGenJnlLine()
@@ -292,34 +382,5 @@ codeunit 18434 "GST Application Session Mgt."
 
         if ToPurchHeader."GST Vendor Type" <> ToPurchHeader."GST Vendor Type"::" " then
             IsCopyDocument := false;
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Config. Insert With Validation", 'OnBeforeInsertWithValidation', '', false, false)]
-    local procedure OnBeforeInsertWithValidation(var RecRefToInsert: RecordRef; var IsHandled: Boolean)
-    var
-        PurchaseHeader: Record "Purchase Header";
-        PurchaseLine: Record "Purchase Line";
-    begin
-        if IsCopyDocument then
-            exit;
-
-        case RecRefToInsert.Number of
-            database::"Purchase Line":
-                begin
-                    RecRefToInsert.SetTable(PurchaseLine);
-                    if PurchaseHeader.Get(PurchaseLine."Document Type", PurchaseLine."Document No.") then
-                        if PurchaseHeader."GST Vendor Type" <> PurchaseHeader."GST Vendor Type"::" " then
-                            IsCopyDocument := true;
-                end;
-        end;
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Config. Package Management", 'OnPostProcessPackage', '', false, false)]
-    local procedure OnPostProcessPackage()
-    begin
-        if not IsCopyDocument then
-            exit;
-
-        IsCopyDocument := false;
     end;
 }

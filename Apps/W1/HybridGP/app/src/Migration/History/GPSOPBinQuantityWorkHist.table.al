@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4067 "GPSOPBinQuantityWorkHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

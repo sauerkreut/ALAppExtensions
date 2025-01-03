@@ -8,15 +8,15 @@ codeunit 139678 "GP Checkbook Tests"
     TestPermissions = Disabled;
 
     var
-        GPAccount: Record "GP Account";
+        GlobalGPAccount: Record "GP Account";
         GPCheckbookMSTR: Record "GP Checkbook MSTR";
         GPCheckbookTransactions: Record "GP Checkbook Transactions";
         GPCM20600: Record "GP CM20600";
         GenJournalTemplate: Record "Gen. Journal Template";
-        GPCompanyMigrationSettings: Record "GP Company Migration Settings";
         GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
-        BankAccount: Record "Bank Account";
+        GlobalBankAccount: Record "Bank Account";
         Assert: Codeunit Assert;
+        GPTestHelperFunctions: Codeunit "GP Test Helper Functions";
         InvalidBankAccountMsg: Label '%1 should not have been created.', Comment = '%1 - bank account no.', Locked = true;
         MissingBankAccountMsg: Label '%1 should have been created.', Comment = '%1 - bank account no.', Locked = true;
         ExtraTransactionMsg: Label 'Invalid transaction with discription "%1" should have been created.', Comment = '%1 - transaction description.', Locked = true;
@@ -47,7 +47,12 @@ codeunit 139678 "GP Checkbook Tests"
         CreateCheckbookData();
 
         // [GIVEN] Inactive checkbooks are to be migrated
-        ConfigureMigrationSettings(true);
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Inactive Checkbooks", true);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
 
         // [WHEN] Checkbook migration code is called
         Migrate();
@@ -102,7 +107,13 @@ codeunit 139678 "GP Checkbook Tests"
         CreateCheckbookData();
 
         // [GIVEN] Inactive checkbooks are NOT to be migrated
-        ConfigureMigrationSettings(false);
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Bank Module", true);
+        GPCompanyAdditionalSettings.Validate("Migrate Inactive Checkbooks", false);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
 
         // [WHEN] Checkbook migration code is called
         Migrate();
@@ -112,19 +123,19 @@ codeunit 139678 "GP Checkbook Tests"
 
         // [THEN] Active Bank Accounts are created with correct settings
         BankAccount.SetRange("No.", MyBankStr1Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
-
-        BankAccount.SetRange("No.", MyBankStr2Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
 
         BankAccount.SetRange("No.", MyBankStr3Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
+
+        BankAccount.SetRange("No.", MyBankStr2Txt);
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
 
         BankAccount.SetRange("No.", MyBankStr4Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
 
         BankAccount.SetRange("No.", MyBankStr5Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
 
         // [THEN] General Journal Lines are created
         GenJournalLine.SetFilter("Journal Batch Name", 'GPBANK');
@@ -174,7 +185,13 @@ codeunit 139678 "GP Checkbook Tests"
         CreateMoreCheckBookData();
 
         // [GIVEN] Inactive checkbooks are NOT to be migrated
-        ConfigureMigrationSettings(false);
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Bank Module", true);
+        GPCompanyAdditionalSettings.Validate("Migrate Inactive Checkbooks", false);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
 
         // [WHEN] Checkbook migration code is called
         Migrate();
@@ -184,19 +201,19 @@ codeunit 139678 "GP Checkbook Tests"
 
         // [THEN] Active Bank Accounts are created with correct settings
         BankAccount.SetRange("No.", MyBankStr1Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
 
         BankAccount.SetRange("No.", MyBankStr2Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
 
         BankAccount.SetRange("No.", MyBankStr3Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
 
         BankAccount.SetRange("No.", MyBankStr4Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
 
         BankAccount.SetRange("No.", MyBankStr5Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
 
         // [THEN] General Journal Lines are created
         GenJournalLine.SetFilter("Journal Batch Name", 'GPBANK');
@@ -221,26 +238,114 @@ codeunit 139678 "GP Checkbook Tests"
 
     [Test]
     [TransactionModel(TransactionModel::AutoCommit)]
-    procedure TestGPCheckbookMigrationBankTransfers()
+    procedure TestBankMasterDataOnly()
     var
         BankAccount: Record "Bank Account";
-        BankAccountLedger: Record "Bank Account Ledger Entry";
+        BankAccountLedgerEntry: Record "Bank Account Ledger Entry";
         GenJournalLine: Record "Gen. Journal Line";
-        HelperFunctions: Codeunit "Helper Functions";
     begin
         // [SCENARIO] CheckBooks are migrated from GP
         // [GIVEN] There are no records in the BankAcount table
         ClearTables();
         GenJournalLine.DeleteAll();
-        BankAccountLedger.Reset();
-        BankAccountLedger.SetFilter("Bank Account No.", '%1|%2|%3|%4|%5', MyBankStr1Txt, MyBankStr2Txt, MyBankStr3Txt, MyBankStr4Txt, MyBankStr5Txt);
-        BankAccountLedger.DeleteAll();
+        BankAccountLedgerEntry.Reset();
+        BankAccountLedgerEntry.SetFilter("Bank Account No.", '%1|%2|%3|%4|%5', MyBankStr1Txt, MyBankStr2Txt, MyBankStr3Txt, MyBankStr4Txt, MyBankStr5Txt);
+        BankAccountLedgerEntry.DeleteAll();
+
+        // [GIVEN] Some records are created in the staging table
+        //  including reconciled bank transactions
+        CreateMoreCheckBookData();
+
+        // [GIVEN] Inactive checkbooks are NOT to be migrated
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Only Bank Master", true);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
+
+        // [WHEN] Checkbook migration code is called
+        Migrate();
+
+        // [THEN] Active Bank Accounts are created
+        Assert.RecordCount(BankAccount, 3);
+
+        // [THEN] General Journal Lines are not created
+        Assert.RecordCount(GenJournalLine, 0);
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure TestBankSkipPosting()
+    var
+        BankAccount: Record "Bank Account";
+        BankAccountLedgerEntry: Record "Bank Account Ledger Entry";
+        GenJournalLine: Record "Gen. Journal Line";
+    begin
+        // [SCENARIO] CheckBooks are migrated from GP
+        // [GIVEN] There are no records in the BankAcount table
+        ClearTables();
+        GenJournalLine.DeleteAll();
+        BankAccountLedgerEntry.Reset();
+        BankAccountLedgerEntry.SetFilter("Bank Account No.", '%1|%2|%3|%4|%5', MyBankStr1Txt, MyBankStr2Txt, MyBankStr3Txt, MyBankStr4Txt, MyBankStr5Txt);
+        BankAccountLedgerEntry.DeleteAll();
+
+        // [GIVEN] Some records are created in the staging table
+        //  including reconciled bank transactions
+        CreateMoreCheckBookData();
+
+        // [GIVEN] Inactive checkbooks are NOT to be migrated
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Only Bank Master", false);
+        GPCompanyAdditionalSettings.Validate("Skip Posting Bank Batches", true);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
+
+        // [WHEN] Checkbook migration code is called
+        Migrate();
+
+        // [THEN] Active Bank Accounts are created
+        Assert.RecordCount(BankAccount, 3);
+
+        // [THEN] The GL Batch is created but not posted
+        Clear(GenJournalLine);
+        GenJournalLine.SetRange("Journal Batch Name", 'GPBANK');
+        Assert.AreEqual(false, GenJournalLine.IsEmpty(), 'Could not locate the bank batch.');
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure TestGPCheckbookMigrationBankTransfers()
+    var
+        BankAccount: Record "Bank Account";
+        BankAccountLedgerEntry: Record "Bank Account Ledger Entry";
+        GenJournalLine: Record "Gen. Journal Line";
+        HelperFunctions: Codeunit "Helper Functions";
+    begin
+#pragma warning disable AA0210
+        // [SCENARIO] CheckBooks are migrated from GP
+        // [GIVEN] There are no records in the BankAcount table
+        ClearTables();
+        GenJournalLine.DeleteAll();
+        BankAccountLedgerEntry.Reset();
+        BankAccountLedgerEntry.SetFilter("Bank Account No.", '%1|%2|%3|%4|%5', MyBankStr1Txt, MyBankStr2Txt, MyBankStr3Txt, MyBankStr4Txt, MyBankStr5Txt);
+        BankAccountLedgerEntry.DeleteAll();
 
         // [GIVEN] Some records are created in the staging table
         CreateCheckbookData();
 
         // [GIVEN] Inactive checkbooks are NOT to be migrated
-        ConfigureMigrationSettings(false);
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Bank Module", true);
+        GPCompanyAdditionalSettings.Validate("Migrate Only Bank Master", false);
+        GPCompanyAdditionalSettings.Validate("Migrate Inactive Checkbooks", false);
+        GPCompanyAdditionalSettings.Validate("Skip Posting Bank Batches", false);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
 
         // [WHEN] Checkbook migration code is called
         Migrate();
@@ -250,19 +355,19 @@ codeunit 139678 "GP Checkbook Tests"
 
         // [THEN] Active Bank Accounts are created with correct settings
         BankAccount.SetRange("No.", MyBankStr1Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr1Txt));
 
         BankAccount.SetRange("No.", MyBankStr2Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr2Txt));
 
         BankAccount.SetRange("No.", MyBankStr3Txt);
-        Assert.IsFalse(BankAccount.FindFirst(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
+        Assert.IsTrue(BankAccount.IsEmpty(), StrSubstNo(InvalidBankAccountMsg, MyBankStr3Txt));
 
         BankAccount.SetRange("No.", MyBankStr4Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr4Txt));
 
         BankAccount.SetRange("No.", MyBankStr5Txt);
-        Assert.IsTrue(BankAccount.FindFirst(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
+        Assert.IsFalse(BankAccount.IsEmpty(), StrSubstNo(MissingBankAccountMsg, MyBankStr5Txt));
 
         // [THEN] General Journal Lines are created
         GenJournalLine.SetFilter("Journal Batch Name", 'GPBANK');
@@ -273,72 +378,127 @@ codeunit 139678 "GP Checkbook Tests"
         HelperFunctions.PostGLTransactions();
 
         // [THEN] Bank Account Ledger entries are created
-        BankAccountLedger.SetRange("Bank Account No.", UpperCase(MyBankStr1Txt));
-        Assert.RecordCount(BankAccountLedger, 0);
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr1Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
 
-        BankAccountLedger.SetRange("Bank Account No.", UpperCase(MyBankStr2Txt));
-        Assert.RecordCount(BankAccountLedger, 2);
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr2Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 2);
 
-        BankAccountLedger.SetRange("Bank Account No.", UpperCase(MyBankStr3Txt));
-        Assert.RecordCount(BankAccountLedger, 0);
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr3Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
 
-        BankAccountLedger.SetRange("Bank Account No.", UpperCase(MyBankStr4Txt));
-        Assert.RecordCount(BankAccountLedger, 4);
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr4Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 4);
 
-        BankAccountLedger.SetRange("Document No.", Format(525));
-        BankAccountLedger.FindFirst();
-        Assert.AreEqual(100.00, BankAccountLedger.Amount, 'Transfer amount is wrong for Trx 520, MyBank4');
+        BankAccountLedgerEntry.SetRange("Document No.", 'XFR000000001');
+        BankAccountLedgerEntry.SetFilter(Amount, '>0');
 
-        BankAccountLedger.Reset();
-        BankAccountLedger.SetRange("Bank Account No.", UpperCase(MyBankStr5Txt));
-        Assert.RecordCount(BankAccountLedger, 7);
+        BankAccountLedgerEntry.FindFirst();
+        Assert.AreEqual(100.00, BankAccountLedgerEntry.Amount, 'Transfer amount is wrong for Trx 520, MyBank4');
 
-        BankAccountLedger.SetRange("Document No.", Format(520));
-        BankAccountLedger.FindFirst();
-        Assert.AreEqual(-100.00, BankAccountLedger.Amount, 'Transfer amount is wrong for Trx 520, MyBank5');
+        BankAccountLedgerEntry.Reset();
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr5Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 7);
 
+        BankAccountLedgerEntry.SetRange("Document No.", 'XFR000000001');
+        BankAccountLedgerEntry.SetFilter(Amount, '<0');
+        BankAccountLedgerEntry.FindFirst();
+        Assert.AreEqual(-100.00, BankAccountLedgerEntry.Amount, 'Transfer amount is wrong for Trx 520, MyBank5');
+#pragma warning restore AA0240
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure TestBankModuleDisabled()
+    var
+        BankAccount: Record "Bank Account";
+        BankAccountLedgerEntry: Record "Bank Account Ledger Entry";
+        GenJournalLine: Record "Gen. Journal Line";
+        HelperFunctions: Codeunit "Helper Functions";
+    begin
+        // [SCENARIO] Bank module is disabled
+        // [GIVEN] There are no records in the BankAcount table
+        ClearTables();
+        GenJournalLine.DeleteAll();
+        BankAccountLedgerEntry.Reset();
+        BankAccountLedgerEntry.SetFilter("Bank Account No.", '%1|%2|%3|%4|%5', MyBankStr1Txt, MyBankStr2Txt, MyBankStr3Txt, MyBankStr4Txt, MyBankStr5Txt);
+        BankAccountLedgerEntry.DeleteAll();
+
+        // [GIVEN] Some records are created in the staging table
+        CreateCheckbookData();
+
+        // [GIVEN] Bank module is disabled
+        GPTestHelperFunctions.CreateConfigurationSettings();
+        GPCompanyAdditionalSettings.GetSingleInstance();
+        GPCompanyAdditionalSettings.Validate("Migrate Bank Module", false);
+        GPCompanyAdditionalSettings.Modify();
+
+        GPTestHelperFunctions.InitializeMigration();
+
+        // [WHEN] Checkbook migration code is called
+        Migrate();
+
+        // [THEN] Bank Accounts are not created
+        Assert.RecordCount(BankAccount, 0);
+
+        // [THEN] General Journal Lines are not created
+        GenJournalLine.SetFilter("Journal Batch Name", 'GPBANK');
+        GenJournalLine.SetFilter("Journal Template Name", 'GENERAL');
+        Assert.RecordCount(GenJournalLine, 0);
+
+        // [WHEN] Batch posting is called.
+        HelperFunctions.PostGLTransactions();
+
+        // [THEN] Bank Account Ledger entries are not created
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr1Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
+
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr2Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
+
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr3Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
+
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr4Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
+
+        BankAccountLedgerEntry.SetRange("Bank Account No.", UpperCase(MyBankStr5Txt));
+        Assert.RecordCount(BankAccountLedgerEntry, 0);
     end;
 
     local procedure ClearTables()
+    var
+        GPConfiguration: Record "GP Configuration";
     begin
-        BankAccount.DeleteAll();
+        GlobalBankAccount.DeleteAll();
         GPCheckbookMSTR.DeleteAll();
-        GPCompanyMigrationSettings.DeleteAll();
-        GPCompanyAdditionalSettings.DeleteAll();
-        GPAccount.DeleteAll();
+        GPTestHelperFunctions.DeleteAllSettings();
+        GlobalGPAccount.DeleteAll();
         GPCheckbookMSTR.DeleteAll();
         GPCheckbookTransactions.DeleteAll();
         GPCM20600.DeleteAll();
+
+        GPConfiguration.GetSingleInstance();
+        GPConfiguration."CheckBooks Created" := false;
+        GPConfiguration.Modify();
     end;
 
     local procedure Migrate()
     var
-        GPCheckbookMigrator: Codeunit "GP Checkbook Migrator";
+        HelperFunctions: Codeunit "Helper Functions";
     begin
-        GPAccount.FindSet();
+        GlobalGPAccount.FindSet();
         repeat
-            MigrateGL(GPAccount);
-        until GPAccount.Next() = 0;
-        GPCheckbookMigrator.MoveCheckbookStagingData();
-    end;
-
-    local procedure ConfigureMigrationSettings(MigrateInactive: Boolean)
-    begin
-        GPCompanyMigrationSettings.Init();
-        GPCompanyMigrationSettings.Name := CompanyName();
-        GPCompanyMigrationSettings.Insert(true);
-
-        GPCompanyAdditionalSettings.Init();
-        GPCompanyAdditionalSettings.Name := GPCompanyMigrationSettings.Name;
-        GPCompanyAdditionalSettings."Migrate Inactive Checkbooks" := MigrateInactive;
-        GPCompanyAdditionalSettings.Insert(true);
+            MigrateGL(GlobalGPAccount);
+        until GlobalGPAccount.Next() = 0;
+        HelperFunctions.CreatePostMigrationData();
     end;
 
     local procedure CreateMoreCheckBookData()
     begin
         CreateCheckbookData();
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 600.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -349,7 +509,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.Recond := true;
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 610.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -360,7 +520,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.Recond := true;
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 620.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -371,7 +531,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.Recond := true;
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 630.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -382,7 +542,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.Recond := true;
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 640.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -399,7 +559,7 @@ codeunit 139678 "GP Checkbook Tests"
         CreateGenJournalTemplates();
         CreateAccounts();
 
-        GPCheckbookMSTR.Init();
+        Clear(GPCheckbookMSTR);
         GPCheckbookMSTR.CHEKBKID := MyBankStr1Txt;
         GPCheckbookMSTR.BNKACTNM := MyBankStr1Txt;
         GPCheckbookMSTR.INACTIVE := true;
@@ -407,31 +567,28 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookMSTR.Insert(true);
 
         GPCheckbookMSTR.Reset();
-        GPCheckbookMSTR.Init();
+        Clear(GPCheckbookMSTR);
         GPCheckbookMSTR.CHEKBKID := MyBankStr2Txt;
         GPCheckbookMSTR.BNKACTNM := MyBankStr2Txt;
         GPCheckbookMSTR.INACTIVE := false;
         GPCheckbookMSTR.ACTINDX := 1;
         GPCheckbookMSTR.Insert(true);
 
-        GPCheckbookMSTR.Reset();
-        GPCheckbookMSTR.Init();
+        Clear(GPCheckbookMSTR);
         GPCheckbookMSTR.CHEKBKID := MyBankStr3Txt;
         GPCheckbookMSTR.BNKACTNM := MyBankStr3Txt;
         GPCheckbookMSTR.INACTIVE := true;
         GPCheckbookMSTR.ACTINDX := 2;
         GPCheckbookMSTR.Insert(true);
 
-        GPCheckbookMSTR.Reset();
-        GPCheckbookMSTR.Init();
+        Clear(GPCheckbookMSTR);
         GPCheckbookMSTR.CHEKBKID := MyBankStr4Txt;
         GPCheckbookMSTR.BNKACTNM := MyBankStr4Txt;
         GPCheckbookMSTR.INACTIVE := false;
         GPCheckbookMSTR.ACTINDX := 3;
         GPCheckbookMSTR.Insert(true);
 
-        GPCheckbookMSTR.Reset();
-        GPCheckbookMSTR.Init();
+        Clear(GPCheckbookMSTR);
         GPCheckbookMSTR.CHEKBKID := MyBankStr5Txt;
         GPCheckbookMSTR.BNKACTNM := MyBankStr5Txt;
         GPCheckbookMSTR.INACTIVE := false;
@@ -443,7 +600,7 @@ codeunit 139678 "GP Checkbook Tests"
         ///        1        2        3                  4                    5                  6                  7
         ///     Deposit, Receipt, APCheck, "Withdrawl/Payroll Check", IncreaseAdjustment, DecreaseAdjustment, BankTransfer;
         /// 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 100.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr1Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -451,9 +608,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 395.59;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'APCheck1 - Vendor Check';
+        GPCheckbookTransactions.CMTrxNum := '100';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 120.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr1Txt;
         GPCheckbookTransactions.CMTrxType := 1;
@@ -461,9 +619,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 500.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'Deposit1';
+        GPCheckbookTransactions.CMTrxNum := '120';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 125.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr1Txt;
         GPCheckbookTransactions.CMTrxType := 2;
@@ -471,9 +630,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 250.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'Receipt1';
+        GPCheckbookTransactions.CMTrxNum := '125';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 130.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr1Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -481,9 +641,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 650.00;
         GPCheckbookTransactions.CMLinkID := '2000';
         GPCheckbookTransactions.DSCRIPTN := 'APCheck2 - NonVendor Check';
+        GPCheckbookTransactions.CMTrxNum := '130';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 200.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -491,9 +652,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 450.36;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'APCheck3 - Vendor Check';
+        GPCheckbookTransactions.CMTrxNum := '200';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 210.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr2Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -501,9 +663,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 450.36;
         GPCheckbookTransactions.CMLinkID := '3000';
         GPCheckbookTransactions.DSCRIPTN := 'APCheck4 - NonVendor Check';
+        GPCheckbookTransactions.CMTrxNum := '210';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 400.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr4Txt;
         GPCheckbookTransactions.CMTrxType := 3;
@@ -511,9 +674,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 200.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'APCheck5 - Vendor Check';
+        GPCheckbookTransactions.CMTrxNum := '400';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 410.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr4Txt;
         GPCheckbookTransactions.CMTrxType := 4;
@@ -521,9 +685,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 200.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'Withdrawl/Payroll Check1';
+        GPCheckbookTransactions.CMTrxNum := '410';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 500.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 2;
@@ -531,9 +696,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 200.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'Receipt2';
+        GPCheckbookTransactions.CMTrxNum := '500';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 505.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 5;
@@ -541,9 +707,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 200.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'IncreaseAdjustment1';
+        GPCheckbookTransactions.CMTrxNum := '505';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 510.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 6;
@@ -551,9 +718,10 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.TRXAMNT := 200.00;
         GPCheckbookTransactions.CMLinkID := '1000';
         GPCheckbookTransactions.DSCRIPTN := 'DecreaseAdjustment1';
+        GPCheckbookTransactions.CMTrxNum := '510';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 520.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -564,7 +732,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000001';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 525.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr4Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -575,7 +743,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000001';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 530.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr4Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -586,7 +754,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000002';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 535.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -597,7 +765,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000002';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 540.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -608,7 +776,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000003';
         GPCheckbookTransactions.Insert(true);
 
-        GPCheckbookTransactions.Init();
+        Clear(GPCheckbookTransactions);
         GPCheckbookTransactions.CMRECNUM := 545.00;
         GPCheckbookTransactions.CHEKBKID := MyBankStr5Txt;
         GPCheckbookTransactions.CMTrxType := 7;
@@ -619,7 +787,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCheckbookTransactions.CMTrxNum := 'XFR000000003';
         GPCheckbookTransactions.Insert(true);
 
-        GPCM20600.Init();
+        Clear(GPCM20600);
         GPCM20600.Xfr_Record_Number := 1.0;
         GPCM20600.CMXFRNUM := 'XFR000000001';
         GPCM20600.CMFRMRECNUM := 520;
@@ -628,7 +796,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCM20600.CMCHKBKID := MyBankStr4Txt;
         GPCM20600.Insert(true);
 
-        GPCM20600.Init();
+        Clear(GPCM20600);
         GPCM20600.Xfr_Record_Number := 2.0;
         GPCM20600.CMXFRNUM := 'XFR000000002';
         GPCM20600.CMFRMRECNUM := 530;
@@ -637,7 +805,7 @@ codeunit 139678 "GP Checkbook Tests"
         GPCM20600.CMCHKBKID := MyBankStr5Txt;
         GPCM20600.Insert(true);
 
-        GPCM20600.Init();
+        Clear(GPCM20600);
         GPCM20600.Xfr_Record_Number := 3.0;
         GPCM20600.CMXFRNUM := 'XFR000000003';
         GPCM20600.CMFRMRECNUM := 540;
@@ -649,72 +817,73 @@ codeunit 139678 "GP Checkbook Tests"
 
     local procedure CreateAccounts()
     begin
-        GPAccount.Init();
-        GPAccount.AcctNum := '100';
-        GPAccount.AcctIndex := 0;
-        GPAccount.Name := 'Furniture & Fixtures';
-        GPAccount.SearchName := 'Furniture & Fixtures';
-        GPAccount.AccountCategory := 9;
-        GPAccount.IncomeBalance := false;
-        GPAccount.DebitCredit := 0;
-        GPAccount.Active := false;
-        GPAccount.DirectPosting := true;
-        GPAccount.AccountSubcategoryEntryNo := 9;
-        GPAccount.Insert(true);
+        Clear(GlobalGPAccount);
+        GlobalGPAccount.AcctNum := '100';
+        GlobalGPAccount.AcctIndex := 0;
+        GlobalGPAccount.Name := 'Furniture & Fixtures';
+        GlobalGPAccount.SearchName := 'Furniture & Fixtures';
+        GlobalGPAccount.AccountCategory := 9;
+        GlobalGPAccount.IncomeBalance := false;
+        GlobalGPAccount.DebitCredit := 0;
+        GlobalGPAccount.Active := false;
+        GlobalGPAccount.DirectPosting := true;
+        GlobalGPAccount.AccountSubcategoryEntryNo := 9;
+        GlobalGPAccount.AccountType := 1;
+        GlobalGPAccount.Insert(true);
 
-        GPAccount.Reset();
-        GPAccount.Init();
-        GPAccount.AcctNum := '110';
-        GPAccount.AcctIndex := 1;
-        GPAccount.Name := 'Cash in banks-First Bank';
-        GPAccount.SearchName := 'Cash in banks-First Bank';
-        GPAccount.AccountCategory := 1;
-        GPAccount.DebitCredit := 1;
-        GPAccount.IncomeBalance := false;
-        GPAccount.Active := false;
-        GPAccount.DirectPosting := true;
-        GPAccount.AccountSubcategoryEntryNo := 1;
-        GPAccount.Insert(true);
+        Clear(GlobalGPAccount);
+        GlobalGPAccount.AcctNum := '110';
+        GlobalGPAccount.AcctIndex := 1;
+        GlobalGPAccount.Name := 'Cash in banks-First Bank';
+        GlobalGPAccount.SearchName := 'Cash in banks-First Bank';
+        GlobalGPAccount.AccountCategory := 1;
+        GlobalGPAccount.DebitCredit := 1;
+        GlobalGPAccount.IncomeBalance := false;
+        GlobalGPAccount.Active := false;
+        GlobalGPAccount.DirectPosting := true;
+        GlobalGPAccount.AccountSubcategoryEntryNo := 1;
+        GlobalGPAccount.AccountType := 1;
+        GlobalGPAccount.Insert(true);
 
-        GPAccount.Reset();
-        GPAccount.Init();
-        GPAccount.AcctNum := '120';
-        GPAccount.AcctIndex := 2;
-        GPAccount.Name := 'Accounts Receivable';
-        GPAccount.SearchName := 'Accounts Receivable';
-        GPAccount.AccountCategory := 3;
-        GPAccount.DebitCredit := 0;
-        GPAccount.Active := false;
-        GPAccount.DirectPosting := true;
-        GPAccount.AccountSubcategoryEntryNo := 3;
-        GPAccount.Insert(true);
+        Clear(GlobalGPAccount);
+        GlobalGPAccount.AcctNum := '120';
+        GlobalGPAccount.AcctIndex := 2;
+        GlobalGPAccount.Name := 'Accounts Receivable';
+        GlobalGPAccount.SearchName := 'Accounts Receivable';
+        GlobalGPAccount.AccountCategory := 3;
+        GlobalGPAccount.DebitCredit := 0;
+        GlobalGPAccount.Active := false;
+        GlobalGPAccount.DirectPosting := true;
+        GlobalGPAccount.AccountSubcategoryEntryNo := 3;
+        GlobalGPAccount.AccountType := 1;
+        GlobalGPAccount.Insert(true);
 
-        GPAccount.Reset();
-        GPAccount.Init();
-        GPAccount.AcctNum := '130';
-        GPAccount.AcctIndex := 3;
-        GPAccount.Name := 'TRUCKS';
-        GPAccount.SearchName := 'TRUCKS';
-        GPAccount.AccountCategory := 9;
-        GPAccount.DebitCredit := 0;
-        GPAccount.Active := false;
-        GPAccount.DirectPosting := true;
-        GPAccount.AccountSubcategoryEntryNo := 9;
-        GPAccount.Insert(true);
+        Clear(GlobalGPAccount);
+        GlobalGPAccount.AcctNum := '130';
+        GlobalGPAccount.AcctIndex := 3;
+        GlobalGPAccount.Name := 'TRUCKS';
+        GlobalGPAccount.SearchName := 'TRUCKS';
+        GlobalGPAccount.AccountCategory := 9;
+        GlobalGPAccount.DebitCredit := 0;
+        GlobalGPAccount.Active := false;
+        GlobalGPAccount.DirectPosting := true;
+        GlobalGPAccount.AccountSubcategoryEntryNo := 9;
+        GlobalGPAccount.AccountType := 1;
+        GlobalGPAccount.Insert(true);
 
-        GPAccount.Reset();
-        GPAccount.Init();
-        GPAccount.AcctNum := '140';
-        GPAccount.AcctIndex := 4;
-        GPAccount.Name := 'MISC';
-        GPAccount.SearchName := 'MISC';
-        GPAccount.AccountCategory := 1;
-        GPAccount.DebitCredit := 1;
-        GPAccount.IncomeBalance := false;
-        GPAccount.Active := false;
-        GPAccount.DirectPosting := true;
-        GPAccount.AccountSubcategoryEntryNo := 1;
-        GPAccount.Insert(true);
+        Clear(GlobalGPAccount);
+        GlobalGPAccount.AcctNum := '140';
+        GlobalGPAccount.AcctIndex := 4;
+        GlobalGPAccount.Name := 'MISC';
+        GlobalGPAccount.SearchName := 'MISC';
+        GlobalGPAccount.AccountCategory := 1;
+        GlobalGPAccount.DebitCredit := 1;
+        GlobalGPAccount.IncomeBalance := false;
+        GlobalGPAccount.Active := false;
+        GlobalGPAccount.DirectPosting := true;
+        GlobalGPAccount.AccountSubcategoryEntryNo := 1;
+        GlobalGPAccount.AccountType := 1;
+        GlobalGPAccount.Insert(true);
     end;
 
     local procedure CreateGenJournalTemplates()
@@ -731,12 +900,12 @@ codeunit 139678 "GP Checkbook Tests"
         end;
     end;
 
-    local procedure MigrateGL(GPAccount: Record "GP Account")
+    local procedure MigrateGL(var GPAccount: Record "GP Account")
     var
         GLAccDataMigrationFacade: Codeunit "GL Acc. Data Migration Facade";
         GPAccountMigrator: Codeunit "GP Account Migrator";
     begin
-        GPAccountMigrator.OnMigrateGlAccount(GLAccDataMigrationFacade, GPAccount.RecordId());
-        GPAccountMigrator.OnMigrateAccountTransactions(GLAccDataMigrationFacade, GPAccount.RecordId());
+        GPAccountMigrator.MigrateAccountDetails(GPAccount, GLAccDataMigrationFacade);
+        GPAccountMigrator.GenerateGLTransactionBatches(GPAccount);
     end;
 }

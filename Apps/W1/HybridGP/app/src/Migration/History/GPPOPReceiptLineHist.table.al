@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4062 "GPPOPReceiptLineHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields
@@ -352,6 +354,9 @@ table 4062 "GPPOPReceiptLineHist"
         key(PK; POPRCTNM, RCPTLNNM)
         {
             Clustered = false;
+        }
+        key(Key2; POPRCTNM)
+        {
         }
     }
 

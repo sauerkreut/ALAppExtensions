@@ -1,3 +1,13 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.VAT.Reporting;
+
+using Microsoft.Foundation.Company;
+using System.Environment;
+using System.Privacy;
+
 codeunit 27020 "DIOT - Initialize"
 {
     Subtype = Install;
@@ -19,7 +29,6 @@ codeunit 27020 "DIOT - Initialize"
         ApplyEvaluationClassificationsForPrivacy();
         DIOTDataManagement.InsertDefaultDIOTConcepts();
         InsertDefaultDIOTCountryData();
-        AddDIOTAssistedSetup();
     end;
 
     local procedure InitializeDone(): boolean
@@ -44,24 +53,6 @@ codeunit 27020 "DIOT - Initialize"
         DataClassificationMgt.SetTableFieldsToNormal(Database::"DIOT Country/Region Data");
         DataClassificationMgt.SetTableFieldsToNormal(Database::"DIOT Report Vendor Buffer");
         DataClassificationMgt.SetTableFieldsToNormal(Database::"DIOT Report Buffer");
-    end;
-
-    local procedure AddDIOTAssistedSetup()
-    var
-        GuidedExperience: Codeunit "Guided Experience";
-    begin
-        GuidedExperience.InsertAssistedSetup(
-            CopyStr(DIOTDataManagement.GetDIOTSetupGuideTxt(), 1, 2048),
-            CopyStr(DIOTDataManagement.GetDIOTSetupGuideTxt(), 1, 50),
-            '',
-            1,
-            ObjectType::Page,
-            PAGE::"DIOT Setup Wizard",
-            "Assisted Setup Group"::GettingStarted,
-            '',
-            "Video Category"::Uncategorized,
-            ''
-        );
     end;
 
     local procedure InsertDefaultDIOTCountryData()

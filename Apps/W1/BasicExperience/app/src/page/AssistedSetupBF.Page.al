@@ -1,3 +1,13 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace System.Environment.Configuration;
+
+using System.Environment;
+using System.Utilities;
+using System.Telemetry;
+
 page 20600 "Assisted Setup BF"
 {
     Caption = 'Basic Experience Setup';
@@ -156,11 +166,11 @@ page 20600 "Assisted Setup BF"
 
     local procedure LoadTopBanners();
     begin
-        if MediaRepository.GET('AssistedSetup-NoText-400px.png', FORMAT(CURRENTCLIENTTYPE))
+        if MediaRepository.GetForCurrentClientType('AssistedSetup-NoText-400px.png')
       then
-            if MediaResources.GET(MediaRepository."Media Resources Ref")
+            if MediaResources.Get(MediaRepository."Media Resources Ref")
         then
-                TopBannerVisible := MediaResources."Media Reference".HASVALUE;
+                TopBannerVisible := MediaResources."Media Reference".HasValue();
     end;
 
     var

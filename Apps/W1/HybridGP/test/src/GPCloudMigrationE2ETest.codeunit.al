@@ -1,3 +1,4 @@
+#pragma warning disable AA0210
 codeunit 139671 "GP Cloud Migration E2E Test"
 {
     // [FEATURE] [GP Forecasting]
@@ -18,6 +19,7 @@ codeunit 139671 "GP Cloud Migration E2E Test"
 
     local procedure Initialize()
     var
+        GPUpgradeSettings: Record "GP Upgrade Settings";
         HybridCompany: Record "Hybrid Company";
         HybridCompanyStatus: Record "Hybrid Company Status";
         HybridReplicationSummary: Record "Hybrid Replication Summary";
@@ -25,6 +27,7 @@ codeunit 139671 "GP Cloud Migration E2E Test"
         IntelligentCloud: Record "Intelligent Cloud";
         IntelligentCloudSetup: Record "Intelligent Cloud Setup";
         WebhookNotification: Record "Webhook Notification";
+        HybridCloudManagement: Codeunit "Hybrid Cloud Management";
     begin
         HybridCompany.DeleteAll();
         HybridCompanyStatus.DeleteAll();
@@ -33,12 +36,15 @@ codeunit 139671 "GP Cloud Migration E2E Test"
         IntelligentCloud.DeleteAll();
         IntelligentCloudSetup.DeleteAll();
         WebhookNotification.DeleteAll();
-
+        GPUpgradeSettings.GetonInsertGPUpgradeSettings(GPUpgradeSettings);
+        GPUpgradeSettings."One Step Upgrade" := false;
+        GPUpgradeSettings.Modify(true);
         LibraryVariableStorage.AssertEmpty();
 
         if Initialized then
             exit;
 
+        HybridCloudManagement.RefreshIntelligentCloudStatusTable();
         Initialized := true;
         Commit();
     end;

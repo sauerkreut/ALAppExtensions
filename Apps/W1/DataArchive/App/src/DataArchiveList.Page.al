@@ -6,6 +6,9 @@
 /// <summary>
 /// Shows the list of data archives. This is the main page for this app.
 /// </summary>
+
+namespace System.DataAdministration;
+
 page 630 "Data Archive List"
 {
     ApplicationArea = All;
@@ -82,6 +85,7 @@ page 630 "Data Archive List"
                 ToolTip = 'Opens the Data Archive - New Archive page that allows you to do a recording of all subsequent deletions in this session.';
                 Image = New;
                 Promoted = true;
+                PromotedOnly = true;
 
                 trigger OnAction()
                 begin
@@ -98,6 +102,7 @@ page 630 "Data Archive List"
                 ToolTip = 'Saves this Data Archive to Excel with one sheet per table.';
                 Image = ExportToExcel;
                 Promoted = true;
+                PromotedOnly = true;
 
                 trigger OnAction()
                 var
@@ -114,6 +119,7 @@ page 630 "Data Archive List"
                 ToolTip = 'Saves this Data Archive to a zip file with one csv file per table.';
                 Image = ExportFile;
                 Promoted = true;
+                PromotedOnly = true;
 
                 trigger OnAction()
                 var

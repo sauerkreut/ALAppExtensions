@@ -17,19 +17,20 @@ codeunit 139768 "UT Page Bank Deposit"
         LibraryERM: Codeunit "Library - ERM";
         LibraryUtility: Codeunit "Library - Utility";
         LibraryApplicationArea: Codeunit "Library - Application Area";
+        LibraryPurchase: Codeunit "Library - Purchase";
         Initialized: Boolean;
         InitializeHandled: Boolean;
         ValueMustExistMsg: Label 'Value must exist.';
-        PostingDateErr: Label 'Validation error for Field: Posting Date,  Message = ''Posting Date must have a value in Bank Deposit Header: No.=%1. It cannot be zero or empty. (Select Refresh to discard errors)''';
+        PostingDateErr: Label 'Validation error for Field: Posting Date,  Message = ', Comment = 'Label contains error message for invalid posting date''Posting Date must have a value in Bank Deposit Header: No.=%1. It cannot be zero or empty. (Select Refresh to discard errors)''';
         FeatureKeyIdTok: Label 'StandardizedBankReconciliationAndDeposits', Locked = true;
+        SourceCodeErr: Label 'Source Code are not equal.';
 
     [Test]
     [HandlerFunctions('DepositTestReportRequestPageHandler')]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionTestReportDeposits()
     var
         GenJournalLine: Record "Gen. Journal Line";
+        GLAccount: Record "G/L Account";
         BankDepositHeader: Record "Bank Deposit Header";
         BankDeposits: TestPage "Bank Deposits";
     begin
@@ -39,6 +40,7 @@ codeunit 139768 "UT Page Bank Deposit"
         EnableBankDepositsFeature();
         CreateBankDepositHeader(BankDepositHeader, '');
         CreateGenJournalLine(GenJournalLine, BankDepositHeader, GenJournalLine."Account Type"::"G/L Account", CreateGLAccount());
+        Commit();
         LibraryVariableStorage.Enqueue(BankDepositHeader."No.");  // Enqueue value for use in DepositTestReportRequestPageHandler.
 
         // Exercise & Verify: Verify the Deposit Test Report after calling action Test Report on Deposits page through DepositTestReportRequestPageHandler.
@@ -46,12 +48,16 @@ codeunit 139768 "UT Page Bank Deposit"
         BankDeposits.GotoRecord(BankDepositHeader);
         BankDeposits.TestReport.Invoke();  // Invokes DepositTestReportRequestPageHandler.
         BankDeposits.Close();
+
+        GLAccount.Get(GenJournalLine."Account No.");
+        GLAccount.Delete();
+        GenJournalLine.Delete();
+        BankDepositHeader.Delete();
+        DisableBankDepositsFeature();
     end;
 
     [Test]
     [HandlerFunctions('DimensionSetEntriesPageHandler')]
-    [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDimensionsPostedBankDepositList()
     var
         PostedBankDepositHeader: Record "Posted Bank Deposit Header";
@@ -71,12 +77,13 @@ codeunit 139768 "UT Page Bank Deposit"
         PostedBankDepositList.GotoRecord(PostedBankDepositHeader);
         PostedBankDepositList.Dimensions.Invoke();  // Invokes DimensionSetEntriesPageHandler.
         PostedBankDepositList.Close();
+
+        DisableBankDepositsFeature();
     end;
 
     [Test]
     [HandlerFunctions('DimensionSetEntriesPageHandler')]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDimensionsPostedBankDepositSubform()
     var
         PostedBankDepositHeader: Record "Posted Bank Deposit Header";
@@ -96,7 +103,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionAccountLedgerEntriesPostedBankDepositSubform()
     var
         PostedBankDepositHeader: Record "Posted Bank Deposit Header";
@@ -124,7 +130,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionAccountCardPostedBankDepositSubform()
     var
         PostedBankDepositHeader: Record "Posted Bank Deposit Header";
@@ -149,7 +154,6 @@ codeunit 139768 "UT Page Bank Deposit"
     [Test]
     [HandlerFunctions('DimensionSetEntriesPageHandler')]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDimensionsPostedBankDeposit()
     var
         PostedBankDepositHeader: Record "Posted Bank Deposit Header";
@@ -172,7 +176,6 @@ codeunit 139768 "UT Page Bank Deposit"
     [Test]
     [HandlerFunctions('EditDimensionSetEntriesPageHandler')]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDimensionsDepositSubform()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -198,7 +201,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionAccountCardDepositSubform()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -226,7 +228,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionAccountLedgerEntriesDepositSubform()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -258,7 +259,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [HandlerFunctions('ApplyCustomerEntriesPageHandler')]
-    [Scope('OnPrem')]
     procedure OnActionApplyEntriesDepositSubform()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -288,7 +288,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [HandlerFunctions('ConfirmHandlerTRUE')]
-    [Scope('OnPrem')]
     procedure OnActionPostDeposit()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -316,7 +315,6 @@ codeunit 139768 "UT Page Bank Deposit"
     [Test]
     [HandlerFunctions('DepositTestReportRequestPageHandler')]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDepositTestReportDeposit()
     var
         BankDepositHeader: Record "Bank Deposit Header";
@@ -336,7 +334,6 @@ codeunit 139768 "UT Page Bank Deposit"
 
     [Test]
     [HandlerFunctions('DepositReportHandler,ConfirmHandlerTRUE')]
-    [Scope('OnPrem')]
     procedure OnActionPostAndPrintDeposit()
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -364,7 +361,6 @@ codeunit 139768 "UT Page Bank Deposit"
     [Test]
     [HandlerFunctions('EditDimensionSetEntriesPageHandler')]
     [TransactionModel(TransactionModel::AutoRollback)]
-    [Scope('OnPrem')]
     procedure OnActionDimensionsDeposit()
     var
         BankDepositHeader: Record "Bank Deposit Header";
@@ -387,7 +383,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [Test]
-    [Scope('OnPrem')]
     procedure TotalDepositLinesControlIsUpdatedWhenCreateDepositLine()
     var
         BankDepositHeader: Record "Bank Deposit Header";
@@ -415,7 +410,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [Test]
-    [Scope('OnPrem')]
     procedure CloseDepositPageWithEmptyPostingDate()
     var
         BankDepositHeader: Record "Bank Deposit Header";
@@ -614,6 +608,162 @@ codeunit 139768 "UT Page Bank Deposit"
         VerifyCurrencyCodeAndFactor(BankDepositHeader, CurrencyCode, CurrencyFactor[2], Amount, AmountLCY);
     end;
 
+    [Test]
+    [HandlerFunctions('ConfirmHandlerTRUE')]
+    procedure VerifyPostBankDepositfromPage()
+    var
+        BankDepositHeader: Record "Bank Deposit Header";
+        BankDeposit: TestPage "Bank Deposit";
+        PostedBankDeposit: TestPage "Posted Bank Deposit";
+        BankDepositHeaderNo: Code[20];
+        PostedBankDepositHeaderNo: Code[20];
+    begin
+        // [SCENARIO 450845] Source Code is not populating on Bank Deposit Journal Lines
+        Initialize();
+
+        // [GIVEN] Create Bank deposit header
+        CreateBankDepositHeader(BankDepositHeader, '');
+
+        // [THEN] Open Bank deposit page and insert line and post the Bank deposit
+        BankDeposit.Trap();
+        BankDepositHeader.SetRecFilter();
+        Page.Run(Page::"Bank Deposit", BankDepositHeader);
+        BankDeposit.Subform."Account No.".SetValue(CreateGLAccount());
+        BankDeposit.Subform."Document No.".SetValue(LibraryUtility.GenerateRandomNumericText(2));
+        BankDeposit.Subform."Credit Amount".SetValue(BankDepositHeader."Total Deposit Amount");
+
+        // [THEN] Post the bank deposit
+        PostedBankDeposit.Trap();
+        BankDepositHeaderNo := BankDepositHeader."No.";
+        BankDeposit.Post.Invoke();
+
+        // [VERIFY] Bank deposit will posted successfully and verfied the document no.
+        PostedBankDepositHeaderNo := COPYSTR(PostedBankDeposit."No.".Value(), 1, MaxStrLen(PostedBankDepositHeaderNo));
+        PostedBankDeposit.Close();
+        Assert.AreEqual(BankDepositHeaderNo, PostedBankDepositHeaderNo, '');
+    end;
+
+    [Test]
+    procedure VerifySourceCodeOnBankDepositPage()
+    var
+        BankDepositHeader: Record "Bank Deposit Header";
+        SourceCodeSetup: Record "Source Code Setup";
+        GenJnlLine: Record "Gen. Journal Line";
+        BankDeposit: TestPage "Bank Deposit";
+    begin
+        // [SCENARIO 450845] Source Code is not populating on Bank Deposit Journal Lines
+        Initialize();
+
+        // [GIVEN] Create Bank deposit header
+        CreateBankDepositHeader(BankDepositHeader, '');
+
+        // [THEN] Open Bank deposit page and insert line and post the Bank deposit
+        BankDeposit.Trap();
+        BankDepositHeader.SetRecFilter();
+        Page.Run(Page::"Bank Deposit", BankDepositHeader);
+        BankDeposit.Subform."Account Type".SetValue(GenJnlLine."Account Type"::Vendor.AsInteger());
+        BankDeposit.Subform."Account No.".SetValue(LibraryPurchase.CreateVendorNo());
+        BankDeposit.Subform."External Document No.".SetValue(LibraryUtility.GenerateRandomNumericText(2));
+        BankDeposit.Subform."Credit Amount".SetValue(BankDepositHeader."Total Deposit Amount");
+
+        // [GIVEN] Get the created General Jnl Line.
+        GenJnlLine.SetFilter("Document No.", BankDepositHeader."No.");
+        GenJnlLine.FindFirst();
+        SourceCodeSetup.Get();
+
+        // [VERIFY] Verify Source Code have values from Source Code Setup
+        Assert.AreEqual(SourceCodeSetup."Bank Deposit", GenJnlLine."Source Code", SourceCodeErr);
+    end;
+
+    [Test]
+    procedure VerifyDocumentNoOnBankDepositPage()
+    var
+        BankDepositHeader: Record "Bank Deposit Header";
+        //SourceCodeSetup: Record "Source Code Setup";
+        GenJnlLine: Record "Gen. Journal Line";
+        BankDeposit: TestPage "Bank Deposit";
+        DocumentNo: Code[20];
+    begin
+        // [SCENARIO 478136] Mistakenly the Document No. in Bank Deposit lines is removed, when changing the Account Type in the lines
+        Initialize();
+
+        // [GIVEN] Create Bank deposit header
+        CreateBankDepositHeader(BankDepositHeader, '');
+
+        // [GIVEN] Open Bank deposit page.
+        BankDeposit.Trap();
+        BankDepositHeader.SetRecFilter();
+        Page.Run(Page::"Bank Deposit", BankDepositHeader);
+
+        // [GIVEN] Add one bank deposit Line of Account Type Vendor
+        BankDeposit.Subform."Account Type".SetValue(GenJnlLine."Account Type"::Vendor.AsInteger());
+        BankDeposit.Subform."Account No.".SetValue(LibraryPurchase.CreateVendorNo());
+        BankDeposit.Subform."Credit Amount".SetValue(BankDepositHeader."Total Deposit Amount");
+
+        // [GIVEN] Save the Document No. 
+        DocumentNo := Format(BankDeposit.Subform."Document No.".Value);
+
+        // [THEN] Go to the next line and change the Account Type to other than Vendor
+        BankDeposit.Subform.Next();
+        BankDeposit.SubForm."Account Type".SetValue(GenJnlLine."Account Type"::"G/L Account".AsInteger());
+
+        // [VERIFY] Verify the Document No. have same value as last line.
+        BankDeposit.Subform."Document No.".AssertEquals(DocumentNo);
+    end;
+
+    [Test]
+    [HandlerFunctions('BankDepositHandler,GenJournalBatchHandler')]
+    procedure VerifyEditJournalOpenBAnkDepositCardPage()
+    var
+        GenJournalTemplate: Record "Gen. Journal Template";
+        GenJournalBatch: Record "Gen. Journal Batch";
+        BAnkDepositHeader: Record "Bank Deposit Header";
+        GenJournalTemplatePage: TestPage "General Journal Templates";
+        GenJournalBatchPage: TestPage "General Journal Batches";
+    begin
+        // [SCENARIO 472257] "The table IDs do not match." error message appears on using Edit Journal from the General Journal 
+        // Batches page for Bank Deposits
+        Initialize();
+
+        // [GIVEN] Create General Journal Template and update Type as "Bank Deposits"
+        LibraryERM.CreateGenJournalTemplate(GenJournalTemplate);
+        GenJournalTemplate.Validate(Type, GenJournalTemplate.Type::"Bank Deposits");
+        GenJournalTemplate.Modify();
+
+        // [GIVEN] Create General Journal Batch
+        LibraryERM.CreateGenJournalBatch(GenJournalBatch, GenJournalTemplate.Name);
+
+        // [WHEN] Open General Journal Template page and got Batches and click on "Edit Journal"
+        GenJournalBatchPage.Trap();
+        GenJournalTemplatePage.OpenEdit();
+        GenJournalTemplatePage.GoToRecord(GenJournalTemplate);
+        GenJournalTemplatePage.Batches.Invoke();
+        GenJournalBatchPage.EditJournal.Invoke();
+
+        // [THEN] Close the General Journal Batch Page
+        GenJournalBatchPage.Close();
+
+        // [VERIFY] Find the first record of Bank Deposit and verify Journal Template Name
+        BankDepositHeader.FindFirst();
+        Assert.AreEqual(GenJournalTemplate.Name, BAnkDepositHeader."Journal Template Name", '');
+    end;
+
+    [Test]
+    procedure DefaultValueOfDocumentNoForDepositLineIsTheBankDepositNo()
+    var
+        BankDepositHeader: Record "Bank Deposit Header";
+        BankDeposit: TestPage "Bank Deposit";
+    begin
+        // [SCENARIO 537832] Bank Deposit default values for lines should be the bank deposit number for the "Document No." and blank for the "External Document No."
+        // [GIVEN] A Bank Deposit Header without lines
+        CreateBankDepositHeader(BankDepositHeader, '');
+        // [WHEN] Opening the Bank Deposit page
+        OpenDepositPage(BankDeposit, BankDepositHeader);
+        // [THEN] The default values for the lines are as expected.
+        Assert.AreEqual(BankDepositHeader."No.", BankDeposit.Subform."Document No.".Value(), 'The default value of Document No. for the Deposit Line should be the Bank Deposit No.');
+        Assert.AreEqual('', BankDeposit.Subform."External Document No.".Value(), 'The default value of External Document No. for the Deposit Line should be empty.');
+    end;
+
     local procedure GetBankDepositsFeature(var FeatureDataUpdateStatus: Record "Feature Data Update Status"; ID: Text[50])
     begin
         if FeatureDataUpdateStatus.Get(ID, CompanyName()) then
@@ -636,6 +786,20 @@ codeunit 139768 "UT Page Bank Deposit"
             exit;
         GetBankDepositsFeature(FeatureDataUpdateStatus, ID);
         FeatureDataUpdateStatus."Feature Status" := FeatureDataUpdateStatus."Feature Status"::Enabled;
+        FeatureDataUpdateStatus.Modify(true);
+    end;
+
+    local procedure DisableBankDepositsFeature()
+    var
+        FeatureDataUpdateStatus: Record "Feature Data Update Status";
+        FeatureManagementFacade: Codeunit "Feature Management Facade";
+        ID: Text[50];
+    begin
+        ID := FeatureKeyIdTok;
+        if FeatureManagementFacade.IsEnabled(ID) then
+            exit;
+        GetBankDepositsFeature(FeatureDataUpdateStatus, ID);
+        FeatureDataUpdateStatus."Feature Status" := FeatureDataUpdateStatus."Feature Status"::Disabled;
         FeatureDataUpdateStatus.Modify(true);
     end;
 
@@ -722,10 +886,14 @@ codeunit 139768 "UT Page Bank Deposit"
     local procedure CreateGenJournalBatch(var GenJournalBatch: Record "Gen. Journal Batch")
     var
         GenJournalTemplate: Record "Gen. Journal Template";
+        SourceCodeSetup: Record "Source Code Setup";
     begin
+        SourceCodeSetup.Get();
         GenJournalTemplate.Name := LibraryUtility.GenerateGUID();
         GenJournalTemplate.Type := GenJournalTemplate.Type::"Bank Deposits";
         GenJournalTemplate."Page ID" := PAGE::"Bank Deposit";
+        GenJournalTemplate."Source Code" := SourceCodeSetup."Bank Deposit";
+        GenJournalTemplate."No. Series" := LibraryUtility.GetGlobalNoSeriesCode();
         GenJournalTemplate.Insert();
 
         GenJournalBatch."Journal Template Name" := GenJournalTemplate.Name;
@@ -746,7 +914,7 @@ codeunit 139768 "UT Page Bank Deposit"
         GenJournalLine."Document No." := LibraryUTUtility.GetNewCode();
         GenJournalLine.Description := GenJournalLine."Document No.";
         GenJournalLine."Source Type" := GenJournalLine."Source Type"::"Bank Account";
-        GenJournalLine."Source Code" := BankDepositHeader."Bank Account No.";
+        GenJournalLine."Source Code" := CopyStr(BankDepositHeader."Bank Account No.", 1, MaxStrLen(GenJournalLine."Source Code"));
         GenJournalLine.Insert();
     end;
 
@@ -817,15 +985,15 @@ codeunit 139768 "UT Page Bank Deposit"
 
     local procedure CreateDetailedCustomerLedgerEntry(CustLedgerEntryNo: Integer; CustomerNo: Code[20])
     var
-        DetailedCustomerLedgEntry: Record "Detailed Cust. Ledg. Entry";
-        DetailedCustomerLedgEntry2: Record "Detailed Cust. Ledg. Entry";
+        DetailedCustLedgEntry: Record "Detailed Cust. Ledg. Entry";
+        DetailedCustLedgEntry2: Record "Detailed Cust. Ledg. Entry";
     begin
-        DetailedCustomerLedgEntry2.FindLast();
-        DetailedCustomerLedgEntry."Entry No." := DetailedCustomerLedgEntry2."Entry No." + 1;
-        DetailedCustomerLedgEntry."Cust. Ledger Entry No." := CustLedgerEntryNo;
-        DetailedCustomerLedgEntry."Customer No." := CustomerNo;
-        DetailedCustomerLedgEntry.Amount := LibraryRandom.RandDec(10, 2);
-        DetailedCustomerLedgEntry.Insert();
+        DetailedCustLedgEntry2.FindLast();
+        DetailedCustLedgEntry."Entry No." := DetailedCustLedgEntry2."Entry No." + 1;
+        DetailedCustLedgEntry."Cust. Ledger Entry No." := CustLedgerEntryNo;
+        DetailedCustLedgEntry."Customer No." := CustomerNo;
+        DetailedCustLedgEntry.Amount := LibraryRandom.RandDec(10, 2);
+        DetailedCustLedgEntry.Insert();
     end;
 
     local procedure CreatePostedSalesInvoiceLine(SellToCustomerNo: Code[20])
@@ -889,10 +1057,12 @@ codeunit 139768 "UT Page Bank Deposit"
         GenJournalLine.SetRange("Journal Template Name", BankDepositHeader."Journal Template Name");
         GenJournalLine.SetRange("Journal Batch Name", BankDepositHeader."Journal Batch Name");
         GenJournalLine.SetRange("Posting Date", BankDepositHeader."Posting Date");
+#pragma warning disable AA0210
         GenJournalLine.SetRange("Bal. Account Type", GenJournalLine."Bal. Account Type"::"Bank Account");
         GenJournalLine.SetRange("Bal. Account No.", BankDepositHeader."Bank Account No.");
         GenJournalLine.SetRange("Currency Code", CurrencyCode);
         GenJournalLine.SetRange("Currency Factor", CurrencyFactor);
+#pragma warning restore
         Assert.RecordCount(GenJournalLine, 2);
 
         GenJournalLine.FindFirst();
@@ -901,7 +1071,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ModalPageHandler]
-    [Scope('OnPrem')]
     procedure EditDimensionSetEntriesPageHandler(var EditDimensionSetEntries: TestPage "Edit Dimension Set Entries")
     var
         DimensionValue: Record "Dimension Value";
@@ -914,7 +1083,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ModalPageHandler]
-    [Scope('OnPrem')]
     procedure DimensionSetEntriesPageHandler(var DimensionSetEntries: TestPage "Dimension Set Entries")
     var
         DimensionCode: Variant;
@@ -925,7 +1093,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [RequestPageHandler]
-    [Scope('OnPrem')]
     procedure DepositRequestPageHandler(var BankDeposit: TestRequestPage "Bank Deposit")
     var
         No: Variant;
@@ -936,7 +1103,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [RequestPageHandler]
-    [Scope('OnPrem')]
     procedure DepositTestReportRequestPageHandler(var BankDepositTestReport: TestRequestPage "Bank Deposit Test Report")
     var
         No: Variant;
@@ -947,7 +1113,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ModalPageHandler]
-    [Scope('OnPrem')]
     procedure ApplyCustomerEntriesPageHandler(var ApplyCustomerEntries: TestPage "Apply Customer Entries")
     var
         CustLedgerEntry: Record "Cust. Ledger Entry";
@@ -963,7 +1128,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ModalPageHandler]
-    [Scope('OnPrem')]
     procedure GeneralJournalTemplateListPageHandler(var GeneralJournalTemplateList: TestPage "General Journal Template List")
     begin
         GeneralJournalTemplateList.FILTER.SetFilter(Name, LibraryVariableStorage.DequeueText());
@@ -971,7 +1135,6 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ModalPageHandler]
-    [Scope('OnPrem')]
     procedure GeneralJournalBatchesMPH(var GeneralJournalBatches: TestPage "General Journal Batches")
     begin
         GeneralJournalBatches.FILTER.SetFilter(Name, LibraryVariableStorage.DequeueText());
@@ -979,16 +1142,28 @@ codeunit 139768 "UT Page Bank Deposit"
     end;
 
     [ReportHandler]
-    [Scope('OnPrem')]
     procedure DepositReportHandler(var BankDeposit: Report "Bank Deposit")
     begin
     end;
 
     [ConfirmHandler]
-    [Scope('OnPrem')]
     procedure ConfirmHandlerTRUE(Question: Text[1024]; var Reply: Boolean)
     begin
         Reply := true;
+    end;
+
+    [PageHandler]
+    [Scope('OnPrem')]
+    procedure BankDepositHandler(var BankDeposit: TestPage "Bank Deposit")
+    begin
+        BankDeposit.Close();
+    end;
+
+    [ModalPageHandler]
+    [Scope('OnPrem')]
+    procedure GenJournalBatchHandler(var GenJournalBatchPage: TestPage "General Journal Batches")
+    begin
+        // Handle the page which is already Open.
     end;
 
     [IntegrationEvent(false, false)]

@@ -1,8 +1,24 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Warehouse.GateEntry;
+
+using Microsoft.Purchases.Posting;
+using Microsoft.Sales.Posting;
+using Microsoft.Inventory.Transfer;
+using Microsoft.Finance.GST.Sales;
+using Microsoft.Inventory.Setup;
+using Microsoft.Foundation.NoSeries;
+using Microsoft.Purchases.History;
+using Microsoft.Purchases.Document;
+using Microsoft.Sales.History;
+using Microsoft.Sales.Document;
+
 codeunit 18604 "Gate Entry Subscribers"
 {
     var
         InventorySetup: Record "Inventory Setup";
-        NoSeriesMgt: Codeunit NoSeriesManagement;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnAfterPurchRcptHeaderInsert', '', false, false)]
     local procedure AttachGateEntryOnReceiptInsert(
@@ -60,6 +76,12 @@ codeunit 18604 "Gate Entry Subscribers"
 
     [EventSubscriber(ObjectType::Table, Database::"Gate Entry Header", 'OnAfterInsertEvent', '', false, false)]
     local procedure UpdateNoSeriesOnAfterInsertEvent(var Rec: Record "Gate Entry Header")
+    var
+        NoSeries: Codeunit "No. Series";
+#if not CLEAN24
+        NoSeriesManagement: Codeunit NoSeriesManagement;
+        IsHandled: Boolean;
+#endif
     begin
         Rec."Document Date" := WorkDate();
         Rec."Document Time" := Time;
@@ -72,12 +94,33 @@ codeunit 18604 "Gate Entry Subscribers"
             Rec."Entry Type"::Inward:
                 if Rec."No." = '' then begin
                     InventorySetup.TestField("Inward Gate Entry Nos.");
-                    NoSeriesMgt.InitSeries(InventorySetup."Inward Gate Entry Nos.", Rec."No. Series", Rec."Posting Date", Rec."No.", Rec."No. Series");
+#if not CLEAN24
+                    IsHandled := false;
+                    NoSeriesManagement.RaiseObsoleteOnBeforeInitSeries(InventorySetup."Inward Gate Entry Nos.", Rec."No. Series", Rec."Posting Date", Rec."No.", Rec."No. Series", IsHandled);
+                    if not IsHandled then begin
+#endif
+                        if not NoSeries.AreRelated(InventorySetup."Inward Gate Entry Nos.", Rec."No. Series") then
+                            Rec."No. Series" := InventorySetup."Inward Gate Entry Nos.";
+                        Rec."No." := NoSeries.GetNextNo(Rec."No. Series", Rec."Posting Date");
+#if not CLEAN24
+                    NoSeriesManagement.RaiseObsoleteOnAfterInitSeries(Rec."No. Series", InventorySetup."Inward Gate Entry Nos.", Rec."Posting Date", Rec."No.");
+                    end;
+#endif
                 end;
             Rec."Entry Type"::Outward:
                 if Rec."No." = '' then begin
                     InventorySetup.TestField("Outward Gate Entry Nos.");
-                    NoSeriesMgt.InitSeries(InventorySetup."Outward Gate Entry Nos.", Rec."No. Series", Rec."Posting Date", Rec."No.", Rec."No. Series");
+#if not CLEAN24
+                    IsHandled := false;
+                    NoSeriesManagement.RaiseObsoleteOnBeforeInitSeries(InventorySetup."Outward Gate Entry Nos.", Rec."No. Series", Rec."Posting Date", Rec."No.", Rec."No. Series", IsHandled);
+                    if not IsHandled then begin
+#endif
+                        Rec."No. Series" := InventorySetup."Outward Gate Entry Nos.";
+                        Rec."No." := NoSeries.GetNextNo(Rec."No. Series", Rec."Posting Date");
+#if not CLEAN24
+                    NoSeriesManagement.RaiseObsoleteOnAfterInitSeries(Rec."No. Series", InventorySetup."Outward Gate Entry Nos.", Rec."Posting Date", Rec."No.");
+                    end;
+#endif
                 end;
         end;
     end;
@@ -95,6 +138,20 @@ codeunit 18604 "Gate Entry Subscribers"
         GateEntryCommentLine.SetRange("Gate Entry Type", Rec."Entry Type");
         GateEntryCommentLine.SetRange("No.", Rec."No.");
         GateEntryCommentLine.DeleteAll();
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"e-Invoice Json Handler", 'OnAfterGetLRNoAndLrDate', '', false, false)]
+    local procedure OnAfterGetLRNoAndLrDate(SalesInvHeader: Record "Sales Invoice Header"; var TransDocNo: Text[15]; var TransDocDt: Text[10])
+    begin
+        GetLRNoAndLRDateForEInvoice(SalesInvHeader, TransDocNo, TransDocDt);
+    end;
+
+    local procedure GetLRNoAndLRDateForEInvoice(SalesInvHeader: Record "Sales Invoice Header"; var TransDocNo: Text[15]; var TransDocDt: Text[10])
+    begin
+        if not SalesInvHeader.IsEmpty() then begin
+            TransDocNo := SalesInvHeader."LR/RR No.";
+            TransDocDt := Format(SalesInvHeader."LR/RR Date", 0, '<Day,2>/<Month,2>/<Year4>');
+        end;
     end;
 
     local procedure AttachGateEntryOnAfterPurchRcptHdrInsert(PurchaseHeader: Record "Purchase Header")

@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4039 "GPIVTrxAmountsHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields
@@ -136,7 +138,9 @@ table 4039 "GPIVTrxAmountsHist"
         {
             Clustered = false;
         }
-
+        key(Key3; TRXSORCE, DOCNUMBR)
+        {
+        }
     }
 
     fieldgroups

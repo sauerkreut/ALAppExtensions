@@ -1,3 +1,5 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4024 "GP Configuration"
 {
     ReplicateData = false;
@@ -29,11 +31,21 @@ table 4024 "GP Configuration"
         {
             DataClassification = SystemMetadata;
         }
+#if not CLEANSCHEMA27
         field(7; "PreMigration Cleanup Completed"; Boolean)
         {
             DataClassification = SystemMetadata;
             InitValue = false;
+#if not CLEAN24
+            ObsoleteState = Pending;
+            ObsoleteTag = '24.0';
+#else
+            ObsoleteState = Removed;
+            ObsoleteTag = '27.0';
+#endif
+            ObsoleteReason = 'Cleaning up tables before running the migration is no longer wanted.';
         }
+#endif
         field(8; "Dimensions Created"; Boolean)
         {
             DataClassification = SystemMetadata;
@@ -84,6 +96,11 @@ table 4024 "GP Configuration"
             DataClassification = SystemMetadata;
             InitValue = false;
         }
+        field(18; "Historical Job Ran"; Boolean)
+        {
+            DataClassification = SystemMetadata;
+            InitValue = false;
+        }
     }
 
     keys
@@ -104,14 +121,38 @@ table 4024 "GP Configuration"
     end;
 
     procedure IsAllPostMigrationDataCreated(): Boolean
+    var
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
     begin
-        exit(
-                "CheckBooks Created" and
-                "Open Purchase Orders Created" and
-                "Fiscal Periods Created" and
-                "Vendor EFT Bank Acc. Created" and
-                "Vendor Classes Created" and
-                "Customer Classes Created"
-            );
+        if not "Fiscal Periods Created" then
+            if GPCompanyAdditionalSettings.GetGLModuleEnabled() then
+                exit(false);
+
+        if not "CheckBooks Created" then
+            if GPCompanyAdditionalSettings.GetBankModuleEnabled() then
+                exit(false);
+
+        if not "Open Purchase Orders Created" then
+            if GPCompanyAdditionalSettings.GetMigrateOpenPOs() then
+                exit(false);
+
+        if not "Vendor EFT Bank Acc. Created" then
+            if GPCompanyAdditionalSettings.GetPayablesModuleEnabled() then
+                exit(false);
+
+        if not "Vendor Classes Created" then
+            if GPCompanyAdditionalSettings.GetMigrateVendorClasses() then
+                exit(false);
+
+        if not "Customer Classes Created" then
+            if GPCompanyAdditionalSettings.GetMigrateCustomerClasses() then
+                exit(false);
+
+        exit(true);
+    end;
+
+    procedure HasHistoricalJobRan(): Boolean
+    begin
+        exit(Rec."Historical Job Ran");
     end;
 }

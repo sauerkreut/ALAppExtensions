@@ -1,3 +1,14 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Sales.Document;
+
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.GST.Sales;
+using Microsoft.Finance.TaxBase;
+using Microsoft.Sales.Customer;
+
 tableextension 18147 "GST Sales Header Ext" extends "Sales Header"
 {
     fields
@@ -45,6 +56,7 @@ tableextension 18147 "GST Sales Header Ext" extends "Sales Header"
             TableRelation = Customer where("e-Commerce Operator" = const(true));
             DataClassification = CustomerContent;
         }
+#if not CLEANSCHEMA26
         field(18149; "E-Commerce Merchant Id"; code[30])
         {
             Caption = 'E-Commerce Merchant Id';
@@ -52,10 +64,11 @@ tableextension 18147 "GST Sales Header Ext" extends "Sales Header"
                 "Merchant Id" = field("e-Commerce Merchant Id"),
                 "Customer No." = field("e-Commerce Customer"));
             DataClassification = CustomerContent;
-            ObsoleteState = Pending;
             ObsoleteReason = 'New field introduced as E-Comm. Merchant Id';
-            ObsoleteTag = '23.0';
+            ObsoleteState = Removed;
+            ObsoleteTag = '26.0';
         }
+#endif
         field(18150; "GST Bill-to State Code"; Code[10])
         {
             Caption = 'GST Bill-to State Code';

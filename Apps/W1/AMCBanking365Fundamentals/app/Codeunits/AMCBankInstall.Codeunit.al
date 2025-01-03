@@ -1,3 +1,13 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Bank.Payment;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Bank.Setup;
+using System.IO;
+
 codeunit 20116 "AMC Bank Install"
 {
     Subtype = install;
@@ -8,50 +18,10 @@ codeunit 20116 "AMC Bank Install"
     begin
         NavApp.GetCurrentModuleInfo(AppInfo);
         if AppInfo.DataVersion() = Version.Create('0.0.0.0') then begin
-            MoveBankAccountTableData();
-            MoveBankDataConversionPmtTypesTableData();
-            MovePaymentMethodTableData();
             DeleteOldDataExchangeDefinitions();
             RemoveDataExchangeDefinitionReferences();
         end;
         UpdateNamespaceApiVersion();
-    end;
-
-    local procedure MoveBankAccountTableData()
-    var
-        BankAccount: Record "Bank Account";
-    begin
-        if BankAccount.FindSet(true, false) then
-            repeat
-                BankAccount."AMC Bank Name" := BankAccount."Bank Name - Data Conversion";
-                BankAccount.Modify(true);
-            until BankAccount.Next() = 0;
-    end;
-
-    local procedure MovePaymentMethodTableData()
-    var
-        PaymentMethod: Record "Payment Method";
-    begin
-        if PaymentMethod.FindSet(true, false) then
-            repeat
-                PaymentMethod."AMC Bank Pmt. Type" := PaymentMethod."Bank Data Conversion Pmt. Type";
-                PaymentMethod.Modify(true);
-            until PaymentMethod.Next() = 0;
-    end;
-
-    local procedure MoveBankDataConversionPmtTypesTableData()
-    var
-        BankDataConversionPmtType: Record "Bank Data Conversion Pmt. Type";
-        AMCBankPmtType: Record "AMC Bank Pmt. Type";
-    begin
-        if BankDataConversionPmtType.FindSet(false, false) then
-            repeat
-                clear(AMCBankPmtType);
-                AMCBankPmtType.Code := BankDataConversionPmtType.Code;
-                AMCBankPmtType.Description := BankDataConversionPmtType.Description;
-                AMCBankPmtType.SystemId := BankDataConversionPmtType.SystemId;
-                AMCBankPmtType.Insert(true);
-            until BankDataConversionPmtType.Next() = 0;
     end;
 
     local procedure DeleteOldDataExchangeDefinitions()

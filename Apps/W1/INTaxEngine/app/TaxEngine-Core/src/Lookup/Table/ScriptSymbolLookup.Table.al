@@ -1,3 +1,9 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.Core;
+
 table 20144 "Script Symbol Lookup"
 {
     Caption = 'Script Symbol Lookup';
@@ -90,6 +96,9 @@ table 20144 "Script Symbol Lookup"
         ScriptSymbolStore: Codeunit "Script Symbol Store";
     begin
         ScriptSymbolStore.OnBeforeValidateIfUpdateIsAllowed("Case ID");
+
+        if not IsNullGuid("Table Sorting ID") then
+            EntityMgmt.DeleteTableSorting("Case ID", "Script ID", "Table Sorting ID");
 
         if not IsNullGuid("Table Filter ID") then
             EntityMgmt.DeleteTableFilters("Case ID", "Script ID", "Table Filter ID");

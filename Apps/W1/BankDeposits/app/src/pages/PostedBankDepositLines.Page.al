@@ -1,3 +1,5 @@
+namespace Microsoft.Bank.Deposit;
+
 page 1695 "Posted Bank Deposit Lines"
 {
     Caption = 'Posted Bank Deposit Lines';
@@ -88,12 +90,8 @@ page 1695 "Posted Bank Deposit Lines"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Show Document';
                     Image = View;
-                    Promoted = true;
-                    PromotedOnly = true;
-                    PromotedCategory = Process;
-                    PromotedIsBig = true;
                     RunObject = Page "Posted Bank Deposit List";
-                    RunPageLink = "No." = FIELD("Bank Deposit No.");
+                    RunPageLink = "No." = field("Bank Deposit No.");
                     ToolTip = 'View the document that the deposit is related to.';
                 }
                 action("Account &Card")
@@ -101,10 +99,6 @@ page 1695 "Posted Bank Deposit Lines"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account &Card';
                     Image = Account;
-                    Promoted = true;
-                    PromotedOnly = true;
-                    PromotedCategory = Process;
-                    PromotedIsBig = true;
                     ShortCutKey = 'Shift+F7';
                     ToolTip = 'View or change detailed information about the account on the deposit line.';
 
@@ -118,10 +112,6 @@ page 1695 "Posted Bank Deposit Lines"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account Ledger E&ntries';
                     Image = LedgerEntries;
-                    Promoted = true;
-                    PromotedOnly = true;
-                    PromotedCategory = Process;
-                    PromotedIsBig = true;
                     ShortCutKey = 'Ctrl+F7';
                     ToolTip = 'View ledger entries that are posted for the account on the deposit line.';
 
@@ -135,10 +125,6 @@ page 1695 "Posted Bank Deposit Lines"
                     ApplicationArea = Suite;
                     Caption = 'Dimensions';
                     Image = Dimensions;
-                    Promoted = true;
-                    PromotedOnly = true;
-                    PromotedCategory = Process;
-                    PromotedIsBig = true;
                     ShortCutKey = 'Alt+D';
                     ToolTip = 'View or edit dimensions, such as area, project, or department, that you can assign to sales and purchase documents to distribute costs and analyze transaction history.';
 

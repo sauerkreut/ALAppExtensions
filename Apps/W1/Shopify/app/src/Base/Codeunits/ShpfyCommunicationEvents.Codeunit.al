@@ -1,3 +1,5 @@
+namespace Microsoft.Integration.Shopify;
+
 /// <summary>
 /// Codeunit Shpfy Communication Events (ID 30200).
 /// </summary>
@@ -6,7 +8,7 @@ codeunit 30200 "Shpfy Communication Events"
     Access = Internal;
 
     [InternalEvent(false)]
-    internal procedure OnClientSend(HttpRequestMsg: HttpRequestMessage; var HttpResponseMsg: HttpResponseMessage)
+    internal procedure OnClientSend(HttpRequestMessage: HttpRequestMessage; var HttpResponseMessage: HttpResponseMessage)
     begin
     end;
 
@@ -15,4 +17,13 @@ codeunit 30200 "Shpfy Communication Events"
     begin
     end;
 
+    [InternalEvent(false)]
+    internal procedure OnGetContent(HttpResponseMessage: HttpResponseMessage; var Response: Text)
+    begin
+    end;
+
+    [InternalEvent(false)]
+    internal procedure OnClientPost(var Url: Text; var Content: HttpContent; var Response: HttpResponseMessage)
+    begin
+    end;
 }

@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4055 "GPPOPDistributionHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

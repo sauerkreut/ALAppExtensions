@@ -1,3 +1,12 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Base;
+
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.TaxBase;
+
 table 18007 "GST Posting Setup"
 {
     Caption = 'GST Posting Setup';
@@ -95,6 +104,12 @@ table 18007 "GST Posting Setup"
             Caption = 'IGST Payable A/c (Import)';
             DataClassification = CustomerContent;
             TableRelation = "G/L Account" where(Blocked = const(false), "Account Type" = filter(Posting));
+        }
+        field(17; "GST TDS Payable Account"; code[20])
+        {
+            Caption = 'GST TDS Payable Account';
+            DataClassification = CustomerContent;
+            TableRelation = "G/L Account";
         }
     }
 

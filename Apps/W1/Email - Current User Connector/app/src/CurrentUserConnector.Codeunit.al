@@ -3,7 +3,12 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 
-codeunit 4500 "Current User Connector" implements "Email Connector"
+namespace System.Email;
+
+using System.Security.AccessControl;
+using System.Environment;
+
+codeunit 4500 "Current User Connector" implements "Email Connector", "Default Email Rate Limit"
 {
     Access = Internal;
     Permissions = tabledata "Email - Outlook Account" = rimd;
@@ -65,13 +70,11 @@ codeunit 4500 "Current User Connector" implements "Email Connector"
         User: Record User;
         EmailOutlookAPIHelper: Codeunit "Email - Outlook API Helper";
         EnvironmentInformation: Codeunit "Environment Information";
-        APIClient: interface "Email - Outlook API Client";
-        OAuthClient: interface "Email - OAuth Client";
+        APIClient: interface "Email - Outlook API Client v2";
+        OAuthClient: interface "Email - OAuth Client v2";
         CurrentUserName: Text[250];
         CurrentUserEmail: Text[250];
-
-        [NonDebuggable]
-        AccessToken: Text;
+        AccessToken: SecretText;
     begin
         if EnvironmentInformation.IsSaaS() then begin
             if not User.Get(UserSecurityId()) then
@@ -119,5 +122,12 @@ codeunit 4500 "Current User Connector" implements "Email Connector"
     procedure GetCurrentUserAccountName(): Text[250]
     begin
         exit(CurrentUserTok)
+    end;
+
+    procedure GetDefaultEmailRateLimit(): Integer
+    var
+        EmailOutlookAPIHelper: Codeunit "Email - Outlook API Helper";
+    begin
+        exit(EmailOutlookAPIHelper.DefaultEmailRateLimit());
     end;
 }

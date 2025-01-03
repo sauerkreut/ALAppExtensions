@@ -1,3 +1,18 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Bank.VoucherInterface;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.TaxBase;
+using Microsoft.Foundation.Address;
+using Microsoft.Foundation.Company;
+using Microsoft.HumanResources.Employee;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
+
 page 18942 "Check Preview Custom"
 {
     Caption = 'Check Preview';
@@ -135,16 +150,19 @@ page 18942 "Check Preview Custom"
                         field(Placeholder4; PlaceHolderLbl)
                         {
                             ApplicationArea = Basic, Suite;
+                            ShowCaption = false;
                             Visible = false;
                         }
                         field(Placeholder5; PlaceHolderLbl)
                         {
                             ApplicationArea = Basic, Suite;
+                            ShowCaption = false;
                             Visible = false;
                         }
                         field(Placeholder6; PlaceHolderLbl)
                         {
                             ApplicationArea = Basic, Suite;
+                            ShowCaption = false;
                             Visible = false;
                         }
                     }
@@ -196,6 +214,9 @@ page 18942 "Check Preview Custom"
     end;
 
     local procedure CalcCheck()
+    var
+        TaxBaseLibrary: Codeunit "Tax Base Library";
+        TDSAmount: Decimal;
     begin
         if "Check Printed" then begin
             GenJnlLine.Reset();
@@ -226,9 +247,10 @@ page 18942 "Check Preview Custom"
         end;
 
         CheckAmount := 0;
-        if GenJnlLine.Find('-') then
+        if GenJnlLine.FindSet() then
             repeat
-                CheckAmount := CheckAmount + GenJnlLine.Amount;
+                TaxBaseLibrary.GetTDSAmount(GenJnlLine, TDSAmount);
+                CheckAmount := CheckAmount + GenJnlLine.Amount - TDSAmount;
             until GenJnlLine.Next() = 0;
 
         if CheckAmount < 0 then

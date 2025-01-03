@@ -1,3 +1,5 @@
+namespace Microsoft.Integration.Shopify;
+
 /// <summary>
 /// Page Shpfy Payouts (ID 30125).
 /// </summary>
@@ -10,7 +12,7 @@ page 30125 "Shpfy Payouts"
     PageType = List;
     PromotedActionCategories = 'New,Process,Report,Inspect';
     SourceTable = "Shpfy Payout";
-    SourceTableView = sorting(Id) order(descending);
+    SourceTableView = sorting(Date) order(descending);
     UsageCategory = History;
 
     layout

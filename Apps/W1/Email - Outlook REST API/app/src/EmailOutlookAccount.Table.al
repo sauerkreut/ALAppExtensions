@@ -3,6 +3,8 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 
+namespace System.Email;
+
 table 4508 "Email - Outlook Account"
 {
     DataClassification = CustomerContent;
@@ -28,13 +30,6 @@ table 4508 "Email - Outlook Account"
         field(4; "Outlook API Email Connector"; Enum "Email Connector")
         {
             DataClassification = SystemMetadata;
-        }
-        field(5; "Created By"; Text[50])
-        {
-            DataClassification = EndUserIdentifiableInformation;
-            ObsoleteReason = 'Unused, can be replaced by SystemCreatedBy and correlate with the User table''s  User Security Id.';
-            ObsoleteState = Removed;
-            ObsoleteTag = '20.0';
         }
     }
 

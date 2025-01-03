@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Payments;
+
+using Microsoft.Finance.GeneralLedger.Journal;
+
 codeunit 18245 "GST Journal Subscribers"
 {
     var
@@ -68,5 +76,14 @@ codeunit 18245 "GST Journal Subscribers"
     local procedure ValidateOrderAddressCode(var Rec: Record "Gen. Journal Line")
     begin
         GSTJournalLineValidations.OrderAddressCode(Rec);
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Journal Bank Charges", 'OnAfterInsertEvent', '', false, false)]
+    local procedure OnAfterInsertEventCheckMultipleBankCharge(var Rec: Record "Journal Bank Charges")
+    begin
+        if Rec.IsTemporary() then
+            exit;
+
+        GSTJournalValidations.CheckMultipleBankCharge(Rec);
     end;
 }

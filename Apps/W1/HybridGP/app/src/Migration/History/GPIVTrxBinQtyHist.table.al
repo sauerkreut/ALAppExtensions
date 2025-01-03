@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4050 "GPIVTrxBinQtyHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

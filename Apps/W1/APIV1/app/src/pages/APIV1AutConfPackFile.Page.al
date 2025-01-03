@@ -1,5 +1,11 @@
+namespace Microsoft.API.V1;
+
+using System.Environment;
+using System.IO;
+
 page 20054 "APIV1 - Aut. Conf. Pack. File"
 {
+#pragma warning disable AA0218
     Caption = 'configurationPackageFile', Locked = true;
     DelayedInsert = true;
     PageType = ListPart;
@@ -12,10 +18,13 @@ page 20054 "APIV1 - Aut. Conf. Pack. File"
         {
             repeater(Group)
             {
-                field(content; Content)
+#pragma warning disable AL0273
+#pragma warning disable AW0004
+                field(content; Rec.Content)
+#pragma warning restore
                 {
                     ApplicationArea = All;
-                    Caption = 'Content', Locked = true;
+                    Caption = 'Specifies the content.', Locked = true;
                 }
             }
         }
@@ -30,10 +39,10 @@ page 20054 "APIV1 - Aut. Conf. Pack. File"
         CodeFilter: Text;
     begin
         if not FilesLoaded then begin
-            CodeFilter := GetFilter(Code);
+            CodeFilter := Rec.GetFilter(Code);
             if CodeFilter = '' then
                 Error(CodeNotSpecifiedForLinesErr);
-            if not FindFirst() then
+            if not Rec.FindFirst() then
                 exit(false);
             FilesLoaded := true;
         end;
@@ -50,5 +59,7 @@ page 20054 "APIV1 - Aut. Conf. Pack. File"
         AutomationAPIManagement: Codeunit "Automation - API Management";
         FilesLoaded: Boolean;
         CodeNotSpecifiedForLinesErr: Label 'You must specify a Configuration Package Code before uploading a Configuration Package File.', Locked = true;
+#pragma warning restore
 }
+
 

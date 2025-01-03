@@ -1,3 +1,10 @@
+namespace Microsoft.Bank.StatementImport.Yodlee;
+
+using Microsoft.Foundation.Company;
+using System.Environment;
+using System.Privacy;
+using System.Upgrade;
+
 codeunit 1454 "Yodlee Install"
 {
     Subtype = install;
@@ -62,12 +69,6 @@ codeunit 1454 "Yodlee Install"
         UpgradeTag: Codeunit "Upgrade Tag";
         YodleeServiceUpgrade: Codeunit "MS - Yodlee Service Upgrade";
     begin
-        if not UpgradeTag.HasUpgradeTag(YodleeServiceUpgrade.GetYodleeSecretsToISUpgradeTag()) then
-            UpgradeTag.SetUpgradeTag(YodleeServiceUpgrade.GetYodleeSecretsToISUpgradeTag());
-
-        if not UpgradeTag.HasUpgradeTag(YodleeServiceUpgrade.GetYodleeSecretsToISValidationTag()) then
-            UpgradeTag.SetUpgradeTag(YodleeServiceUpgrade.GetYodleeSecretsToISValidationTag());
-
         if not UpgradeTag.HasUpgradeTag(YodleeServiceUpgrade.GetYodleeUpdateBankSessionTableTag()) then
             UpgradeTag.SetUpgradeTag(YodleeServiceUpgrade.GetYodleeUpdateBankSessionTableTag());
 

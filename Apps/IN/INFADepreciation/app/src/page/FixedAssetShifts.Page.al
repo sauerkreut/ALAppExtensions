@@ -1,3 +1,9 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.FixedAssets.FADepreciation;
+
 page 18633 "Fixed Asset Shifts"
 {
     ApplicationArea = FixedAssets;
@@ -21,6 +27,7 @@ page 18633 "Fixed Asset Shifts"
                     ToolTip = 'Specifies the depreciation book code.';
                     ApplicationArea = FixedAssets;
                 }
+#if not CLEAN26
                 field("FA Posting Group"; Rec."FA Posting Group")
                 {
                     Editable = false;
@@ -37,6 +44,7 @@ page 18633 "Fixed Asset Shifts"
                         Error(FAPostingGroupsErr);
                     end;
                 }
+#endif
                 field("Fixed Asset Posting Group"; Rec."Fixed Asset Posting Group")
                 {
                     Editable = false;

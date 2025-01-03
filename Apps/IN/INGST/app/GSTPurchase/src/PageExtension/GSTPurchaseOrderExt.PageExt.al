@@ -1,7 +1,27 @@
-﻿pageextension 18084 "GST Purchase Order Ext" extends "Purchase Order"
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Purchases.Document;
+
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.GST.Purchase;
+
+pageextension 18084 "GST Purchase Order Ext" extends "Purchase Order"
 {
     layout
     {
+        modify(ShippingOptionWithLocation)
+        {
+            trigger OnAfterValidate()
+            begin
+                GstPurchaseSubscriber.SetLocationCodeVisibleConditionally(IsLocationVisible, ShipToOptions);
+            end;
+        }
+        modify(Control98)
+        {
+            Visible = IsLocationVisible;
+        }
         modify("Posting Date")
         {
             trigger OnAfterValidate()
@@ -14,6 +34,7 @@
         }
         modify("Location Code")
         {
+            ShowMandatory = ShipToOptions = ShipToOptions::"Custom Address";
             trigger OnAfterValidate()
             var
                 GSTBaseValidation: Codeunit "GST Base Validation";
@@ -248,7 +269,7 @@
                 {
                     ApplicationArea = Basic, Suite;
                     Caption = 'Subcontracting Post Line No';
-                    ToolTip = 'Specified subcontracting post line no';
+                    ToolTip = 'Specifies subcontracting post line no';
                 }
             }
         }
@@ -300,11 +321,16 @@
     trigger OnAfterGetRecord()
     begin
         SetLocGSTRegNoEditable();
+        GstPurchaseSubscriber.SetLocationCodeVisibleConditionally(IsLocationVisible, ShipToOptions);
     end;
 
     var
+        GstPurchaseSubscriber: Codeunit "GST Purchase Subscribers";
         GSTLocRegNo: Boolean;
+        [InDataSet]
         IsRateChangeEnabled: Boolean;
+        [InDataSet]
+        IsLocationVisible: Boolean;
 
     local procedure SetLocGSTRegNoEditable()
     begin

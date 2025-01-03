@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.JsonExchange;
+
+using Microsoft.Finance.TaxEngine.Core;
+using Microsoft.Finance.TaxEngine.PostingHandler;
+using Microsoft.Finance.TaxEngine.ScriptHandler;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Finance.TaxEngine.UseCaseBuilder;
+using System.Reflection;
+
 codeunit 20361 "Tax Json Deserialization"
 {
     procedure SetCanImportUseCases(NewCanImportUseCases: Boolean)
@@ -2319,6 +2332,8 @@ codeunit 20361 "Tax Json Deserialization"
                         ActionLoopThroughRecords."Case ID",
                         ActionLoopThroughRecords."Script ID",
                         JToken2Text30(JToken));
+                'CalculateSum':
+                    ActionLoopThroughRecField."Calculate Sum" := JToken.AsValue().AsBoolean();
                 else
                     Error(CannotReadPropertyErr, property);
             end;
@@ -2427,7 +2442,7 @@ codeunit 20361 "Tax Json Deserialization"
     var
         Variables: Record "Script Variable";
     begin
-        Variables.SetRange("Script ID", CaseID);
+        Variables.SetRange("Case ID", CaseID);
         Variables.SetRange("Script ID", ScriptID);
         if Variables.FindLast() then
             exit(Variables.ID + 10000);
@@ -2439,7 +2454,7 @@ codeunit 20361 "Tax Json Deserialization"
     var
         LookupFieldSorting: Record "Lookup Field Sorting";
     begin
-        LookupFieldSorting.SetRange("Script ID", CaseID);
+        LookupFieldSorting.SetRange("Case ID", CaseID);
         LookupFieldSorting.SetRange("Script ID", ScriptID);
         if LookupFieldSorting.FindLast() then
             exit(LookupFieldSorting."Line No." + 10000);

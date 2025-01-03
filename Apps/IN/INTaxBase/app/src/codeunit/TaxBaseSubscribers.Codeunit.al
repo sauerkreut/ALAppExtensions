@@ -1,3 +1,26 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxBase;
+
+using Microsoft.Finance.Dimension;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Posting;
+using Microsoft.Finance.ReceivablesPayables;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Finance.TaxEngine.UseCaseBuilder;
+using Microsoft.Finance.VAT.Setup;
+using Microsoft.Inventory.Location;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Sales.Document;
+using Microsoft.Sales.FinanceCharge;
+using Microsoft.Sales.History;
+using Microsoft.Service.Document;
+using Microsoft.RoleCenters;
+using Microsoft;
+
 codeunit 18544 "Tax Base Subscribers"
 {
     procedure GetTCSAmount(Amount: Decimal)
@@ -13,6 +36,11 @@ codeunit 18544 "Tax Base Subscribers"
     procedure GetTDSAmount(Amount: Decimal)
     begin
         OnAfterGetTDSAmount(Amount);
+    end;
+
+    procedure GetAmountFromDocumentNoForEInv(DocumentNo: Code[20]; var Amount: Decimal)
+    begin
+        OnAfterGetAmountFromDocumentNoForEInv(DocumentNo, Amount);
     end;
 
     procedure GetTDSAmountFromTransNo(TransactionNo: Integer; var Amount: Decimal)
@@ -61,6 +89,12 @@ codeunit 18544 "Tax Base Subscribers"
     local procedure TaxComponentValuesFromRecID(RecID: RecordId; TaxTypeCode: Code[20]; ComponentID: Integer; var ComponentRate: Decimal; var ComponentAmount: Decimal)
     begin
         GetTaxComponentValuesFromRecID(RecID, TaxTypeCode, ComponentID, ComponentRate, ComponentAmount);
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Purchase Header", 'OnAfterValidateEvent', 'Applies-to ID', false, false)]
+    local procedure OnAfterValidateEventAppliesToID(var Rec: Record "Purchase Header")
+    begin
+        CallTaxEngineForPurchaseLines(Rec);
     end;
 
     [EventSubscriber(ObjectType::Table, Database::"Purchase Header", 'OnAfterValidateEvent', 'Applies-to Doc. No.', false, false)]
@@ -185,6 +219,68 @@ codeunit 18544 "Tax Base Subscribers"
                 IsHandled := true;
     end;
 
+    [EventSubscriber(ObjectType::Table, Database::"Gen. Journal Line", 'OnAfterInitDefaultDimensionSources', '', false, false)]
+    local procedure OnAfterInitDefaultDimensionSources(var GenJournalLine: Record "Gen. Journal Line"; var DefaultDimSource: List of [Dictionary of [Integer, Code[20]]]; FromFieldNo: Integer)
+    var
+        DimMgt: Codeunit DimensionManagement;
+    begin
+        DimMgt.AddDimSource(DefaultDimSource, Database::Location, GenJournalLine."Location Code", FromFieldNo = GenJournalLine.FieldNo("Location Code"));
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Purch. Rcpt. Line", 'OnInsertInvLineFromRcptLineOnBeforeValidateQuantity', '', false, false)]
+    local procedure OnInsertInvLineFromRcptLineOnBeforeValidateQuantity(PurchRcptLine: Record "Purch. Rcpt. Line"; var PurchaseLine: Record "Purchase Line"; var IsHandled: Boolean; var PurchInvHeader: Record "Purchase Header")
+    begin
+        DisablePurchaseLineTaxEngineCall(PurchRcptLine, PurchaseLine);
+    end;
+
+    local procedure DisablePurchaseLineTaxEngineCall(var PurchRcptLine: Record "Purch. Rcpt. Line"; var PurchLine: Record "Purchase Line")
+    var
+        IsHandled: Boolean;
+    begin
+        OnBeforeSkipCallingTaxEngineForPurchLine(PurchLine, IsHandled);
+        if IsHandled then
+            exit;
+
+        if PurchRcptLine."Document No." <> PurchLine."Receipt No." then
+            exit;
+
+        PurchLine.SetSkipTaxCalulation(true);
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Purch. Rcpt. Line", 'OnAfterInsertInvLineFromRcptLine', '', false, false)]
+    local procedure OnAfterInsertInvLineFromRcptLine(var PurchLine: Record "Purchase Line"; PurchOrderLine: Record "Purchase Line"; NextLineNo: Integer; PurchRcptLine: Record "Purch. Rcpt. Line")
+    begin
+        EnablePurchaseLineTaxEngineCall(PurchLine, PurchRcptLine);
+    end;
+
+    local procedure EnablePurchaseLineTaxEngineCall(var PurchLine: Record "Purchase Line"; PurchRcptLine: Record "Purch. Rcpt. Line")
+    var
+        IsHandled: Boolean;
+    begin
+        OnBeforeEnableCallingTaxEngineForPurchLine(PurchLine, IsHandled);
+        if IsHandled then
+            exit;
+
+        if PurchRcptLine."Document No." <> PurchLine."Receipt No." then
+            exit;
+
+        if PurchLine.GetSkipTaxCalculation() then
+            PurchLine.SetSkipTaxCalulation(false);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Get Receipt", 'OnAfterInsertLines', '', false, false)]
+    local procedure OnAfterInsertReceiptLines(var PurchHeader: Record "Purchase Header")
+    begin
+        CallTaxEngineForPurchaseLines(PurchHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Use Case Event Handling", 'OnBeforePurchaseUseCaseHandleEvent', '', false, false)]
+    local procedure OnBeforePurchaseUseCaseHandleEvent(var PurchLine: Record "Purchase Line"; var IsHandled: Boolean)
+    begin
+        if PurchLine.GetSkipTaxCalculation() then
+            IsHandled := true;
+    end;
+
     local procedure CallTaxEngineForPurchaseLines(var PurchaseHeader: Record "Purchase Header")
     var
         PurchaseLine: Record "Purchase Line";
@@ -223,6 +319,20 @@ codeunit 18544 "Tax Base Subscribers"
     end;
 
     [IntegrationEvent(true, false)]
+    local procedure OnBeforeSkipCallingTaxEngineForPurchLine(
+        var PurchLine: Record "Purchase Line";
+        var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(true, false)]
+    local procedure OnBeforeEnableCallingTaxEngineForPurchLine(
+        var PurchLine: Record "Purchase Line";
+        var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(true, false)]
     local procedure OnBeforeCallingTaxEngineFromGenJnlLine(var GenJnlLine: Record "Gen. Journal Line")
     begin
     end;
@@ -254,6 +364,11 @@ codeunit 18544 "Tax Base Subscribers"
 
     [IntegrationEvent(false, false)]
     local procedure OnAfterGetGSTAmountForSalesInvLines(SalesInvoiceLine: Record "Sales Invoice Line"; var GSTBaseAmount: Decimal; var GSTAmount: Decimal)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetAmountFromDocumentNoForEInv(DocumentNo: Code[20]; var Amount: Decimal)
     begin
     end;
 }

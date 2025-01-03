@@ -1,3 +1,30 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Payments;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Ledger;
+using Microsoft.Finance.GeneralLedger.Posting;
+using Microsoft.Finance.TaxBase;
+using Microsoft.Finance.TaxEngine.PostingHandler;
+using Microsoft.Finance.TaxEngine.UseCaseBuilder;
+using Microsoft.FixedAssets.Depreciation;
+using Microsoft.FixedAssets.FixedAsset;
+using Microsoft.FixedAssets.Journal;
+using Microsoft.FixedAssets.Ledger;
+using Microsoft.Inventory.Location;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.Posting;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Document;
+using Microsoft.Sales.Posting;
+using Microsoft.Sales.Receivables;
+
 codeunit 18243 "GST Journal Line Subscribers"
 {
     var
@@ -208,10 +235,9 @@ codeunit 18243 "GST Journal Line Subscribers"
 
     [EventSubscriber(ObjectType::Table, Database::"Gen. Journal Line", 'OnAfterValidateEvent', 'Currency Factor', false, false)]
     local procedure OnValidateCurrencyCode(var Rec: Record "Gen. Journal Line"; var xRec: Record "Gen. Journal Line")
-    var
-        CalculateTax: Codeunit "Calculate Tax";
     begin
-        CalculateTax.CallTaxEngineOnGenJnlLine(Rec, xRec);
+        if not Rec.GetSkipTaxCalculation() then
+            TaxEngineCallingHandler(Rec, xRec);
     end;
 
     [EventSubscriber(ObjectType::Table, Database::"Gen. Journal Line", 'OnAfterValidateEvent', 'GST TDS/TCS Base Amount', false, false)]
@@ -253,35 +279,6 @@ codeunit 18243 "GST Journal Line Subscribers"
         end;
     end;
 
-#if not CLEAN20
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnBeforePostBalancingEntry', '', false, false)]
-    local procedure OnBeforePostBalancingEntry(var GenJnlLine: Record "Gen. Journal Line"; var PurchHeader: Record "Purchase Header"; var TotalPurchLine: Record "Purchase Line"; var TotalPurchLineLCY: Record "Purchase Line"; PreviewMode: Boolean; CommitIsSupressed: Boolean; var VendLedgEntry: Record "Vendor Ledger Entry")
-    var
-        PaymentMethod: Record "Payment Method";
-        GLEntry: Record "G/L Entry";
-    begin
-        if PurchHeader."GST Vendor Type" <> PurchHeader."GST Vendor Type"::" " then
-            if PurchHeader."Payment Method Code" <> '' then
-                if PaymentMethod.Get(PurchHeader."Payment Method Code") then
-                    if PaymentMethod."Bal. Account No." <> '' then begin
-                        GLEntry.SetRange("External Document No.", GenJnlLine."External Document No.");
-                        GLEntry.SetRange("Document No.", GenJnlLine."Document No.");
-                        if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Payment) then begin
-                            GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::Invoice);
-                            GLEntry.SetFilter("Credit Amount", '<>%1', 0);
-                        end
-                        else
-                            if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Refund) then begin
-                                GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::"Credit Memo");
-                                GLEntry.SetFilter("Debit Amount", '<>%1', 0);
-                            end;
-
-                        if GLEntry.FindFirst() then
-                            GenJnlLine.Validate(Amount, GLEntry.Amount * -1);
-                    end;
-    end;
-#endif
-
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch. Post Invoice Events", 'OnPostBalancingEntryOnBeforeGenJnlPostLine', '', false, false)]
     local procedure OnPostBalancingEntryOnBeforeGenJnlPostLine(var GenJnlLine: Record "Gen. Journal Line"; var PurchHeader: Record "Purchase Header"; var TotalPurchLine: Record "Purchase Line"; var TotalPurchLineLCY: Record "Purchase Line"; PreviewMode: Boolean; SuppressCommit: Boolean; var GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line")
     var
@@ -292,8 +289,10 @@ codeunit 18243 "GST Journal Line Subscribers"
             if PurchHeader."Payment Method Code" <> '' then
                 if PaymentMethod.Get(PurchHeader."Payment Method Code") then
                     if PaymentMethod."Bal. Account No." <> '' then begin
+                        GLEntry.LoadFields("External Document No.", "Document No.", "G/L Account No.", "Document Type", "Credit Amount", "Debit Amount", Amount);
                         GLEntry.SetRange("External Document No.", GenJnlLine."External Document No.");
                         GLEntry.SetRange("Document No.", GenJnlLine."Document No.");
+                        GLEntry.SetRange("G/L Account No.", GetVendorAccount(PurchHeader."Buy-from Vendor No."));
                         if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Payment) then begin
                             GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::Invoice);
                             GLEntry.SetFilter("Credit Amount", '<>%1', 0);
@@ -309,48 +308,20 @@ codeunit 18243 "GST Journal Line Subscribers"
                     end;
     end;
 
-#if not CLEAN20
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Sales-Post", 'OnBeforePostBalancingEntry', '', false, false)]
-    local procedure OnBeforePostBalancingEntryforSales(var GenJnlLine: Record "Gen. Journal Line"; SalesHeader: Record "Sales Header")
-    var
-        PaymentMethod: Record "Payment Method";
-        GLEntry: Record "G/L Entry";
-    begin
-        if SalesHeader."GST Customer Type" <> SalesHeader."GST Customer Type"::" " then
-            if SalesHeader."Payment Method Code" <> '' then
-                if PaymentMethod.Get(SalesHeader."Payment Method Code") then
-                    if PaymentMethod."Bal. Account No." <> '' then begin
-                        GLEntry.SetRange("External Document No.", GenJnlLine."External Document No.");
-                        GLEntry.SetRange("Document No.", GenJnlLine."Document No.");
-                        if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Payment) then begin
-                            GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::Invoice);
-                            GLEntry.SetFilter("Debit Amount", '<>%1', 0);
-                        end
-                        else
-                            if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Refund) then begin
-                                GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::"Credit Memo");
-                                GLEntry.SetFilter("Credit Amount", '<>%1', 0);
-                            end;
-
-                        if GLEntry.FindFirst() then
-                            GenJnlLine.Validate(Amount, (GLEntry.Amount * -1));
-
-                    end;
-    end;
-#endif
-
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Sales Post Invoice Events", 'OnPostBalancingEntryOnBeforeGenJnlPostLine', '', false, false)]
     local procedure OnPostBalancingEntryOnBeforeGenJnlPostLineforSales(var GenJnlLine: Record "Gen. Journal Line"; SalesHeader: Record "Sales Header")
     var
         PaymentMethod: Record "Payment Method";
         GLEntry: Record "G/L Entry";
     begin
-        if SalesHeader."GST Customer Type" <> SalesHeader."GST Customer Type"::" " then
+        if (SalesHeader."GST Customer Type" <> SalesHeader."GST Customer Type"::" ") and (SalesHeader."GST Customer Type" <> SalesHeader."GST Customer Type"::Export) then
             if SalesHeader."Payment Method Code" <> '' then
                 if PaymentMethod.Get(SalesHeader."Payment Method Code") then
                     if PaymentMethod."Bal. Account No." <> '' then begin
+                        GLEntry.LoadFields("External Document No.", "Document No.", "G/L Account No.", "Document Type", "Credit Amount", "Debit Amount", Amount);
                         GLEntry.SetRange("External Document No.", GenJnlLine."External Document No.");
                         GLEntry.SetRange("Document No.", GenJnlLine."Document No.");
+                        GLEntry.SetRange("G/L Account No.", GetCustomerAccount(SalesHeader."Bill-to Customer No."));
                         if (GenJnlLine."Document Type" = GenJnlLine."Document Type"::Payment) then begin
                             GLEntry.SetRange("Document Type", GenJnlLine."Document Type"::Invoice);
                             GLEntry.SetFilter("Debit Amount", '<>%1', 0);
@@ -364,5 +335,52 @@ codeunit 18243 "GST Journal Line Subscribers"
                         if GLEntry.FindFirst() then
                             GenJnlLine.Validate(Amount, (GLEntry.Amount * -1));
                     end;
+    end;
+
+    [EventSubscriber(ObjectType::Report, Report::"Calculate Depreciation", 'OnBeforeGenJnlLineCreate', '', false, false)]
+    local procedure OnBeforeGenJnlLineCreate(var GenJournalLine: Record "Gen. Journal Line")
+    begin
+        GenJournalLine.SetSkipTaxCalulation(true);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Use Case Event Handling", 'OnBeforeGenJnlLineUseCaseHandleEvent', '', false, false)]
+    local procedure OnBeforeGenJnlLineUseCaseHandleEvent(var Rec: Record "Gen. Journal Line"; var IsHandled: Boolean)
+    begin
+        if Rec.GetSkipTaxCalculation() then
+            IsHandled := true;
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"FA Insert G/L Account", 'OnBeforeCalculateNoOfEmptyLines', '', false, false)]
+    local procedure OnBeforeCalculateNoOfEmptyLines(var GenJnlLine: Record "Gen. Journal Line"; var TempFAGLPostingBuffer: Record "FA G/L Posting Buffer" temporary)
+    begin
+        if (GenJnlLine."Source Type" = GenJnlLine."Source Type"::"Fixed Asset") and (GenJnlLine."FA Posting Type" = GenJnlLine."FA Posting Type"::Depreciation) then
+            GenJnlLine.SetSkipTaxCalulation(true);
+    end;
+
+    local procedure GetCustomerAccount(CustomerNo: Code[20]): Code[20]
+    var
+        Customer: Record Customer;
+        CustomerPotingGroup: Record "Customer Posting Group";
+    begin
+        if Customer.Get(CustomerNo) then
+            if CustomerPotingGroup.Get(Customer."Customer Posting Group") then
+                exit(CustomerPotingGroup."Receivables Account");
+    end;
+
+    local procedure GetVendorAccount(VendorNo: Code[20]): Code[20]
+    var
+        Vendor: Record Vendor;
+        VendorPostingGroup: Record "Vendor Posting Group";
+    begin
+        if Vendor.Get(VendorNo) then
+            if VendorPostingGroup.Get(Vendor."Vendor Posting Group") then
+                exit(VendorPostingGroup."Payables Account");
+    end;
+
+    local procedure TaxEngineCallingHandler(var GenJnlLine: Record "Gen. Journal Line"; var xGenJnlLine: Record "Gen. Journal Line")
+    var
+        CalculateTax: Codeunit "Calculate Tax";
+    begin
+        CalculateTax.CallTaxEngineOnGenJnlLine(GenJnlLine, xGenJnlLine);
     end;
 }

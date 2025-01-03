@@ -1,3 +1,9 @@
+namespace Microsoft.Bank.StatementImport;
+
+using Microsoft;
+using Microsoft.Bank.BankAccount;
+using Microsoft.Finance.GeneralLedger.Setup;
+
 pageextension 8850 "Bank Account Card Extension" extends "Bank Account Card"
 {
     var
@@ -6,6 +12,7 @@ pageextension 8850 "Bank Account Card Extension" extends "Bank Account Card"
 
     trigger OnOpenPage()
     var
+        ConnectivityAppsMgt: Codeunit "Connectivity Apps Mgt.";
         GeneralLedgerSetupRecordRef: RecordRef;
         AutoMatchFieldRef: FieldRef;
     begin
@@ -13,7 +20,8 @@ pageextension 8850 "Bank Account Card Extension" extends "Bank Account Card"
             if not AutoMatchFieldRef.Value() then
                 exit;
 
-        CreateEmptyBankStatementImportNotification();
+        if not ConnectivityAppsMgt.IsBankingAppAvailable() then
+            CreateEmptyBankStatementImportNotification();
     end;
 
     local procedure AutoMatchAvailable(var GeneralLedgerSetupRecordRef: RecordRef; var AutoMatchFieldRef: FieldRef): Boolean
@@ -35,6 +43,7 @@ pageextension 8850 "Bank Account Card Extension" extends "Bank Account Card"
             if SetBankStatementImportFormat.Recall() then;
             SetBankStatementImportFormat.Message := BankStatementImportFormatEmptyMsg;
             SetBankStatementImportFormat.Scope := NotificationScope::LocalScope;
+            SetBankStatementImportFormat.SetData('BankAccountCode', Rec."No.");
             SetBankStatementImportFormat.AddAction(NotificationActionLbl, Codeunit::"Bank Statement File Wizard", 'RunBankStatementFileWizard');
             SetBankStatementImportFormat.Send();
         end;

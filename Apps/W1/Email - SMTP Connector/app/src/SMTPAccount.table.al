@@ -3,6 +3,8 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 
+namespace System.Email;
+
 /// <summary>
 /// Holds the information for all e-mail accounts that are registered via the SMTP connector
 /// </summary>
@@ -29,19 +31,6 @@ table 4511 "SMTP Account"
         field(3; "Server"; Text[250])
         {
             DataClassification = CustomerContent;
-        }
-
-        field(4; Authentication; Enum "SMTP Authentication")
-        {
-            DataClassification = CustomerContent;
-            ObsoleteReason = 'Replaced by "Authentication Types" as the enum is moving to SMTP API app.';
-#if not CLEAN20
-            ObsoleteState = Pending;
-            ObsoleteTag = '20.0';
-#else
-            ObsoleteState = Removed;
-            ObsoleteTag = '22.0';
-#endif
         }
 
         field(5; "User Name"; Text[250])
@@ -74,6 +63,20 @@ table 4511 "SMTP Account"
             DataClassification = SystemMetadata;
         }
 
+        field(9; "Sender Type"; Enum "SMTP Connector Sender Type")
+        {
+            DataClassification = CustomerContent;
+
+            trigger OnValidate()
+            begin
+                if Rec."Sender Type" = Rec."Sender Type"::"Specific User" then
+                    exit;
+
+                Rec."Email Address" := '';
+                Rec."Sender Name" := '';
+            end;
+        }
+
         field(10; "Email Address"; Text[250])
         {
             DataClassification = CustomerContent;
@@ -90,14 +93,6 @@ table 4511 "SMTP Account"
         field(11; "Sender Name"; Text[250])
         {
             DataClassification = CustomerContent;
-        }
-
-        field(12; "Created By"; Text[50])
-        {
-            DataClassification = EndUserIdentifiableInformation;
-            ObsoleteReason = 'Unused, can be replaced by SystemCreatedBy and correlate with the User table''s  User Security Id.';
-            ObsoleteState = Removed;
-            ObsoleteTag = '20.0';
         }
         field(13; "Authentication Type"; Enum "SMTP Authentication Types")
         {
@@ -124,7 +119,7 @@ table 4511 "SMTP Account"
     end;
 
     [NonDebuggable]
-    procedure SetPassword(Password: Text)
+    procedure SetPassword(Password: SecretText)
     begin
         if IsNullGuid(Rec."Password Key") then
             Rec."Password Key" := CreateGuid();
@@ -134,7 +129,7 @@ table 4511 "SMTP Account"
     end;
 
     [NonDebuggable]
-    procedure GetPassword(PasswordKey: Guid) Password: Text
+    procedure GetPassword(PasswordKey: Guid) Password: SecretText
     begin
         if not IsolatedStorage.Get(Format(PasswordKey), DataScope::Company, Password) then
             Error(UnableToGetPasswordMsg);

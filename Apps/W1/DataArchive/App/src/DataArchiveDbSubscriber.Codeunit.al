@@ -6,6 +6,11 @@
 /// <summary>
 /// This codeunit manually bound to the Global database delete trigger
 /// </summary>
+
+namespace System.DataAdministration;
+
+using System.Environment;
+
 codeunit 603 "Data Archive Db Subscriber"
 {
     Access = Internal;
@@ -27,7 +32,7 @@ codeunit 603 "Data Archive Db Subscriber"
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Global Triggers", 'OnDatabaseDelete', '', false, false)]
-    local procedure OnDatabaseDelete(RecRef: RecordRef)
+    local procedure SaveRecordOnDatabaseDelete(RecRef: RecordRef)
     begin
         if DataArchiveProviderIsSet then
             if not RecRef.IsTemporary() then

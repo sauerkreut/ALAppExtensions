@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.VAT.Reporting;
+
+using Microsoft.Finance.VAT.Ledger;
+using Microsoft.Finance.VAT.Setup;
+using Microsoft.Purchases.Vendor;
+using System.Environment.Configuration;
+using System.IO;
+using System.Utilities;
+
 codeunit 27021 "DIOT Data Management"
 {
     trigger OnRun()
@@ -27,7 +40,7 @@ codeunit 27021 "DIOT Data Management"
         LeaseAndRentNonMXErr: Label 'Operations with non-mx Vendor cannot have Lease And Rent Type of operation.';
         MissingRFCNoErr: Label 'MX vendors must have RFC Number filled in.';
         CountryCodeNotValidErr: Label 'Vendor''s Country Code is not among valid DIOT Country Codes.';
-        NegativeAmountErr: Label 'The amount for Concept No. %1 for Vendor with No. = %2 is negative, which is not valid.';
+        NegativeAmountErr: Label 'The amount for Concept No. %1 for Vendor with No. = %2 is negative, which is not valid.', Comment = '%1 = DIOT Concept No. Field Value; %2 = Vendor No. Field Value';
         NoDataMsg: Label 'There are no VAT Entries for configured concepts in the specified date range.';
 
     procedure GetTypeOfOperationCode(TypeOfOperation: Option): code[2]
@@ -234,31 +247,27 @@ codeunit 27021 "DIOT Data Management"
         TypeOfOperation: Option;
         CalcAmount: Decimal;
     begin
-        with VATEntry do begin
-            SetRange(Type, Type::Purchase);
-            SetFilter("Bill-to/Pay-to No.", '<>%1', '');
-            SetRange("Posting Date", StartingDate, EndingDate);
-        end;
+        VATEntry.SetRange(Type, VATEntry.Type::Purchase);
+        VATEntry.SetFilter("Bill-to/Pay-to No.", '<>%1', '');
+        VATEntry.SetRange("Posting Date", StartingDate, EndingDate);
         if DIOTConceptLink.FindSet() then
             repeat
                 CurrentDIOTConcept.Get(DIOTConceptLink."DIOT Concept No.");
                 CurrentVATPostingSetup.Get(DIOTConceptLink."VAT Bus. Posting Group", DIOTConceptLink."VAT Prod. Posting Group");
-                with VATEntry do begin
-                    SetRange("VAT Bus. Posting Group", DIOTConceptLink."VAT Bus. Posting Group");
-                    SetRange("VAT Prod. Posting Group", DIOTConceptLink."VAT Prod. Posting Group");
-                    if CurrentVATPostingSetup."Unrealized VAT Type" = CurrentVATPostingSetup."Unrealized VAT Type"::" " then
-                        SetRange("Document Type", "Document Type"::Invoice)
-                    else
-                        SetRange("Document Type", "Document Type"::Payment);
-                    if FindSet() then
-                        repeat
-                            VendorNo := "Bill-to/Pay-to No.";
-                            TypeOfOperation := GetTypeOfOperationForEntry(VATEntry);
-                            CalcAmount := CalcAmountForVATEntryAndDIOTConcept(VATEntry, CurrentDIOTConcept, CurrentVATPostingSetup);
-                            InsertBufferConditionally(TempDIOTReportBuffer, VendorNo, TypeOfOperation, DIOTConceptLink."DIOT Concept No.", CalcAmount);
-                            InsertVendorBufferConditionally(TempDIOTReportVendorBuffer, VendorNo, TypeOfOperation);
-                        until Next() = 0;
-                end;
+                VATEntry.SetRange("VAT Bus. Posting Group", DIOTConceptLink."VAT Bus. Posting Group");
+                VATEntry.SetRange("VAT Prod. Posting Group", DIOTConceptLink."VAT Prod. Posting Group");
+                if CurrentVATPostingSetup."Unrealized VAT Type" = CurrentVATPostingSetup."Unrealized VAT Type"::" " then
+                    VATEntry.SetRange("Document Type", VATEntry."Document Type"::Invoice)
+                else
+                    VATEntry.SetFilter("Unrealized VAT Entry No.", '<>%1', 0);
+                if VATEntry.FindSet() then
+                    repeat
+                        VendorNo := VATEntry."Bill-to/Pay-to No.";
+                        TypeOfOperation := GetTypeOfOperationForEntry(VATEntry);
+                        CalcAmount := CalcAmountForVATEntryAndDIOTConcept(VATEntry, CurrentDIOTConcept, CurrentVATPostingSetup);
+                        InsertBufferConditionally(TempDIOTReportBuffer, VendorNo, TypeOfOperation, DIOTConceptLink."DIOT Concept No.", CalcAmount);
+                        InsertVendorBufferConditionally(TempDIOTReportVendorBuffer, VendorNo, TypeOfOperation);
+                    until VATEntry.Next() = 0;
             until DIOTConceptLink.Next() = 0;
         CheckDIOTData(TempDIOTReportVendorBuffer, TempDIOTReportBuffer, TempErrorMessage);
     end;
@@ -290,9 +299,10 @@ codeunit 27021 "DIOT Data Management"
     var
         DIOTLine: Text;
         i: Integer;
+        DIOTLineTxt: Label '%1|%2|%3|%4|%5|%6|%7|', Locked = true;
     begin
         with DIOTReportVendorBuffer do begin
-            DIOTLine := StrSubstNo('%1|%2|%3|%4|%5|%6|%7|', "Type of Vendor Text", "Type of Operation Text", "RFC Number", "TAX Registration ID", "Vendor Name", "Country/Region Code", Nationality);
+            DIOTLine := StrSubstNo(DIOTLineTxt, "Type of Vendor Text", "Type of Operation Text", "RFC Number", "TAX Registration ID", "Vendor Name", "Country/Region Code", Nationality);
             for i := 1 to ArrayLen(ColumnAmounts) do begin
                 if ColumnAmounts[i] > 0 then
                     DIOTLine += Format(ROUND(ColumnAmounts[i], 1), 0, 9);

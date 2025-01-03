@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4077 "GPSOPTrxAmountsHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields
@@ -621,6 +623,9 @@ table 4077 "GPSOPTrxAmountsHist"
         key(PK; SOPNUMBE, SOPTYPE, CMPNTSEQ, LNITMSEQ)
         {
             Clustered = false;
+        }
+        key(Key2; SOPTYPE, SOPNUMBE)
+        {
         }
     }
 

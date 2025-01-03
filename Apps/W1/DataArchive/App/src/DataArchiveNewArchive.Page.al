@@ -6,6 +6,9 @@
 /// <summary>
 /// Used for 'recording' delete operations.
 /// </summary>
+
+namespace System.DataAdministration;
+
 page 633 "Data Archive - New Archive"
 {
     Caption = 'New Data Archive';
@@ -38,6 +41,7 @@ page 633 "Data Archive - New Archive"
                 Caption = 'Start Logging';
                 Image = Start;
                 Promoted = true;
+                PromotedOnly = true;
                 ToolTip = 'Start logging deletions. All deletions will be added to the new archive.';
                 trigger OnAction()
                 begin

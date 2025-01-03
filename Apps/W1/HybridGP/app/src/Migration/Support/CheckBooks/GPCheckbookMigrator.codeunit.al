@@ -1,14 +1,22 @@
+namespace Microsoft.DataMigration.GP;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Finance.GeneralLedger.Journal;
+using System.Integration;
+
 codeunit 40025 "GP Checkbook Migrator"
 {
     var
         BatchNameTxt: Label 'GPBANK', Locked = true;
         BankWarningTxt: Label 'Unable to get %1 posting account.', Comment = '%1 = Posting Group', Locked = true;
+        DescriptionTxt: Label 'Last GP Reconciled Balance Amount';
 
     procedure MoveCheckbookStagingData()
     var
         GPCheckbookMSTR: Record "GP Checkbook MSTR";
         BankAccount: Record "Bank Account";
         GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
         MigrateInactiveCheckbooks: Boolean;
     begin
         MigrateInactiveCheckbooks := GPCompanyAdditionalSettings.GetMigrateInactiveCheckbooks();
@@ -19,29 +27,48 @@ codeunit 40025 "GP Checkbook Migrator"
         repeat
             if not BankAccount.Get(GPCheckbookMSTR.CHEKBKID) then
                 if MigrateInactiveCheckbooks or not GPCheckbookMSTR.INACTIVE then begin
+                    DataMigrationErrorLogging.SetLastRecordUnderProcessing(Format(GPCheckbookMSTR.RecordId()));
                     Clear(BankAccount);
                     BankAccount."No." := DelChr(GPCheckbookMSTR.CHEKBKID, '>', ' ');
                     BankAccount.Name := DelChr(GPCheckbookMSTR.DSCRIPTN, '>', ' ');
                     BankAccount."Bank Account No." := DelChr(GPCheckbookMSTR.BNKACTNM, '>', ' ');
                     BankAccount."Last Check No." := GetLastCheckNumber(GPCheckbookMSTR.NXTCHNUM);
-                    BankAccount."Balance Last Statement" := GPCheckbookMSTR.Last_Reconciled_Balance;
                     BankAccount."Bank Acc. Posting Group" := GetOrCreateBankAccPostingGroup(GPCheckbookMSTR.ACTINDX);
                     UpdateBankInfo(DelChr(GPCheckbookMSTR.BANKID, '>', ' '), BankAccount);
                     BankAccount.Insert(true);
 
-                    MoveTransactionsData(BankAccount."No.", BankAccount."Bank Acc. Posting Group", GPCheckbookMSTR.CHEKBKID);
+                    if not GPCompanyAdditionalSettings.GetMigrateOnlyBankMaster() then
+                        CreateTransactions(BankAccount."No.", BankAccount."Bank Acc. Posting Group", GPCheckbookMSTR.CHEKBKID,
+                                            GPCheckbookMSTR.Last_Reconciled_Date, GPCheckbookMSTR.Last_Reconciled_Balance);
                 end;
         until GPCheckbookMSTR.Next() = 0;
+    end;
+
+    local procedure CreateTransactions(BankAccountNo: Code[20]; BankAccPostingGroupCode: Code[20]; CheckbookID: Text[15]; TrxDate: Date; Amount: Decimal)
+    var
+        PostingAccountNumber: Code[20];
+    begin
+        if not GetBankAccPostingAccountNumber(PostingAccountNumber, BankAccPostingGroupCode) then
+            exit;
+
+        if Amount <> 0.00 then
+            CreateGeneralJournalLine('BBF', DescriptionTxt, '', TrxDate, PostingAccountNumber, Amount, BankAccountNo);
+
+        MoveTransactionsData(BankAccountNo, BankAccPostingGroupCode, CheckbookID);
     end;
 
     procedure MoveTransactionsData(BankAccountNo: Code[20]; BankAccPostingGroupCode: Code[20]; CheckbookID: Text[15])
     var
         GPCheckbookTransactions: Record "GP Checkbook Transactions";
         PostingAccountNumber: Code[20];
+        DocumentNo: Code[20];
+        Description: Text[100];
+        ExternalDocumentNo: Code[35];
         Amount: Decimal;
     begin
         GPCheckbookTransactions.SetRange(CHEKBKID, CheckbookID);
         GPCheckbookTransactions.SetRange(Recond, false);
+        GPCheckbookTransactions.SetFilter(TRXAMNT, '<>%1', 0);
         if not GPCheckbookTransactions.FindSet() then
             exit;
 
@@ -58,8 +85,10 @@ codeunit 40025 "GP Checkbook Migrator"
                 if IsNegativeAmount(GPCheckbookTransactions.CMRECNUM, GPCheckbookTransactions.CMTrxNum) then
                     Amount := -GPCheckbookTransactions.TRXAMNT;
 
-            CreateGeneralJournalLine(Format(GPCheckbookTransactions.CMRECNUM), GPCheckbookTransactions.DSCRIPTN,
-                                        GPCheckbookTransactions.TRXDATE, PostingAccountNumber, Amount, BankAccountNo);
+            DocumentNo := CopyStr(GPCheckbookTransactions.CMTrxNum.Trim(), 1, MaxStrLen(DocumentNo));
+            Description := CopyStr(GPCheckbookTransactions.paidtorcvdfrom.Trim(), 1, MaxStrLen(Description));
+            ExternalDocumentNo := CopyStr(GPCheckbookTransactions.CMLinkID.Trim(), 1, MaxStrLen(ExternalDocumentNo));
+            CreateGeneralJournalLine(DocumentNo, Description, ExternalDocumentNo, GPCheckbookTransactions.TRXDATE, PostingAccountNumber, Amount, BankAccountNo);
         until GPCheckbookTransactions.Next() = 0;
     end;
 
@@ -127,7 +156,7 @@ codeunit 40025 "GP Checkbook Migrator"
         exit(Format(LastCheckNumber));
     end;
 
-    local procedure CreateGeneralJournalLine(DocumentNo: Code[20]; Description: Text[50]; PostingDate: Date; OffsetAccount: Code[20]; TrxAmount: Decimal; BankAccount: Code[20])
+    local procedure CreateGeneralJournalLine(DocumentNo: Code[20]; Description: Text[100]; ExternalDocumentNo: Code[35]; PostingDate: Date; OffsetAccount: Code[20]; TrxAmount: Decimal; BankAccount: Code[20])
     var
         GenJournalLine: Record "Gen. Journal Line";
         GenJournalLineCurrent: Record "Gen. Journal Line";
@@ -155,6 +184,7 @@ codeunit 40025 "GP Checkbook Migrator"
         GenJournalLine.Validate("Line No.", LineNum);
         GenJournalLine.Validate("Document Type", GenJournalLine."Document Type"::" ");
         GenJournalLine.Validate("Document No.", DocumentNo);
+        GenJournalLine.Validate("External Document No.", ExternalDocumentNo);
         GenJournalLine.Validate("Account Type", GenJournalLine."Account Type"::"Bank Account");
         GenJournalLine.Validate("Account No.", BankAccount);
         GenJournalLine.Validate(Description, Description);

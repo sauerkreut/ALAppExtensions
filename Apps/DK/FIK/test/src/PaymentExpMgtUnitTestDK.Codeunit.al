@@ -15,13 +15,10 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
         LibrarySales: Codeunit "Library - Sales";
         LibraryUtility: Codeunit "Library - Utility";
         LibraryRandom: Codeunit "Library - Random";
-        BankAccNotFoundErr: Label 'The %1 does not exist.', Locked = true;
         PmtDataExportingFlagErr: Label 'Payment data on %1 exporting status is wrong.', Locked = true;
         IsInitialized: Boolean;
         RollbackChangesErr: Label 'Roll back all the changes.', Locked = true;
         AnyText: Text[20];
-        AnyDecimal: Decimal;
-        AnyDate: Date;
 
     trigger OnRun();
     begin
@@ -59,7 +56,6 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
     [Test]
     procedure CustLedgerEntryNotExportedMarked();
     var
-        BankAccount: Record "Bank Account";
         CustLedgerEntry: Record "Cust. Ledger Entry";
         CustomerLedgerEntries: TestPage "Customer Ledger Entries";
     begin
@@ -77,7 +73,7 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
         ASSERTERROR CustomerLedgerEntries.ExportPaymentsToFile.INVOKE();
 
         // Verify
-        Assert.ExpectedError(STRSUBSTNO(BankAccNotFoundErr, BankAccount.TABLECAPTION()));
+        Assert.ExpectedErrorCannotFind(Database::"Bank Account");
     end;
 
     [Test]
@@ -110,7 +106,6 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
     [Test]
     procedure VendorLedgerEntryNotExportedMarked();
     var
-        BankAccount: Record "Bank Account";
         VendLedgerEntry: Record "Vendor Ledger Entry";
         VendorLedgerEntries: TestPage "Vendor Ledger Entries";
     begin
@@ -121,14 +116,13 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
 
         // Post-Setup
         Assert.IsFalse(VendLedgerEntry."Exported to Payment File", STRSUBSTNO(PmtDataExportingFlagErr, VendLedgerEntry.TABLECAPTION()));
-
         // Exercise
         VendorLedgerEntries.OPENVIEW();
         VendorLedgerEntries.GOTORECORD(VendLedgerEntry);
         ASSERTERROR VendorLedgerEntries.ExportPaymentsToFile.INVOKE();
 
         // Verify
-        Assert.ExpectedError(STRSUBSTNO(BankAccNotFoundErr, BankAccount.TABLECAPTION()));
+        Assert.ExpectedErrorCannotFind(Database::"Bank Account");
     end;
 
     local procedure Initialize();
@@ -141,8 +135,6 @@ codeunit 148030 "Payment Exp Mgt Unit Test DK"
         IsInitialized := TRUE;
 
         AnyText := LibraryUtility.GenerateRandomCode(PaymentExportData.FIELDNO("Short Advice"), DATABASE::"Payment Export Data");
-        AnyDecimal := LibraryRandom.RandDecInRange(-1000000, 1000000, 2);
-        AnyDate := LibraryUtility.GenerateRandomDate(WORKDATE() - 200, WORKDATE() + 200);
     end;
 
     [ConfirmHandler]

@@ -7,12 +7,15 @@ codeunit 139762 "SMTP Account Auth Tests"
 {
     Subtype = Test;
     EventSubscriberInstance = Manual;
+    TestPermissions = Disabled;
 
     var
         Assert: Codeunit "Library Assert";
         TokenFromCacheTxt: Label 'aGVhZGVy.eyJ1bmlxdWVfbmFtZSI6InRlc3R1c2VyQGRvbWFpbi5jb20iLCJ1cG4iOiJ0ZXN0dXNlckBkb21haW4uY29tIn0=.c2lnbmF0dXJl', Comment = 'Access token example (with no secret data)', Locked = true;
+#pragma warning disable AA0240
         TokenFromCacheUserNameTxt: Label 'testuser@domain.com', Locked = true;
-        AuthenticationSuccessfulMsg: Label '%1 was authenticated.';
+#pragma warning restore AA0240
+        AuthenticationSuccessfulMsg: Label '%1 was authenticated.', Comment = '%1 = username';
         AuthenticationFailedMsg: Label 'Could not authenticate.';
         EveryUserShouldPressAuthenticateMsg: Label 'Before people can send email they must authenticate their email account. They can do that by choosing the Authenticate action on the SMTP Account page.';
         TokenFromCache: Text;
@@ -64,20 +67,24 @@ codeunit 139762 "SMTP Account Auth Tests"
     var
         OAuth2SMTPAuthentication: Codeunit "OAuth2 SMTP Authentication";
         ReturnedUserName: Text;
+        Token: Text;
     begin
-        OAuth2SMTPAuthentication.GetUserName(TokenFromCacheTxt, ReturnedUserName);
+        Token := TokenFromCacheTxt;
+        OAuth2SMTPAuthentication.GetUserName(Token, ReturnedUserName);
         Assert.AreEqual(TokenFromCacheUserNameTxt, ReturnedUserName, 'Incorrect returned username.');
     end;
 
     [Test]
     [TransactionModel(TransactionModel::AutoRollback)]
+    [NonDebuggable]
     procedure GetOAuth2CredentialsTest()
     var
         OAuth2SMTPAuthentication: Codeunit "OAuth2 SMTP Authentication";
         SMTPAccountAuthTests: Codeunit "SMTP Account Auth Tests";
         EnvironmentInfoTestLibrary: Codeunit "Environment Info Test Library";
         UserName: Text;
-        AuthToken: Text;
+        AuthToken: SecretText;
+        Token: Text;
     begin
         // [SCENARIO] If the provided server is the O365 SMTP server, and there is available token cache,
         // the access token is acquires from cache and the user name variable is filled.
@@ -85,7 +92,8 @@ codeunit 139762 "SMTP Account Auth Tests"
         // [GIVEN] Environment is on-prem and token from cache with credentials is available.
         EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(false);
         SetAuthFlowProvider(Codeunit::"SMTP Account Auth Tests");
-        SMTPAccountAuthTests.SetTokenCache(TokenFromCacheTxt);
+        Token := TokenFromCacheTxt;
+        SMTPAccountAuthTests.SetTokenCache(Token);
         BindSubscription(SMTPAccountAuthTests);
 
         // [WHEN] AuthenticateWithOAuth2 is called.
@@ -93,7 +101,7 @@ codeunit 139762 "SMTP Account Auth Tests"
 
         // [THEN] The AuthToken and UserName have the expected values.
         Assert.AreEqual(TokenFromCacheUserNameTxt, UserName, 'UserName should not have been filled.');
-        Assert.AreEqual(TokenFromCacheTxt, AuthToken, 'AuthToken should not have been filled.');
+        Assert.AreEqual(TokenFromCacheTxt, AuthToken.Unwrap(), 'AuthToken should not have been filled.');
     end;
 
     [Test]
@@ -162,6 +170,7 @@ codeunit 139762 "SMTP Account Auth Tests"
     var
         AzureADMgtSetup: Record "Azure AD Mgt. Setup";
         AzureADAppSetup: Record "Azure AD App Setup";
+        DummyKey: Text;
     begin
         AzureADMgtSetup.Get();
         AzureADMgtSetup."Auth Flow Codeunit ID" := ProviderCodeunit;
@@ -171,7 +180,8 @@ codeunit 139762 "SMTP Account Auth Tests"
             AzureADAppSetup.Init();
             AzureADAppSetup."Redirect URL" := 'http://dummyurl:1234/Main_Instance1/WebClient/OAuthLanding.htm';
             AzureADAppSetup."App ID" := CreateGuid();
-            AzureADAppSetup.SetSecretKeyToIsolatedStorage(CreateGuid());
+            DummyKey := CreateGuid();
+            AzureADAppSetup.SetSecretKeyToIsolatedStorage(DummyKey);
             AzureADAppSetup.Insert();
         end;
     end;

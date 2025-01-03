@@ -1,3 +1,9 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.TaxTypeHandler;
+
 table 20253 "Tax Rate Value"
 {
     Caption = 'Tax Configuration Value';
@@ -79,6 +85,9 @@ table 20253 "Tax Rate Value"
         key(PK; "Tax Type", "Config ID", ID, "Column ID")
         {
             Clustered = true;
+        }
+        key(K2; "Config ID", "Column ID")
+        {
         }
     }
 }

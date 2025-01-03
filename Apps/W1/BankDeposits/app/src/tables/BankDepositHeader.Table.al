@@ -1,9 +1,21 @@
+namespace Microsoft.Bank.Deposit;
+
+using Microsoft.Sales.Setup;
+using Microsoft.Bank.BankAccount;
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.Dimension;
+using System.Globalization;
+using Microsoft.Foundation.AuditCodes;
+using Microsoft.Foundation.NoSeries;
+
 table 1690 "Bank Deposit Header"
 {
     Caption = 'Bank Deposit Header';
     DataCaptionFields = "No.";
     LookupPageID = "Bank Deposit List";
     Permissions = tabledata "Bank Deposit Header" = rm;
+    DataClassification = CustomerContent;
 
     fields
     {
@@ -12,10 +24,12 @@ table 1690 "Bank Deposit Header"
             Caption = 'No.';
 
             trigger OnValidate()
+            var
+                NoSeries: Codeunit "No. Series";
             begin
                 if "No." <> xRec."No." then begin
                     SalesReceivablesSetup.Get();
-                    NoSeriesManagement.TestManual(SalesReceivablesSetup."Bank Deposit Nos.");
+                    NoSeries.TestManual(SalesReceivablesSetup."Bank Deposit Nos.");
                     "No. Series" := '';
                 end;
             end;
@@ -37,6 +51,7 @@ table 1690 "Bank Deposit Header"
                 Validate("Currency Code", BankAccount."Currency Code");
                 "Bank Acc. Posting Group" := BankAccount."Bank Acc. Posting Group";
                 "Language Code" := BankAccount."Language Code";
+                "Format Region" := BankAccount."Format Region";
 
                 DimensionManagement.AddDimSource(DefaultDimSource, Database::"Bank Account", "Bank Account No.");
                 CreateDim(DefaultDimSource);
@@ -115,7 +130,7 @@ table 1690 "Bank Deposit Header"
         {
             CaptionClass = '1,2,1';
             Caption = 'Shortcut Dimension 1 Code';
-            TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(1));
+            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(1));
 
             trigger OnValidate()
             begin
@@ -127,7 +142,7 @@ table 1690 "Bank Deposit Header"
         {
             CaptionClass = '1,2,2';
             Caption = 'Shortcut Dimension 2 Code';
-            TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(2));
+            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(2));
 
             trigger OnValidate()
             begin
@@ -179,23 +194,25 @@ table 1690 "Bank Deposit Header"
         {
             Caption = 'Journal Batch Name';
             Editable = false;
-            TableRelation = "Gen. Journal Batch".Name WHERE("Journal Template Name" = FIELD("Journal Template Name"));
+            TableRelation = "Gen. Journal Batch".Name where("Journal Template Name" = field("Journal Template Name"));
         }
         field(21; Comment; Boolean)
         {
-            CalcFormula = Exist("Bank Acc. Comment Line" WHERE("Table Name" = CONST("Bank Deposit Header"),
-                                                           "Bank Account No." = FIELD("Bank Account No."),
-                                                           "No." = FIELD("No.")));
+            CalcFormula = exist("Bank Acc. Comment Line" where("Table Name" = const("Bank Deposit Header"),
+                                                           "Bank Account No." = field("Bank Account No."),
+                                                           "No." = field("No.")));
             Caption = 'Comment';
             Editable = false;
             FieldClass = FlowField;
         }
+#pragma warning disable AA0232
         field(22; "Total Deposit Lines"; Decimal)
+#pragma warning restore
         {
             AutoFormatExpression = "Currency Code";
             AutoFormatType = 1;
-            CalcFormula = - Sum("Gen. Journal Line".Amount WHERE("Journal Template Name" = FIELD("Journal Template Name"),
-                                                                 "Journal Batch Name" = FIELD("Journal Batch Name")));
+            CalcFormula = - sum("Gen. Journal Line".Amount where("Journal Template Name" = field("Journal Template Name"),
+                                                                 "Journal Batch Name" = field("Journal Batch Name")));
             Caption = 'Total Deposit Lines';
             Editable = false;
             FieldClass = FlowField;
@@ -203,6 +220,47 @@ table 1690 "Bank Deposit Header"
         field(23; "Post as Lump Sum"; Boolean)
         {
             Caption = 'Post as Lump Sum';
+
+            trigger OnValidate()
+            var
+                GenJournalLine: Record "Gen. Journal Line";
+                GenJournalTemplate: Record "Gen. Journal Template";
+                GenJournalDocumentType: Enum "Gen. Journal Document Type";
+                NotFirstLine: Boolean;
+                InconsistentDocTypes: Boolean;
+            begin
+                if not Rec."Post as Lump Sum" then
+                    exit;
+                GenJournalTemplate.Get(Rec."Journal Template Name");
+                if not GenJournalTemplate."Force Doc. Balance" then
+                    exit;
+
+                GenJournalLine.SetRange("Journal Template Name", Rec."Journal Template Name");
+                GenJournalLine.SetRange("Journal Batch Name", Rec."Journal Batch Name");
+                if not GenJournalLine.FindSet() then
+                    exit;
+
+                if GuiAllowed() then
+                    if not Confirm(UpdateDocumentNosTxt) then
+                        Error('');
+                repeat
+                    GenJournalLine."Document No." := Rec."No.";
+                    if not NotFirstLine then
+                        NotFirstLine := true
+                    else
+                        if GenJournalDocumentType <> GenJournalLine."Document Type" then
+                            InconsistentDocTypes := true;
+                    GenJournalDocumentType := GenJournalLine."Document Type";
+                    GenJournalLine.Modify();
+                until GenJournalLine.Next() = 0;
+                if InconsistentDocTypes then
+                    Message(InconsistentDocTypesMsg);
+            end;
+        }
+        field(24; "Format Region"; Text[80])
+        {
+            Caption = 'Format Region';
+            TableRelation = "Language Selection"."Language Tag";
         }
         field(480; "Dimension Set ID"; Integer)
         {
@@ -267,15 +325,22 @@ table 1690 "Bank Deposit Header"
         SalesReceivablesSetup: Record "Sales & Receivables Setup";
         BankDepositHeader: Record "Bank Deposit Header";
         GenJournalBatch: Record "Gen. Journal Batch";
+#if not CLEAN24
         NoSeriesManagement: Codeunit NoSeriesManagement;
+#endif
         DimensionManagement: Codeunit DimensionManagement;
         GenJnlManagement: Codeunit GenJnlManagement;
         PostingDescriptionTxt: Label 'Deposit %1 %2', Comment = '%1 - the caption of field No.; %2 - the value of field No.';
         OnlyOneAllowedErr: Label 'Only one %1 is allowed for each %2. Choose Change Batch action if you want to create a new bank deposit.', Comment = '%1 - bank deposit; %2 - general journal batch name';
         CannotRenameErr: Label 'You cannot rename a %1.', Comment = '%1 - bank deposit';
+        UpdateDimensionsOnExistingLinesQst: Label 'Do you want to add the bank deposit dimensions to all bank deposit lines?';
+        UpdateDocumentNosTxt: Label 'When posting as lump sum all the lines must have the same Document No. as the bank deposit. Do you want to update the Document No. on all lines?';
+        InconsistentDocTypesMsg: Label 'The bank deposit lines have different Document Types. When posting as lump sum all the document types must be the same, please update them before posting.';
 
     local procedure InitInsert()
     var
+        NoSeries: Codeunit "No. Series";
+        NoSeriesCode: Code[20];
         IsHandled: Boolean;
     begin
         IsHandled := false;
@@ -283,15 +348,26 @@ table 1690 "Bank Deposit Header"
         if not IsHandled then
             if "No." = '' then begin
                 TestNoSeries();
-                NoSeriesManagement.InitSeries(GetNoSeriesCode(), xRec."No. Series", "Posting Date", "No.", "No. Series");
+                NoSeriesCode := GetNoSeriesCode();
+#if not CLEAN24
+                NoSeriesManagement.RaiseObsoleteOnBeforeInitSeries(NoSeriesCode, xRec."No. Series", "Posting Date", "No.", "No. Series", IsHandled);
+                if not IsHandled then begin
+#endif
+                    "No. Series" := NoSeriesCode;
+                    if NoSeries.AreRelated("No. Series", xRec."No. Series") then
+                        "No. Series" := xRec."No. Series";
+                    "No." := NoSeries.GetNextNo("No. Series", "Posting Date");
+#if not CLEAN24
+                    NoSeriesManagement.RaiseObsoleteOnAfterInitSeries("No. Series", NoSeriesCode, "Posting Date", "No.");
+                end;
+#endif
             end;
 
         OnInitInsertOnBeforeInitRecord(xRec);
         InitRecord();
     end;
 
-    [Scope('OnPrem')]
-    procedure InitRecord()
+    internal procedure InitRecord()
     var
         BatchFound: Boolean;
     begin
@@ -341,7 +417,9 @@ table 1690 "Bank Deposit Header"
         LocalGenJournalTemplate: Record "Gen. Journal Template";
         LocalGenJournalBatch: Record "Gen. Journal Batch";
     begin
+#pragma warning disable AA0210
         LocalGenJournalTemplate.SetRange(Type, LocalGenJournalTemplate.Type::"Bank Deposits");
+#pragma warning restore
         if LocalGenJournalTemplate.Count() <> 1 then
             exit(false);
 
@@ -370,7 +448,7 @@ table 1690 "Bank Deposit Header"
         IsHandled := false;
         OnBeforeGetNoSeriesCode(Rec, SalesReceivablesSetup, NoSeriesCode, IsHandled);
         if IsHandled then
-            exit;
+            exit(NoSeriesCode);
 
         NoSeriesCode := SalesReceivablesSetup."Bank Deposit Nos.";
         OnAfterGetNoSeriesCode(Rec, NoSeriesCode);
@@ -422,29 +500,68 @@ table 1690 "Bank Deposit Header"
         DimensionManagement.ValidateShortcutDimValues(FieldNumber, ShortcutDimCode, "Dimension Set ID");
     end;
 
-    [Scope('OnPrem')]
-    procedure AssistEdit(OldBankDepositHeader: Record "Bank Deposit Header"): Boolean
+    internal procedure AssistEdit(OldBankDepositHeader: Record "Bank Deposit Header"): Boolean
     var
         LocalBankDepositHeader: Record "Bank Deposit Header";
+        NoSeries: Codeunit "No. Series";
     begin
         LocalBankDepositHeader := Rec;
         SalesReceivablesSetup.Get();
         SalesReceivablesSetup.TestField("Bank Deposit Nos.");
-        if NoSeriesManagement.SelectSeries(SalesReceivablesSetup."Bank Deposit Nos.", OldBankDepositHeader."No. Series", LocalBankDepositHeader."No. Series") then begin
-            NoSeriesManagement.SetSeries(LocalBankDepositHeader."No.");
+        if NoSeries.LookupRelatedNoSeries(SalesReceivablesSetup."Bank Deposit Nos.", OldBankDepositHeader."No. Series", LocalBankDepositHeader."No. Series") then begin
+            LocalBankDepositHeader."No." := NoSeries.GetNextNo(LocalBankDepositHeader."No. Series");
             Rec := LocalBankDepositHeader;
             exit(true);
         end;
         exit(false);
     end;
 
-    [Scope('OnPrem')]
-    procedure ShowDocDim()
+    internal procedure ShowDocDim()
+    var
+        IsHandled: Boolean;
+        OldDimensionSetId: Integer;
     begin
+        IsHandled := false;
+        OnBeforeShowDocDim(Rec, xRec, IsHandled);
+        if IsHandled then
+            exit;
+
+        OldDimensionSetId := Rec."Dimension Set ID";
+
         "Dimension Set ID" :=
           DimensionManagement.EditDimensionSet("Dimension Set ID", "Bank Account No." + ' ' + "No.", "Shortcut Dimension 1 Code", "Shortcut Dimension 2 Code");
 
+        if OldDimensionSetId <> Rec."Dimension Set ID" then begin
+            Rec.Modify();
+            PropagateDimensionsToLines();
+        end;
+
         OnAferShowDocDim(Rec);
+    end;
+
+    local procedure PropagateDimensionsToLines()
+    var
+        LocalGenJournalLine: Record "Gen. Journal Line";
+        BankDepositPost: Codeunit "Bank Deposit-Post";
+        CanUpdateLineDimension: Boolean;
+    begin
+        LocalGenJournalLine.Reset();
+        LocalGenJournalLine.SetRange("Journal Template Name", Rec."Journal Template Name");
+        LocalGenJournalLine.SetRange("Journal Batch Name", Rec."Journal Batch Name");
+        if LocalGenJournalLine.FindSet() then begin
+            if GuiAllowed() then
+                CanUpdateLineDimension := Confirm(UpdateDimensionsOnExistingLinesQst)
+            else
+                CanUpdateLineDimension := true;
+
+            if not CanUpdateLineDimension then
+                exit;
+
+            repeat
+                LocalGenJournalLine.Validate("Dimension Set ID", BankDepositPost.CombineDimensionSetsHeaderPriority(Rec, LocalGenJournalLine));
+                LocalGenJournalLine.Modify(true);
+            until LocalGenJournalLine.Next() = 0;
+        end;
     end;
 
     [IntegrationEvent(false, false)]
@@ -484,6 +601,14 @@ table 1690 "Bank Deposit Header"
 
     [IntegrationEvent(false, false)]
     local procedure OnAferShowDocDim(var BankDepositHeader: Record "Bank Deposit Header")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeShowDocDim(
+        var BankDepositHeader: Record "Bank Deposit Header";
+        xBankDepositHeader: Record "Bank Deposit Header";
+        var IsHandled: Boolean)
     begin
     end;
 }

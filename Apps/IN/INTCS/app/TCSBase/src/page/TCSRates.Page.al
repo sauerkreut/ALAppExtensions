@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TCS.TCSBase;
+
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+
 page 18816 "TCS Rates"
 {
     Caption = 'TCS Rates';
@@ -402,6 +410,7 @@ page 18816 "TCS Rates"
 
     trigger OnOpenPage()
     begin
+        ColumnCount := 0;
         GlobalTaxType := '';
         TCSSetup.Get();
         TCSSetup.TestField(TCSSetup."Tax Type");

@@ -1,7 +1,12 @@
-// ------------------------------------------------------------------------------------------------
+﻿// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
+
+namespace Microsoft.Bank.Payment;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Purchases.Document;
 
 tableextension 13613 PurchaseHeader extends "Purchase Header"
 {
@@ -59,5 +64,5 @@ tableextension 13613 PurchaseHeader extends "Purchase Header"
         }
     }
     var
-        PmtReferenceErr: Label '%1 should be blank for %2 %3.';
+        PmtReferenceErr: Label '%1 should be blank for %2 %3.', Comment = '%1 = Payment Reference Field Caption; %2 = Payment Reference Table Caption; %3 = Payment Method Code';
 }

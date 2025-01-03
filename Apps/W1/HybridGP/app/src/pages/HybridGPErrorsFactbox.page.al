@@ -1,3 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
+using System.Environment.Configuration;
+using System.Integration;
+
 page 4031 "Hybrid GP Errors Factbox"
 {
     Caption = 'GP Synchronization Errors';
@@ -15,12 +20,12 @@ page 4031 "Hybrid GP Errors Factbox"
             {
                 ShowCaption = false;
 
-                field("Migration Errors"; MigrationErrorCount)
+                field("Migration Errors"; Rec.MigrationErrorCount)
                 {
                     Caption = 'Migration Errors';
                     ApplicationArea = Basic, Suite;
                     Style = Unfavorable;
-                    StyleExpr = (MigrationErrorCount > 0);
+                    StyleExpr = (Rec.MigrationErrorCount > 0);
                     ToolTip = 'Indicates the number of errors that occurred during the migration.';
 
                     trigger OnDrillDown()
@@ -29,20 +34,6 @@ page 4031 "Hybrid GP Errors Factbox"
                     begin
                         DataSyncStatus.SetMigrationVisibility(true);
                         DataSyncStatus.RunModal();
-                    end;
-                }
-
-                field("Posting Errors"; PostingErrorCount)
-                {
-                    Caption = 'Posting Errors';
-                    ApplicationArea = Basic, Suite;
-                    Style = Unfavorable;
-                    StyleExpr = (PostingErrorCount > 0);
-                    ToolTip = 'Indicates the number of posting errors that occurred during the migration.';
-
-                    trigger OnDrillDown()
-                    begin
-                        Page.RunModal(Page::"Data Sync Status");
                     end;
                 }
             }
@@ -67,7 +58,7 @@ page 4031 "Hybrid GP Errors Factbox"
 
         GPMigrationErrors.PostingErrorCount := PostingErrors;
         GPMigrationErrors.MigrationErrorCount := MigrationErrors;
-        if NOT GPMigrationErrors.Insert() then
+        if not GPMigrationErrors.Insert() then
             GPMigrationErrors.Modify();
     end;
 

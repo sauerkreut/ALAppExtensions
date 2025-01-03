@@ -1,13 +1,23 @@
+namespace Microsoft.Bank.Deposit;
+
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.Dimension;
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Sales.Customer;
+using Microsoft.Purchases.Vendor;
+using Microsoft.HumanResources.Employee;
+using Microsoft.Intercompany.Partner;
+using Microsoft.FixedAssets.FixedAsset;
+using Microsoft.Finance.ReceivablesPayables;
+
 page 1693 "Bank Deposit Subform"
 {
     AutoSplitKey = true;
     Caption = 'Lines';
     DelayedInsert = true;
     PageType = ListPart;
-    PromotedActionCategories = 'New,Process,Report,Line,Functions';
     SourceTable = "Gen. Journal Line";
     Permissions = tabledata "Bank Deposit Header" = r;
-
     layout
     {
         area(content)
@@ -23,18 +33,22 @@ page 1693 "Bank Deposit Subform"
                     trigger OnValidate()
                     var
                         CurType: Enum "Gen. Journal Account Type";
+                        DocumentNo: Code[20];
                     begin
-                        if xRec."Account Type" <> "Account Type" then begin
+                        if xRec."Account Type" <> Rec."Account Type" then begin
                             CurType := Rec."Account Type";
+                            DocumentNo := Rec."Document No.";
                             OnValidateAccountTypeOnBeforeInit(Rec);
                             Rec.Init();
+                            Rec.SetUpNewLine(Rec, Rec.Amount, false);
                             CopyValuesFromHeader();
                             Rec."Account Type" := CurType;
+                            Rec."Document No." := DocumentNo;
                         end;
                         AccountTypeOnAfterValidate();
                     end;
                 }
-                field("Account No."; "Account No.")
+                field("Account No."; Rec."Account No.")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the account number of the entity from which the bank deposit item was received.';
@@ -44,8 +58,8 @@ page 1693 "Bank Deposit Subform"
                         // special case:  OnValidate for Account No. field changed the Currency code, now we must change it back.
                         BankDepositHeader.Reset();
                         BankDepositHeader.SetCurrentKey("Journal Template Name", "Journal Batch Name");
-                        BankDepositHeader.SetRange("Journal Template Name", "Journal Template Name");
-                        BankDepositHeader.SetRange("Journal Batch Name", "Journal Batch Name");
+                        BankDepositHeader.SetRange("Journal Template Name", Rec."Journal Template Name");
+                        BankDepositHeader.SetRange("Journal Batch Name", Rec."Journal Batch Name");
                         if BankDepositHeader.FindFirst() then begin
                             Rec.Validate("Currency Code", BankDepositHeader."Currency Code");
                             Rec.Validate("Posting Date", BankDepositHeader."Posting Date");
@@ -53,17 +67,17 @@ page 1693 "Bank Deposit Subform"
                         Rec.Validate(Description, GetLineDescription());
                     end;
                 }
-                field(Description; Description)
+                field(Description; Rec.Description)
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies a description of the bank deposit line.';
                 }
-                field("Document Date"; "Document Date")
+                field("Document Date"; Rec."Document Date")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the date of the bank deposit document.';
                 }
-                field("Document Type"; "Document Type")
+                field("Document Type"; Rec."Document Type")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the type of the document that the bank deposit is related to.';
@@ -71,16 +85,22 @@ page 1693 "Bank Deposit Subform"
 
                     trigger OnValidate()
                     begin
-                        if not ("Document Type" in ["Document Type"::Payment, "Document Type"::Refund, "Document Type"::" "]) then
+                        if not (Rec."Document Type" in [Rec."Document Type"::Payment, Rec."Document Type"::Refund, Rec."Document Type"::" "]) then
                             error(DocumentTypeErr);
                     end;
                 }
-                field("Document No."; "Document No.")
+                field("Document No."; Rec."Document No.")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the number of the bank deposit document.';
+                    Editable = not DepositIsLumpSum;
                 }
-                field("Credit Amount"; "Credit Amount")
+                field("External Document No."; Rec."External Document No.")
+                {
+                    ApplicationArea = Basic, Suite;
+                    ToolTip = 'Specifies the external document number for this line, such as a check number.';
+                }
+                field("Credit Amount"; Rec."Credit Amount")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the total of the credit entries in the bank deposit.';
@@ -90,7 +110,7 @@ page 1693 "Bank Deposit Subform"
                         CurrPage.Update();
                     end;
                 }
-                field(Amount; Amount)
+                field(Amount; Rec.Amount)
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the amount of the item, such as a check, that was deposited.';
@@ -101,13 +121,13 @@ page 1693 "Bank Deposit Subform"
                         CurrPage.Update();
                     end;
                 }
-                field("Shortcut Dimension 1 Code"; "Shortcut Dimension 1 Code")
+                field("Shortcut Dimension 1 Code"; Rec."Shortcut Dimension 1 Code")
                 {
                     ApplicationArea = Suite;
                     ToolTip = 'Specifies the value assigned to this dimension for this bank deposit.';
                     Visible = false;
                 }
-                field("Shortcut Dimension 2 Code"; "Shortcut Dimension 2 Code")
+                field("Shortcut Dimension 2 Code"; Rec."Shortcut Dimension 2 Code")
                 {
                     ApplicationArea = Suite;
                     ToolTip = 'Specifies the value assigned to this dimension for this bank deposit.';
@@ -117,9 +137,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,3';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(3),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(3),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -132,9 +152,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,4';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(4),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(4),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -147,9 +167,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,5';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(5),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(5),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -162,9 +182,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,6';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(6),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(6),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -177,9 +197,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,7';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(7),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(7),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -192,9 +212,9 @@ page 1693 "Bank Deposit Subform"
                 {
                     ApplicationArea = Dimensions;
                     CaptionClass = '1,2,8';
-                    TableRelation = "Dimension Value".Code WHERE("Global Dimension No." = CONST(8),
-                                                                  "Dimension Value Type" = CONST(Standard),
-                                                                  Blocked = CONST(false));
+                    TableRelation = "Dimension Value".Code where("Global Dimension No." = const(8),
+                                                                  "Dimension Value Type" = const(Standard),
+                                                                  Blocked = const(false));
                     Visible = false;
                     ToolTip = 'Specifies the shortcut dimension for this bank deposit.';
 
@@ -203,25 +223,25 @@ page 1693 "Bank Deposit Subform"
                         Rec.ValidateShortcutDimCode(8, ShortcutDimCode[8]);
                     end;
                 }
-                field("Applies-to Doc. Type"; "Applies-to Doc. Type")
+                field("Applies-to Doc. Type"; Rec."Applies-to Doc. Type")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the document type that will be applied to the bank deposit process.';
                     Visible = false;
                 }
-                field("Applies-to Doc. No."; "Applies-to Doc. No.")
+                field("Applies-to Doc. No."; Rec."Applies-to Doc. No.")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the document number that will be applied to the bank deposit process.';
                     Visible = false;
                 }
-                field("Applies-to ID"; "Applies-to ID")
+                field("Applies-to ID"; Rec."Applies-to ID")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the entry ID that will be applied to the bank deposit process.';
                     Visible = false;
                 }
-                field("Reason Code"; "Reason Code")
+                field("Reason Code"; Rec."Reason Code")
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies a reason code that will enable you to trace the entry. The reason code to all G/L, bank account, customer and other ledger entries created when posting.';
@@ -259,16 +279,19 @@ page 1693 "Bank Deposit Subform"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Apply Entries';
                     Image = ApplyEntries;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category5;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Shift+F11';
                     ToolTip = 'Select one or more ledger entries that you want to apply this record to so that the related posted documents are closed as paid or refunded. ';
 
                     trigger OnAction()
                     begin
                         ShowApplyEntries();
+                        CurrPage.Update();
                     end;
                 }
             }
@@ -281,10 +304,12 @@ page 1693 "Bank Deposit Subform"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account &Card';
                     Image = Account;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category4;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Shift+F7';
                     ToolTip = 'View or change detailed information about the account on the bank deposit line.';
 
@@ -298,10 +323,12 @@ page 1693 "Bank Deposit Subform"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account Ledger E&ntries';
                     Image = LedgerEntries;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category4;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Ctrl+F7';
                     ToolTip = 'View ledger entries that are posted for the account on the bank deposit line.';
 
@@ -315,10 +342,12 @@ page 1693 "Bank Deposit Subform"
                     ApplicationArea = Suite;
                     Caption = 'Dimensions';
                     Image = Dimensions;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category4;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Alt+D';
                     ToolTip = 'View or edit dimensions, such as area, project, or department, that you can assign to sales and purchase documents to distribute costs and analyze transaction history.';
 
@@ -357,6 +386,7 @@ page 1693 "Bank Deposit Subform"
 
     trigger OnNewRecord(BelowxRec: Boolean)
     begin
+        Rec.SetUpNewLine(xRec, xRec.Amount, false);
         if Rec."Journal Template Name" <> '' then begin
             Rec."Account Type" := xRec."Account Type";
             Rec."Document Type" := xRec."Document Type";
@@ -368,10 +398,16 @@ page 1693 "Bank Deposit Subform"
     var
         BankDepositHeader: Record "Bank Deposit Header";
         TotalDepositLines: Decimal;
+        DepositIsLumpSum: Boolean;
         DocumentTypeErr: Label 'Document Type should be Payment, Refund or blank.';
 
     protected var
         ShortcutDimCode: array[8] of Code[20];
+
+    internal procedure SetDepositIsLumpSum(NewDepositIsLumpSum: Boolean)
+    begin
+        DepositIsLumpSum := NewDepositIsLumpSum;
+    end;
 
     local procedure GetLinesTotal(): Decimal
     begin
@@ -396,7 +432,9 @@ page 1693 "Bank Deposit Subform"
         Rec."Currency Factor" := BankDepositHeader."Currency Factor";
         Rec."Document Date" := BankDepositHeader."Document Date";
         Rec."Posting Date" := BankDepositHeader."Posting Date";
-        Rec."External Document No." := BankDepositHeader."No.";
+        if BankDepositHeader."Post as Lump Sum" or (Rec."Document No." = '') then
+            Rec."Document No." := BankDepositHeader."No.";
+        Rec."External Document No." := '';
         Rec."Reason Code" := BankDepositHeader."Reason Code";
     end;
 
@@ -409,7 +447,7 @@ page 1693 "Bank Deposit Subform"
         ICPartner: Record "IC Partner";
         FixedAsset: Record "Fixed Asset";
     begin
-        Case Rec."Account Type" of
+        case Rec."Account Type" of
             "Gen. Journal Account Type"::"G/L Account":
                 if GLAccount.Get(Rec."Account No.") then
                     exit(GLAccount.Name);
@@ -428,7 +466,7 @@ page 1693 "Bank Deposit Subform"
             "Gen. Journal Account Type"::"Fixed Asset":
                 if FixedAsset.Get(Rec."Account No.") then
                     exit(FixedAsset.Description);
-        End
+        end
     end;
 
     procedure ShowAccountCard()
@@ -472,4 +510,6 @@ page 1693 "Bank Deposit Subform"
     begin
     end;
 }
+
+
 

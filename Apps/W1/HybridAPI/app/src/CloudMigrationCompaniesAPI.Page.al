@@ -1,3 +1,9 @@
+namespace Microsoft.DataMigration.API;
+
+using Microsoft.Utilities;
+using Microsoft.DataMigration;
+using System.Environment;
+
 page 40020 "Cloud Migration Companies API"
 {
     PageType = API;
@@ -66,6 +72,20 @@ page 40020 "Cloud Migration Companies API"
                     ApplicationArea = All;
                     Editable = false;
                 }
+
+                field(companyInitializationStatus; Rec."Company Initialization Status")
+                {
+                    Caption = 'Company Initialization Status';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
+
+                field(companyInitializationError; CompanyInitializationFailureTxt)
+                {
+                    Caption = 'Company Initialization Error';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
             }
         }
     }
@@ -80,6 +100,16 @@ page 40020 "Cloud Migration Companies API"
         ActionContext.SetResultCode(WebServiceActionResultCode::None);
     end;
 
+    [ServiceEnabled]
+    [Scope('Cloud')]
+    procedure InitializeCompany(var ActionContext: WebServiceActionContext)
+    var
+        HybridCompanyInitialize: Codeunit "Hybrid Company Initialize";
+    begin
+        HybridCompanyInitialize.InitalizeCompany(Rec);
+        ActionContext.SetResultCode(WebServiceActionResultCode::None);
+    end;
+
     trigger OnAfterGetRecord()
     var
         AssistedCompanySetupStatus: Record "Assisted Company Setup Status";
@@ -87,6 +117,10 @@ page 40020 "Cloud Migration Companies API"
     begin
         Status := AssistedCompanySetupStatus.GetCompanySetupStatusValue(CopyStr(Rec.Name, 1, MaxStrLen(Company.Name)));
         Created := Company.Get(Rec.Name);
+        if Rec."Company Initialization Status" = Rec."Company Initialization Status"::"Initialization Failed" then
+            CompanyInitializationFailureTxt := Rec.GetCompanyInitFailureMessage()
+        else
+            Clear(CompanyInitializationFailureTxt);
     end;
 
     trigger OnNewRecord(BelowxRec: Boolean)
@@ -98,4 +132,5 @@ page 40020 "Cloud Migration Companies API"
     var
         Status: Enum "Company Setup Status";
         Created: Boolean;
+        CompanyInitializationFailureTxt: Text;
 }

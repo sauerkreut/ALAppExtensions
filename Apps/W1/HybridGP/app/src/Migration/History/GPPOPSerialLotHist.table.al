@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4063 "GPPOPSerialLotHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

@@ -1,7 +1,13 @@
-// ------------------------------------------------------------------------------------------------
+﻿// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
+
+namespace Microsoft.Bank.Payment;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Purchases.Payables;
+using Microsoft.Purchases.Vendor;
 
 tableextension 13612 VendorLedgerEntry extends "Vendor Ledger Entry"
 {
@@ -81,6 +87,6 @@ tableextension 13612 VendorLedgerEntry extends "Vendor Ledger Entry"
         }
     }
     var
-        FieldIsNotEmptyErr: Label '%1 cannot be used while %2 has a value.';
-        PmtReferenceErr: Label '%1 should be blank for %2 %3.', Comment = '%1=Field;%2=Table;%3=Field';
+        FieldIsNotEmptyErr: Label '%1 cannot be used while %2 has a value.', Comment = '%1 = Creditor No. Field Caption; %2 = Recipient Bank Account Field Caption';
+        PmtReferenceErr: Label '%1 should be blank for %2 %3.', Comment = '%1 = Payment Reference Field Caption; %2 = Payment Reference Table Caption; %3 = Payment Method Code';
 }

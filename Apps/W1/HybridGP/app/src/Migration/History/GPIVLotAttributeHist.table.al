@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4081 "GPIVLotAttributeHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

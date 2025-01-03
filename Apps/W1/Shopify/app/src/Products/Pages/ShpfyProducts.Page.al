@@ -1,3 +1,8 @@
+namespace Microsoft.Integration.Shopify;
+
+using Microsoft.Inventory.Item;
+using System.Environment.Configuration;
+
 /// <summary>
 /// Page Shpfy Products (ID 30126).
 /// </summary>
@@ -277,7 +282,7 @@ page 30126 "Shpfy Products"
                 PromotedOnly = true;
                 ToolTip = 'Select which items you want to create as products in Shopify.';
                 AboutTitle = 'Define shop products';
-                AboutText = 'Here you select which items in Business Central you wish to push to become products in Shopify. When you selsect **Add Items** you will get an option to filter and select the items which are then brought into this list and can be synchronized to Shopify.';
+                AboutText = 'Here you select which items in Business Central you wish to push to become products in Shopify. When you select **Add Items** you will get an option to filter and select the items which are then brought into this list and can be synchronized to Shopify.';
 
                 trigger OnAction()
                 var
@@ -310,12 +315,31 @@ page 30126 "Shpfy Products"
                     Tags.RunModal();
                 end;
             }
+            action(Metafields)
+            {
+                ApplicationArea = All;
+                Caption = 'Metafields';
+                Image = PriceAdjustment;
+                Promoted = true;
+                PromotedCategory = Process;
+                PromotedIsBig = true;
+                PromotedOnly = true;
+                ToolTip = 'Add metafields to a product. This can be used for adding custom data fields to products in Shopify.';
+
+                trigger OnAction()
+                var
+                    Metafields: Page "Shpfy Metafields";
+                begin
+                    Rec.TestField(Id);
+                    Metafields.RunForResource(Database::"Shpfy Product", Rec.Id, Rec."Shop Code");
+                end;
+            }
             group(Sync)
             {
                 action(SyncProducts)
                 {
                     ApplicationArea = All;
-                    Caption = 'Sync Products';
+                    Caption = 'Products';
                     Image = ImportExport;
                     Promoted = true;
                     PromotedCategory = Category4;
@@ -333,7 +357,7 @@ page 30126 "Shpfy Products"
                 action(SyncProductPrices)
                 {
                     ApplicationArea = All;
-                    Caption = 'Sync Prices to Shopify';
+                    Caption = 'Prices to Shopify';
                     Image = ImportExport;
                     Promoted = true;
                     PromotedCategory = Category4;
@@ -351,7 +375,7 @@ page 30126 "Shpfy Products"
                 action(SyncImages)
                 {
                     ApplicationArea = All;
-                    Caption = 'Sync Product Images';
+                    Caption = 'Product Images';
                     Image = ImportExport;
                     Promoted = true;
                     PromotedCategory = Category4;
@@ -362,13 +386,13 @@ page 30126 "Shpfy Products"
                     var
                         BackgroundSyncs: Codeunit "Shpfy Background Syncs";
                     begin
-                        BackgroundSyncs.ProductImagesSync(Rec."Shop Code");
+                        BackgroundSyncs.ProductImagesSync(Rec."Shop Code", '');
                     end;
                 }
                 action(SyncInventory)
                 {
                     ApplicationArea = All;
-                    Caption = 'Sync Inventory';
+                    Caption = 'Inventory';
                     Image = ImportExport;
                     Promoted = true;
                     PromotedCategory = Category4;
@@ -385,4 +409,36 @@ page 30126 "Shpfy Products"
             }
         }
     }
+
+    trigger OnOpenPage()
+    var
+        Shop: Record "Shpfy Shop";
+        Product: Record "Shpfy Product";
+        MyNotifications: Record "My Notifications";
+        ShopMgt: Codeunit "Shpfy Shop Mgt.";
+        NoItemNotification: Notification;
+    begin
+        if Shop.Get(Rec.GetFilter("Shop Code")) then begin
+            Product.SetRange("Shop Code", Shop.Code);
+            if Product.IsEmpty() then
+                if MyNotifications.IsEnabled(ShopMgt.GetNoItemNotificationId()) then begin
+                    NoItemNotification.Id := ShopMgt.GetNoItemNotificationId();
+                    NoItemNotification.Message := NoItemNotificationMsg;
+                    NoItemNotification.Scope := NotificationScope::LocalScope;
+                    NoItemNotification.SetData('ShopCode', Shop.Code);
+                    if (Shop."Sync Item" = Shop."Sync Item"::" ") or (Shop."Sync Item" = Shop."Sync Item"::"To Shopify") then
+                        NoItemNotification.AddAction(AddItemsMsg, Codeunit::"Shpfy Sync Products", 'AddItemsToShopifyNotification');
+                    if Shop."Sync Item" = Shop."Sync Item"::"From Shopify" then
+                        NoItemNotification.AddAction(SyncProductsMsg, Codeunit::"Shpfy Sync Products", 'SyncProductsNotification');
+                    NoItemNotification.AddAction(DontShowThisAgainMsg, Codeunit::"Shpfy Shop Mgt.", 'DisableNoItemNotification');
+                    NoItemNotification.Send();
+                end;
+        end;
+    end;
+
+    var
+        DontShowThisAgainMsg: Label 'Don''t show this again.';
+        AddItemsMsg: Label 'Add Items to Shopify';
+        SyncProductsMsg: Label 'Sync Products';
+        NoItemNotificationMsg: Label 'There isn''t data here yet. Do you want to synchronize products?';
 }

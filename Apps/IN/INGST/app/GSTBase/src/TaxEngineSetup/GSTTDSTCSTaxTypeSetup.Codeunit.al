@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.JsonExchange;
+
+using Microsoft.Finance.GST.Base;
+
 codeunit 18011 "GST TDS TCS Tax Type Setup"
 {
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Tax Engine Assisted Setup", 'OnSetupTaxTypes', '', false, false)]
@@ -65,6 +73,8 @@ codeunit 18011 "GST TDS TCS Tax Type Setup"
         "{81E6747B-B7CE-4A75-BEE5-F630FF17C687}Lbl": Label 'GST Use Cases';
         "{c34d7e4b-1538-4d41-9e72-71dfcf6fc94d}Lbl": Label 'GST Use Cases';
         "{5430a349-b6ae-4ca1-a7d9-6884d93da5ef}Lbl": Label 'GST Use Cases';
+        "{7c83d9d2-7b73-48c6-ab6f-3e2e7221b1d8}Lbl": Label 'GST Use Cases';
+        "{88bbce88-a277-47a7-ac40-ed384c9224e8}Lbl": Label 'GST Use Cases';
     begin
         Handled := true;
 
@@ -83,6 +93,10 @@ codeunit 18011 "GST TDS TCS Tax Type Setup"
                 exit("{c34d7e4b-1538-4d41-9e72-71dfcf6fc94d}Lbl");
             '{5430a349-b6ae-4ca1-a7d9-6884d93da5ef}':
                 exit("{5430a349-b6ae-4ca1-a7d9-6884d93da5ef}Lbl");
+            '{7c83d9d2-7b73-48c6-ab6f-3e2e7221b1d8}':
+                exit("{7c83d9d2-7b73-48c6-ab6f-3e2e7221b1d8}Lbl");
+            '{88bbce88-a277-47a7-ac40-ed384c9224e8}':
+                exit("{88bbce88-a277-47a7-ac40-ed384c9224e8}Lbl");
         end;
 
         Handled := false;

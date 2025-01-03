@@ -3,6 +3,8 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 
+namespace System.Visualization;
+
 table 1436 "Ess. Business Headline Per Usr"
 {
     fields
@@ -19,13 +21,6 @@ table 1436 "Ess. Business Headline Per Usr"
         field(3; "Headline Visible"; Boolean)
         {
             DataClassification = SystemMetadata;
-        }
-        field(4; "Headline Computation Date"; DateTime)
-        {
-            DataClassification = SystemMetadata;
-            ObsoleteState = Removed;
-            ObsoleteReason = 'Replaced with the Last Computed field on the RC Headlines User Data table';
-            ObsoleteTag = '18.0';
         }
         field(5; "Headline Computation WorkDate"; Date)
         {

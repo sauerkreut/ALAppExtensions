@@ -1,3 +1,7 @@
+namespace Mirosoft.Integration.CompanyHub;
+
+using System.Telemetry;
+
 page 1165 "COHUB Enviroment Card"
 {
     PageType = Card;
@@ -155,8 +159,10 @@ page 1165 "COHUB Enviroment Card"
                 trigger OnAction()
                 var
                     COHUBCore: Codeunit "COHUB Core";
+                    FeatureTelemetry: Codeunit "Feature Telemetry";
                 begin
                     COHUBCore.ValidateEnviromentUrl(Rec);
+                    FeatureTelemetry.LogUptake('0000IFG', COHUBCore.GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::"Set up");
                 end;
             }
         }
@@ -170,7 +176,9 @@ page 1165 "COHUB Enviroment Card"
     trigger OnOpenPage()
     var
         COHUBCore: Codeunit "COHUB Core";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
         COHUBCore.ShowNotSupportedOnPremNotification();
+        FeatureTelemetry.LogUptake('0000IFH', COHUBCore.GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::Discovered);
     end;
 }

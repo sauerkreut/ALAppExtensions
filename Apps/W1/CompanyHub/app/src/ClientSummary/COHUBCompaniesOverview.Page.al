@@ -1,3 +1,7 @@
+namespace Mirosoft.Integration.CompanyHub;
+
+using System.Telemetry;
+
 page 1167 "COHUB Companies Overview"
 {
     Caption = 'Company Hub';
@@ -97,5 +101,13 @@ page 1167 "COHUB Companies Overview"
             }
         }
     }
+
+    trigger OnOpenPage()
+    var
+        FeatureTelemetry: Codeunit "Feature Telemetry";
+        COHUBCore: Codeunit "COHUB Core";
+    begin
+        FeatureTelemetry.LogUptake('0000IFL', COHUBCore.GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::Discovered);
+    end;
 }
 

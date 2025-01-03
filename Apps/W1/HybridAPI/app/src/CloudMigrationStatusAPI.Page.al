@@ -1,3 +1,8 @@
+namespace Microsoft.DataMigration.API;
+
+using Microsoft.DataMigration;
+using System.Telemetry;
+
 page 40021 "Cloud Migration Status API"
 {
     PageType = API;
@@ -90,7 +95,7 @@ page 40021 "Cloud Migration Status API"
                     Caption = 'Additional Details';
                     EntityName = 'cloudMigrationStatusDetail';
                     EntitySetName = 'cloudMigrationStatusDetails';
-                    SubPageLink = "Run ID" = Field("Run ID");
+                    SubPageLink = "Run ID" = field("Run ID");
                 }
             }
         }
@@ -102,8 +107,10 @@ page 40021 "Cloud Migration Status API"
     var
         HybridReplicationSummary: Record "Hybrid Replication Summary";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
         NewRunID: Text;
     begin
+        FeatureTelemetry.LogUsage('0000JMN', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Replication');
         HybridCloudManagement.VerifyCanStartReplication();
         NewRunID := HybridCloudManagement.RunReplicationAPI(Rec.ReplicationType::Normal);
         Commit();
@@ -117,8 +124,10 @@ page 40021 "Cloud Migration Status API"
     procedure RunDataUpgrade(var ActionContext: WebServiceActionContext)
     var
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
-        HybridCloudManagement.RunDataUpgrade(Rec);
+        FeatureTelemetry.LogUsage('0000JMO', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Upgrade');
+        HybridCloudManagement.RunDataUpgradeAPI(Rec);
         SetActionResponseToThisPage(ActionContext, Rec);
     end;
 
@@ -132,7 +141,6 @@ page 40021 "Cloud Migration Status API"
         SetActionResponseToThisPage(ActionContext, Rec);
     end;
 
-
     [ServiceEnabled]
     [Scope('Cloud')]
     procedure ResetCloudData(var ActionContext: WebServiceActionContext)
@@ -145,15 +153,28 @@ page 40021 "Cloud Migration Status API"
 
     [ServiceEnabled]
     [Scope('Cloud')]
+    procedure CompleteCloudMigration(var ActionContext: WebServiceActionContext)
+    var
+        FeatureTelemetry: Codeunit "Feature Telemetry";
+        HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+    begin
+        HybridCloudManagement.CompleteCloudMigration();
+        FeatureTelemetry.LogUsage('0000JV6', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Completed');
+    end;
+
+    [ServiceEnabled]
+    [Scope('Cloud')]
     procedure DisableReplication(var ActionContext: WebServiceActionContext)
     var
         HybridReplicationSummary: Record "Hybrid Replication Summary";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
         HybridCloudManagement.DisableMigrationAPI();
         HybridReplicationSummary.SetCurrentKey("Start Time");
         HybridReplicationSummary.FindLast();
         SetActionResponseToThisPage(ActionContext, HybridReplicationSummary);
+        FeatureTelemetry.LogUsage('0000JMP', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Disabled');
     end;
 
     local procedure SetActionResponseToThisPage(var ActionContext: WebServiceActionContext; HybridReplicationSummary: Record "Hybrid Replication Summary")
@@ -161,12 +182,11 @@ page 40021 "Cloud Migration Status API"
         SetActionResponse(ActionContext, Page::"Cloud Mig Product Type API", HybridReplicationSummary.SystemId, HybridReplicationSummary.FieldNo(SystemId));
     end;
 
-    local procedure SetActionResponse(var ActionContext: WebServiceActionContext; PageId: Integer; RunId: Guid; KeyFieldNo: Integer)
-    var
+    local procedure SetActionResponse(var ActionContext: WebServiceActionContext; PageId: Integer; ActionRunId: Guid; KeyFieldNo: Integer)
     begin
         ActionContext.SetObjectType(ObjectType::Page);
         ActionContext.SetObjectId(PageId);
-        ActionContext.AddEntityKey(KeyFieldNo, RunId);
+        ActionContext.AddEntityKey(KeyFieldNo, ActionRunId);
         ActionContext.SetResultCode(WebServiceActionResultCode::Deleted);
     end;
 

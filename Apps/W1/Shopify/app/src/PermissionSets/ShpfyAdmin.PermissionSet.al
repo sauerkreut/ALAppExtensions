@@ -1,3 +1,5 @@
+namespace Microsoft.Integration.Shopify;
+
 /// <summary>
 /// Shpfy - Admin Permissions (ID 30103).
 /// </summary>
@@ -10,5 +12,5 @@ permissionset 30103 "Shpfy - Admin"
     IncludedPermissionSets = "Shpfy - Edit";
 
     Permissions =
-        tabledata "Shpfy Registered Store" = IMD;
+        tabledata "Shpfy Registered Store New" = IMD;
 }

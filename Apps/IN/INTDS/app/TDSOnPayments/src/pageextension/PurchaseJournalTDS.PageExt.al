@@ -1,3 +1,12 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GeneralLedger.Journal;
+
+using Microsoft.Finance.TaxBase;
+using Microsoft.Finance.TDS.TDSOnPayments;
+
 pageextension 18768 "Purchase Journal TDS" extends "Purchase Journal"
 {
     layout
@@ -7,6 +16,7 @@ pageextension 18768 "Purchase Journal TDS" extends "Purchase Journal"
             field("Provisional Entry"; Rec."Provisional Entry")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Provisional Entry';
                 ToolTip = 'Specifies whether this is a provisional entry or not.';
 
                 trigger OnValidate()
@@ -17,11 +27,13 @@ pageextension 18768 "Purchase Journal TDS" extends "Purchase Journal"
             field("Applied Provisional Entry"; Rec."Applied Provisional Entry")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Applied Provisional Entry';
                 ToolTip = 'Specifies the applied provisional entry number.';
             }
             field("TDS Section Code"; Rec."TDS Section Code")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'TDS Section Code';
                 ToolTip = 'Specifies the Section Codes as per the Income Tax Act 1961 for e tds returns';
 
                 trigger OnValidate()

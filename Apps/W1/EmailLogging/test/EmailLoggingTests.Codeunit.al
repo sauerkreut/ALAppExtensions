@@ -6,6 +6,7 @@
 codeunit 139763 "Email Logging Tests"
 {
     Subtype = Test;
+    TestPermissions = Disabled;
 
     var
         EmailLoggingAPIHelper: Codeunit "Email Logging API Helper";
@@ -109,12 +110,16 @@ codeunit 139763 "Email Logging Tests"
     procedure TestClearEmailLoggingSetup()
     var
         EmailLoggingSetup: Record "Email Logging Setup";
+        ClientSecret: SecretText;
+        TextClientSecret: Text;
     begin
         Initialize();
         InitializeSetup();
         EmailLoggingSetup.Get();
         EmailLoggingSetup."Client Id" := 'some value';
-        EmailLoggingSetup.SetClientSecret('some value');
+        TextClientSecret := 'some value';
+        ClientSecret := TextClientSecret;
+        EmailLoggingSetup.SetClientSecret(ClientSecret);
         EmailLoggingSetup."Consent Given" := true;
         EmailLoggingSetup.Enabled := false;
         EmailLoggingSetup.Modify();
@@ -122,7 +127,7 @@ codeunit 139763 "Email Logging Tests"
         Assert.IsTrue(EmailLoggingSetup."Email Address" <> '', 'Email address is not set');
         Assert.IsTrue(EmailLoggingSetup."Email Batch Size" > 0, 'Email batch size is not set');
         Assert.IsTrue(EmailLoggingSetup."Client Id" <> '', 'Client id is not set');
-        Assert.IsTrue(EmailLoggingSetup.GetClientSecret() <> '', 'Client secret is not set');
+        Assert.IsTrue(not EmailLoggingSetup.GetClientSecret().IsEmpty(), 'Client secret is not set');
         Assert.IsTrue(EmailLoggingSetup."Consent Given", 'Consent is not set');
         EmailLoggingManagement.ClearEmailLoggingSetup(EmailLoggingSetup);
 
@@ -130,7 +135,7 @@ codeunit 139763 "Email Logging Tests"
         Assert.IsFalse(EmailLoggingSetup."Email Address" <> '', 'E-mail address is not cleared');
         Assert.AreEqual(EmailLoggingSetup.GetDefaultEmailBatchSize(), EmailLoggingSetup."Email Batch Size", 'Email batch size is not reset to default value');
         Assert.IsFalse(EmailLoggingSetup."Client Id" <> '', 'Client id is not cleared');
-        Assert.IsFalse(EmailLoggingSetup.GetClientSecret() <> '', 'Client secret is not cleared');
+        Assert.IsFalse(not EmailLoggingSetup.GetClientSecret().IsEmpty(), 'Client secret is not cleared');
         Assert.IsFalse(EmailLoggingSetup."Consent Given", 'Consent is not cleared');
     end;
 
@@ -191,6 +196,58 @@ codeunit 139763 "Email Logging Tests"
         Assert.AreEqual(WebLink, EmailLoggingMessage.GetWebLink(), 'Unexpected webLink');
         Assert.AreEqual(IsDraft, Format(EmailLoggingMessage.GetIsDraft()).ToLower() = 'yes', 'Unexpected isDraft');
         Assert.AreEqual(Subject, EmailLoggingMessage.GetSubject(), 'Unexpected subject');
+        Assert.AreEqual(Sender, EmailLoggingMessage.GetSender(), 'Unexpected sender');
+        Assert.AreEqual(DatePart(SentDateTime), DatePart(EmailLoggingMessage.GetSentDateTime()), 'Unexpected sentDateTime');
+        Assert.AreEqual(DatePart(ReceivedDateTime), DatePart(EmailLoggingMessage.GetReceivedDateTime()), 'Unexpected receivedDateTime');
+        Assert.AreEqual(1, EmailLoggingMessage.GetToRecipients().Count(), 'Unexpected toRecipients count');
+        Assert.AreEqual(1, EmailLoggingMessage.GetCcRecipients().Count(), 'Unexpected ccRecipients count');
+        Assert.AreEqual(2, EmailLoggingMessage.GetToAndCcRecipients().Count(), 'Unexpected toAndCcRecipients count');
+        Assert.AreEqual(ToRecipient, EmailLoggingMessage.GetToRecipients().Get(1), 'Unexpected toRecipient');
+        Assert.AreEqual(CcRecipient, EmailLoggingMessage.GetCcRecipients().Get(1), 'Unexpected ccRecipient');
+        Assert.AreEqual(ToRecipient, EmailLoggingMessage.GetToAndCcRecipients().Get(1), 'Unexpected toAndCcRecipient #1');
+        Assert.AreEqual(CcRecipient, EmailLoggingMessage.GetToAndCcRecipients().Get(2), 'Unexpected toAndCcRecipient #2');
+    end;
+
+    [Test]
+    [Scope('OnPrem')]
+    procedure TestMessageWithEmptySubjectInitialized()
+    var
+        EmailLoggingMessage: Codeunit "Email Logging Message";
+        MessageList: List of [JsonObject];
+        MessageJsonObject: JsonObject;
+        Id: Text;
+        InternetMessageId: Text;
+        WebLink: Text;
+        IsDraft: Boolean;
+        Subject: Text;
+        SentDateTime: Text;
+        ReceivedDateTime: Text;
+        Sender: Text;
+        ToRecipient: Text;
+        CcRecipient: Text;
+    begin
+        Initialize();
+        InitializeSetup();
+        Id := 'id';
+        InternetMessageId := 'internetMessageId';
+        WebLink := 'https://link.com/' + InternetMessageId;
+        IsDraft := false;
+        SentDateTime := DatePart(Now) + 'T11:59:00Z';
+        ReceivedDateTime := DatePart(Now) + 'T12:01:00Z';
+        Subject := 'null';
+        Sender := 'sender@domain.com';
+        ToRecipient := 'toRecipient@domain.com';
+        CcRecipient := 'ccRecipient@domain.com';
+        AddMessageToInbox(Id, InternetMessageId, WebLink, IsDraft, SentDateTime, ReceivedDateTime, Subject, Sender, ToRecipient, CcRecipient);
+        EmailLoggingAPIHelper.GetMessages(MessageList);
+        MessageList.Get(1, MessageJsonObject);
+        EmailLoggingMessage.Initialize(MessageJsonObject);
+        Assert.IsTrue(EmailLoggingMessage.IsInitialized(), 'Message is not initialized');
+        Assert.AreEqual(Id, EmailLoggingMessage.GetId(), 'Unexpected id');
+        Assert.AreEqual(InternetMessageId, EmailLoggingMessage.GetInternetMessageId(), 'Unexpected internetMessageId');
+        Assert.AreEqual(WebLink, EmailLoggingMessage.GetWebLink(), 'Unexpected webLink');
+        Assert.AreEqual(IsDraft, Format(EmailLoggingMessage.GetIsDraft()).ToLower() = 'yes', 'Unexpected isDraft');
+        Assert.AreEqual('', EmailLoggingMessage.GetSubject(), 'Unexpected subject');
         Assert.AreEqual(Sender, EmailLoggingMessage.GetSender(), 'Unexpected sender');
         Assert.AreEqual(DatePart(SentDateTime), DatePart(EmailLoggingMessage.GetSentDateTime()), 'Unexpected sentDateTime');
         Assert.AreEqual(DatePart(ReceivedDateTime), DatePart(EmailLoggingMessage.GetReceivedDateTime()), 'Unexpected receivedDateTime');

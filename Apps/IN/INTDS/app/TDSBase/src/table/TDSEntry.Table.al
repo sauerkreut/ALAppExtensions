@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TDS.TDSBase;
+
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Account;
+using System.Security.AccessControl;
+using Microsoft.Finance.Currency;
+using Microsoft.Purchases.Payables;
+using Microsoft.Purchases.Vendor;
+
 table 18689 "TDS Entry"
 {
     Caption = 'TDS Entry';
@@ -465,11 +478,8 @@ table 18689 "TDS Entry"
     begin
         VendorLedgerEntry.SetRange("Transaction No.", Rec."Transaction No.");
         if VendorLedgerEntry.FindFirst() then begin
-            if VendorLedgerEntry."Document Type" = VendorLedgerEntry."Document Type"::Invoice then
-                VendorLedgerEntry."Total TDS Including SHE CESS" += -Rec."Total TDS Including SHE CESS"
-            else
-                if VendorLedgerEntry."Document Type" = VendorLedgerEntry."Document Type"::Payment then
-                    VendorLedgerEntry."Total TDS Including SHE CESS" += Rec."Total TDS Including SHE CESS";
+            if VendorLedgerEntry."Document Type" in [VendorLedgerEntry."Document Type"::Invoice, VendorLedgerEntry."Document Type"::Payment] then
+                VendorLedgerEntry."Total TDS Including SHE CESS" += Rec."Total TDS Including SHE CESS";
 
             if VendorLedgerEntry."TDS Section Code" = '' then
                 VendorLedgerEntry."TDS Section Code" := Rec.Section;

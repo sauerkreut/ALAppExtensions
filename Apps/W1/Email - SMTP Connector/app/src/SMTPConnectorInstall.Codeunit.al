@@ -1,3 +1,13 @@
+// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+
+namespace System.Email;
+
+using System.Environment;
+using System.Privacy;
+
 codeunit 4515 "SMTP Connector Install"
 {
     Subtype = Install;
@@ -23,6 +33,5 @@ codeunit 4515 "SMTP Connector Install"
         DataClassificationMgt.SetFieldToNormal(Database::"SMTP Account", Account.FieldNo("Secure Connection"));
         DataClassificationMgt.SetFieldToNormal(Database::"SMTP Account", Account.FieldNo(Server));
         DataClassificationMgt.SetFieldToNormal(Database::"SMTP Account", Account.FieldNo("Server Port"));
-        DataClassificationMgt.SetFieldToNormal(Database::"SMTP Account", Account.FieldNo(Authentication));
     end;
 }

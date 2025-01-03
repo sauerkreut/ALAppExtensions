@@ -1,3 +1,18 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TDS.TDSOnPayments;
+
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.TaxEngine.PostingHandler;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Finance.TDS.TDSBase;
+using Microsoft.Finance.TDS.TDSForCustomer;
+using Microsoft.Inventory.Location;
+using Microsoft.Foundation.Company;
+using Microsoft.Finance.TaxBase;
+
 codeunit 18766 "General Journal Validations"
 {
     [EventSubscriber(ObjectType::Table, Database::"Gen. Journal Line", 'OnAfterValidateEvent', 'TDS Section Code', false, false)]
@@ -52,15 +67,12 @@ codeunit 18766 "General Journal Validations"
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Handler", 'OnBeforeGenJnlLinePostFromTaxEngine', '', false, false)]
     local procedure OnBeforeGenJnlLinePostFromTaxEngine(var GenJnlLine: Record "Gen. Journal Line")
-    var
-        CalculateTax: Codeunit "Calculate Tax";
     begin
         if GenJnlLine."TDS Section Code" = '' then
             exit;
 
         GenJnlLine."TDS Posting to G/L" := true;
         GenJnlLine."TDS Invoice Amount" := GenJnlLine.Amount;
-        CalculateTax.CallTaxEngineOnGenJnlLine(GenJnlLine, GenJnlLine);
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Handler", 'OnAfterGenJnlLinePostFromTaxEngine', '', false, false)]

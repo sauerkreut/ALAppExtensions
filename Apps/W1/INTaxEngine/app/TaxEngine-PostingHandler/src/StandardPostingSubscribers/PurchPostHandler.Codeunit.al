@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.PostingHandler;
+
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Purchases.Posting;
+
 codeunit 20335 "Purch.-Post Handler"
 {
 
@@ -105,7 +118,11 @@ codeunit 20335 "Purch.-Post Handler"
     begin
         TaxPostingHandler.GetCurrency(PurchHeader."Currency Code", Currency);
         Currency.TestField("Invoice Rounding Precision");
-        TotalAmount := TotalAmountIncludingVAT + TaxPostingBufferMgmt.GetTotalTaxAmount();
+
+        if PurchHeader."Document Type" in ["Purchase Document Type"::"Credit Memo", "Purchase Document Type"::"Return Order"] then
+            TotalAmount := TotalAmountIncludingVAT - TaxPostingBufferMgmt.GetTotalTaxAmount()
+        else
+            TotalAmount := TotalAmountIncludingVAT + TaxPostingBufferMgmt.GetTotalTaxAmount();
 
         InvoiceRoundingAmount :=
           -Round(
@@ -115,23 +132,11 @@ codeunit 20335 "Purch.-Post Handler"
             Currency."Amount Rounding Precision");
     end;
 
-#if not CLEAN20
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnBeforePostVendorEntry', '', false, false)]
-    local procedure OnBeforePostVendorEntry(
-        var GenJnlLine: Record "Gen. Journal Line";
-        var PurchHeader: Record "Purchase Header")
-    var
-        TaxPostingBufferMgmt: Codeunit "Tax Posting Buffer Mgmt.";
-    begin
-        GenJnlLine."Tax ID" := TaxPostingBufferMgmt.GetTaxID();
-    end;
-#endif
-
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch. Post Invoice Events", 'OnPostLedgerEntryOnBeforeGenJnlPostLine', '', false, false)]
     local procedure OnPostLedgerEntryOnBeforeGenJnlPostLine(var GenJnlLine: Record "Gen. Journal Line"; var PurchHeader: Record "Purchase Header")
     var
         TaxPostingBufferMgmt: Codeunit "Tax Posting Buffer Mgmt.";
     begin
         GenJnlLine."Tax ID" := TaxPostingBufferMgmt.GetTaxID();
-    end;   
+    end;
 }

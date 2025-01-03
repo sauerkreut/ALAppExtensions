@@ -1,12 +1,13 @@
+namespace Microsoft.Bank.Deposit;
 page 1697 "Posted Bank Deposit Subform"
 {
     AutoSplitKey = true;
     Caption = 'Posted Bank Deposit Subform';
     Editable = false;
     PageType = ListPart;
-    PromotedActionCategories = 'New,Process,Report,Line,Functions';
     SourceTable = "Posted Bank Deposit Line";
-    Permissions = tabledata "Posted Bank Deposit Line" = r;
+    Permissions = tabledata "Posted Bank Deposit Header" = r,
+                  tabledata "Posted Bank Deposit Line" = r;
 
     layout
     {
@@ -44,6 +45,11 @@ page 1697 "Posted Bank Deposit Subform"
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the number of the document (usually a check) that was deposited.';
+                }
+                field("External Document No."; Rec."External Document No.")
+                {
+                    ApplicationArea = Basic, Suite;
+                    ToolTip = 'Specifies the external document number for this line, such as a check number.';
                 }
                 field(Amount; Rec.Amount)
                 {
@@ -100,10 +106,12 @@ page 1697 "Posted Bank Deposit Subform"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account &Card';
                     Image = Account;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category4;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Shift+F7';
                     ToolTip = 'View or change detailed information about the account on the deposit line.';
 
@@ -117,10 +125,12 @@ page 1697 "Posted Bank Deposit Subform"
                     ApplicationArea = Basic, Suite;
                     Caption = 'Account Ledger E&ntries';
                     Image = LedgerEntries;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category5;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Ctrl+F7';
                     ToolTip = 'View ledger entries that are posted for the account on the deposit line.';
 
@@ -134,10 +144,12 @@ page 1697 "Posted Bank Deposit Subform"
                     ApplicationArea = Suite;
                     Caption = 'Dimensions';
                     Image = Dimensions;
+#pragma warning disable AL0729
                     Promoted = true;
                     PromotedOnly = true;
                     PromotedCategory = Category4;
                     PromotedIsBig = true;
+#pragma warning restore
                     ShortCutKey = 'Alt+D';
                     ToolTip = 'View or edit dimensions, such as area, project, or department, that you can assign to sales and purchase documents to distribute costs and analyze transaction history.';
 

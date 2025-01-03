@@ -1,3 +1,12 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GeneralLedger.Journal;
+
+using Microsoft.Finance.TaxBase;
+using Microsoft.Finance.TDS.TDSOnPayments;
+
 pageextension 18766 "General Journal Ext" extends "General Journal"
 {
     layout
@@ -7,11 +16,13 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Party Type"; Rec."Party Type")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Party Type';
                 ToolTip = 'Specifies the type of party that the entry on the journal line will be posted to.';
             }
             field("Party Code"; Rec."Party Code")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Party Code';
                 ToolTip = 'Specifies the party number that the entry on the journal line will be posted to.';
             }
         }
@@ -20,6 +31,7 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Provisional Entry"; Rec."Provisional Entry")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Provisional Entry';
                 ToolTip = 'Specifies whether this is a provisional entry or not.';
 
                 trigger OnValidate()
@@ -30,11 +42,13 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Applied Provisional Entry"; Rec."Applied Provisional Entry")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Applied Provisional Entry';
                 ToolTip = 'Specifies the applied provisional entry number.';
             }
             field("TDS Section Code"; Rec."TDS Section Code")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'TDS Section Code';
                 ToolTip = 'Specifies the Section Codes as per the Income Tax Act 1961 for eTDS Returns.';
 
                 trigger OnValidate()
@@ -51,6 +65,7 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Include GST in TDS Base"; Rec."Include GST in TDS Base")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Include GST in TDS Base';
                 ToolTip = 'Select this field to include GST value in the TDS Base.';
 
                 trigger OnValidate()
@@ -61,6 +76,7 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Nature of Remittance"; Rec."Nature of Remittance")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Nature of Remittance';
                 ToolTip = 'Specify the type of Remittance deductee deals with for which the journal line has been created.';
 
                 trigger OnValidate()
@@ -71,6 +87,7 @@ pageextension 18766 "General Journal Ext" extends "General Journal"
             field("Act Applicable"; Rec."Act Applicable")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Act Applicable';
                 ToolTip = 'Specify the tax rates prescribed under the IT Act or DTAA for which the journal line has been created.';
 
                 trigger OnValidate()

@@ -1,7 +1,27 @@
-﻿pageextension 18083 "GST Purchase invoice Ext" extends "Purchase invoice"
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Purchases.Document;
+
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.GST.Purchase;
+
+pageextension 18083 "GST Purchase invoice Ext" extends "Purchase invoice"
 {
     layout
     {
+        modify(ShippingOptionWithLocation)
+        {
+            trigger OnAfterValidate()
+            begin
+                GstPurchaseSubscriber.SetLocationCodeVisibleForQuoteandInvoice(IsLocationVisible, ShipToOptions);
+            end;
+        }
+        modify(Control81)
+        {
+            Visible = IsLocationVisible;
+        }
         modify("Posting Date")
         {
             trigger OnAfterValidate()
@@ -13,6 +33,7 @@
         }
         modify("Location Code")
         {
+            ShowMandatory = ShipToOptions = ShipToOptions::"Custom Address";
             trigger OnAfterValidate()
             var
                 GSTBaseValidation: Codeunit "GST Base Validation";
@@ -237,4 +258,14 @@
             }
         }
     }
+
+    trigger OnAfterGetRecord()
+    begin
+        GstPurchaseSubscriber.SetLocationCodeVisibleForQuoteandInvoice(IsLocationVisible, ShipToOptions);
+    end;
+
+    var
+        GstPurchaseSubscriber: Codeunit "GST Purchase Subscribers";
+        [InDataSet]
+        IsLocationVisible: boolean;
 }

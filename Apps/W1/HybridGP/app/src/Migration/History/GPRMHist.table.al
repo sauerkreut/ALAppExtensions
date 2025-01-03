@@ -1,6 +1,8 @@
+namespace Microsoft.DataMigration.GP;
+
 table 4065 "GPRMHist"
 {
-    ReplicateData = false;
+    DataClassification = CustomerContent;
     Extensible = false;
 
     fields

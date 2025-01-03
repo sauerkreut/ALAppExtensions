@@ -1,3 +1,6 @@
+#if not CLEAN26
+namespace Microsoft.DataMigration.GP;
+
 page 4095 "GP Item"
 {
     PageType = Card;
@@ -6,6 +9,10 @@ page 4095 "GP Item"
     InsertAllowed = false;
     Caption = 'Item Table';
     PromotedActionCategories = 'Related Entities';
+    UsageCategory = None;
+    ObsoleteState = Pending;
+    ObsoleteReason = 'Removing the GP staging table pages because they cause confusion and should not be used.';
+    ObsoleteTag = '26.0';
 
     layout
     {
@@ -13,22 +20,86 @@ page 4095 "GP Item"
         {
             group(General)
             {
-                field(No; No) { ApplicationArea = All; ToolTip = 'Number'; }
-                field(Description; Description) { ApplicationArea = All; ToolTip = 'Description'; }
-                field(SearchDescription; SearchDescription) { ApplicationArea = All; ToolTip = 'Search Description'; }
-                field(ShortName; ShortName) { ApplicationArea = All; ToolTip = 'Short Name'; }
-                field(BaseUnitOfMeasure; BaseUnitOfMeasure) { ApplicationArea = All; ToolTip = 'Base Unit of Measure'; }
-                field(ItemType; ItemType) { ApplicationArea = All; ToolTip = 'ITem Type'; }
-                field(CostingMethod; CostingMethod) { ApplicationArea = All; ToolTip = 'Costing Method'; }
-                field(CurrentCost; CurrentCost) { ApplicationArea = All; ToolTip = 'Current Cost'; }
-                field(StandardCost; StandardCost) { ApplicationArea = All; ToolTip = 'Standard Cost'; }
-                field(UnitListPrice; UnitListPrice) { ApplicationArea = All; ToolTip = 'Unit List Price'; }
-                field(ShipWeight; ShipWeight) { ApplicationArea = All; ToolTip = 'Ship Weight'; }
-                field(InActive; InActive) { ApplicationArea = All; ToolTip = 'InActive'; }
-                field(QuantityOnHand; QuantityOnHand) { ApplicationArea = All; ToolTip = 'Quantity On Hand'; }
-                field(SalesUnitOfMeasure; SalesUnitOfMeasure) { ApplicationArea = All; ToolTip = 'Sales Unit of Measure'; }
-                field(PurchUnitOfMeasure; PurchUnitOfMeasure) { ApplicationArea = All; ToolTip = 'Purchase Unit of Measure'; }
-                field(ItemTrackingCode; ItemTrackingCode) { ApplicationArea = All; ToolTip = 'Item Tracking Code'; }
+                field(No; Rec.No)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Number';
+                }
+                field(Description; Rec.Description)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Description';
+                }
+                field(SearchDescription; Rec.SearchDescription)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Search Description';
+                }
+                field(ShortName; Rec.ShortName)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Short Name';
+                }
+                field(BaseUnitOfMeasure; Rec.BaseUnitOfMeasure)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Base Unit of Measure';
+                }
+                field(ItemType; Rec.ItemType)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'ITem Type';
+                }
+                field(CostingMethod; Rec.CostingMethod)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Costing Method';
+                }
+                field(CurrentCost; Rec.CurrentCost)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Current Cost';
+                }
+                field(StandardCost; Rec.StandardCost)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Standard Cost';
+                }
+                field(UnitListPrice; Rec.UnitListPrice)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Unit List Price';
+                }
+                field(ShipWeight; Rec.ShipWeight)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Ship Weight';
+                }
+                field(InActive; Rec.InActive)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'InActive';
+                }
+                field(QuantityOnHand; Rec.QuantityOnHand)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Quantity On Hand';
+                }
+                field(SalesUnitOfMeasure; Rec.SalesUnitOfMeasure)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Sales Unit of Measure';
+                }
+                field(PurchUnitOfMeasure; Rec.PurchUnitOfMeasure)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Purchase Unit of Measure';
+                }
+                field(ItemTrackingCode; Rec.ItemTrackingCode)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Item Tracking Code';
+                }
             }
         }
     }
@@ -57,3 +128,4 @@ page 4095 "GP Item"
         }
     }
 }
+#endif

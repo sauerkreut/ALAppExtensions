@@ -1,3 +1,16 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Subcontracting;
+
+using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Foundation.UOM;
+using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Location;
+using Microsoft.Purchases.Vendor;
+
 table 18476 "Subcon. Delivery Challan Line"
 {
     Caption = 'Subcon. Delivery Challan Line';
@@ -46,6 +59,7 @@ table 18476 "Subcon. Delivery Challan Line"
         field(6; "Quantity To Send"; Decimal)
         {
             Caption = 'Quantity To Send';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
 
             trigger OnValidate()
@@ -56,11 +70,13 @@ table 18476 "Subcon. Delivery Challan Line"
         field(7; "Quantity (Base)"; Decimal)
         {
             Caption = 'Quantity (Base)';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
         }
         field(8; "Quantity To Send (Base)"; Decimal)
         {
             Caption = 'Quantity To Send (Base)';
+            DecimalPlaces = 0 : 3;
             DataClassification = EndUserIdentifiableInformation;
         }
         field(9; Description; Text[100])
@@ -109,6 +125,7 @@ table 18476 "Subcon. Delivery Challan Line"
         field(16; "Qty. per Unit of Measure"; Decimal)
         {
             Caption = 'Qty. per Unit of Measure';
+            DecimalPlaces = 0 : 3;
             Editable = false;
             DataClassification = EndUserIdentifiableInformation;
         }

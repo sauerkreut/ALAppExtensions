@@ -1,20 +1,40 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.VAT.Reporting;
+
+using Microsoft.Finance.VAT.Setup;
+using Microsoft.Foundation.Company;
+using Microsoft.Utilities;
+using System.Environment;
+using System.Environment.Configuration;
+using System.Media;
+using System.Privacy;
+using System.Security.Authentication;
+using System.Telemetry;
+using System.Upgrade;
+
 codeunit 10681 "Electronic VAT Installation"
 {
     Subtype = Install;
 
     var
-        FeatureTelemetry: Codeunit "Feature Telemetry";
-        NOVATReportTok: Label 'NO VAT Reporting', Locked = true;
         AssistedSetupTxt: Label 'Set up an electronic VAT submission';
         AssistedSetupDescriptionTxt: Label 'Connect to the ID-porten integration point and submit your VAT return to Skatteetaten.';
         AssistedSetupHelpTxt: Label 'https://go.microsoft.com/fwlink/?linkid=2181211', Locked = true;
-        AuthenticationURLTxt: Label 'https://oidc.difi.no/idporten-oidc-provider', Locked = true;
+        AuthenticationURLTxt: Label 'https://idporten.no', Locked = true;
+        LoginURLTxt: Label 'https://login.idporten.no', Locked = true;
 
         ValidateVATReturnUrlLbl: Label 'https://idporten.api.skatteetaten.no/api/mva/grensesnittstoette/mva-melding/valider', Locked = true;
         ExchangeIDPortenToAltinnUrlLbl: Label 'https://platform.altinn.no/authentication/api/v1/exchange/id-porten', Locked = true;
         SubmissionEnvironmentUrlLbl: Label 'https://skd.apps.altinn.no/', Locked = true;
         SubmissionAppUrlLbl: Label 'skd/mva-melding-innsending-v1/', Locked = true;
         ElectronicVATLbl: Label 'ELEC VAT', Locked = true;
+        ElectronicVATSetupTitleTxt: Label 'Set up electronic VAT submission';
+        ElectronicVATSetupShortTitleTxt: Label 'Electronic VAT submission';
+        ElectronicVATSetupDescriptionTxt: Label 'Set up Business Central to be able to report VAT to the Norwegian authorities.';
+
 
     trigger OnInstallAppPerCompany()
     var
@@ -57,6 +77,7 @@ codeunit 10681 "Electronic VAT Installation"
         ElecVATSetup.Insert(true);
         ElecVATSetup.Validate("OAuth Feature GUID", CreateGuid());
         ElecVATSetup.Validate("Authentication URL", AuthenticationURLTxt);
+        ElecVATSetup.Validate("Login URL", LoginURLTxt);
         OAuth20.GetDefaultRedirectURL(RedirectUrl);
         ElecVATSetup.Validate("Redirect URL", CopyStr(RedirectUrl, 1, MaxStrLen(ElecVATSetup."Redirect URL")));
         ElecVATSetup.Validate("Validate VAT Return Url", ValidateVATReturnUrlLbl);
@@ -80,12 +101,14 @@ codeunit 10681 "Electronic VAT Installation"
     local procedure CreateVATReportsConfiguration()
     var
         VATReportsConfiguration: Record "VAT Reports Configuration";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
+        NOVATReportTok: Label 'NO VAT Reporting', Locked = true;
     begin
         FeatureTelemetry.LogUptake('0000HTK', NOVATReportTok, Enum::"Feature Uptake Status"::"Set up");
         if VATReportsConfiguration.Get(VATReportsConfiguration."VAT Report Type"::"VAT Return", ElectronicVATLbl) then
             exit;
         VATReportsConfiguration.Validate("VAT Report Type", VATReportsConfiguration."VAT Report Type"::"VAT Return");
-        VATReportsConfiguration.validate("VAT Report Version", ElectronicVATLbl);
+        VATReportsConfiguration.Validate("VAT Report Version", ElectronicVATLbl);
         VATReportsConfiguration.Validate("Suggest Lines Codeunit ID", Codeunit::"VAT Report Suggest Lines");
         VATReportsConfiguration.Validate("Content Codeunit ID", Codeunit::"Elec. VAT Create Content");
         VATReportsConfiguration.Validate("Submission Codeunit ID", Codeunit::"Elec. VAT Submit Return");
@@ -138,5 +161,13 @@ codeunit 10681 "Electronic VAT Installation"
             exit;
         if ElecVATSetup.Get() and ElecVATSetup.Enabled then
             GuidedExperience.CompleteAssistedSetup(ObjectType, ObjectID);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Guided Experience", 'OnRegisterManualSetup', '', true, true)]
+    local procedure InsertIntoManualSetupOnRegisterManualSetup()
+    var
+        GuidedExperience: Codeunit "Guided Experience";
+    begin
+        GuidedExperience.InsertManualSetup(ElectronicVATSetupTitleTxt, ElectronicVATSetupShortTitleTxt, ElectronicVATSetupDescriptionTxt, 5, ObjectType::Page, Page::"Electronic VAT Setup Card", "Manual Setup Category"::Finance, '', true);
     end;
 }

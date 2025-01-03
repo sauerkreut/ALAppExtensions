@@ -1,7 +1,12 @@
-// ------------------------------------------------------------------------------------------------
+﻿// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
+
+namespace Microsoft.Bank.Payment;
+
+using Microsoft.Foundation.Company;
+using System.Telemetry;
 
 tableextension 13614 CompanyInformation extends "Company Information"
 {
@@ -19,10 +24,10 @@ tableextension 13614 CompanyInformation extends "Company Information"
                 IF BankCreditorNo = '' THEN
                     EXIT;
                 IF STRLEN(BankCreditorNo) <> MAXSTRLEN(BankCreditorNo) THEN
-                    ERROR(STRSUBSTNO(BankCreditorNumberLengthErr, FIELDCAPTION(BankCreditorNo)));
+                    ERROR(BankCreditorNumberLengthErr, FIELDCAPTION(BankCreditorNo));
             end;
         }
     }
     var
-        BankCreditorNumberLengthErr: Label '%1 must be an 8-digit number.';
+        BankCreditorNumberLengthErr: Label '%1 must be an 8-digit number.', Comment = '%1 = Bank Creditor Number';
 }

@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GeneralLedger.Journal;
+
+using Microsoft.Finance.TaxBase;
+
 pageextension 18840 "Sales Journal" extends "Sales Journal"
 {
     layout
@@ -7,6 +15,7 @@ pageextension 18840 "Sales Journal" extends "Sales Journal"
             field("Location Code"; Rec."Location Code")
             {
                 ApplicationArea = Basic, Suite;
+                Caption = 'Location Code';
                 ToolTip = 'Specifies the location code for which the journal lines will be posted.';
             }
             field("TCS Nature of Collection"; Rec."TCS Nature of Collection")

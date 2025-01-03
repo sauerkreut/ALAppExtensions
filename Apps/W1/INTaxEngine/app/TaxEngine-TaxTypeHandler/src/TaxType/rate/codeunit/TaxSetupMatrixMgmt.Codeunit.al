@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TaxEngine.TaxTypeHandler;
+
+using Microsoft.Finance.TaxEngine.Core;
+
 codeunit 20233 "Tax Setup Matrix Mgmt."
 {
     procedure DeleteAllTaxRates(TaxType: Code[20]; SkipConfirmation: Boolean)
@@ -61,6 +69,7 @@ codeunit 20233 "Tax Setup Matrix Mgmt."
         Clear(AttributeValue);
         for i := 1 to CaptionCount do begin
             TaxRateValue.Reset();
+            TaxRateValue.SetCurrentKey("Config ID", "Column ID");
             TaxRateValue.SetRange("Config ID", ConfigID);
             TaxRateValue.SetRange("Column ID", AttributeID[i]);
             if TaxRateValue.FindFirst() then begin

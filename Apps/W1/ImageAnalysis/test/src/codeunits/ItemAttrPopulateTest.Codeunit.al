@@ -1,3 +1,9 @@
+namespace Microsoft.Utility.ImageAnalysis;
+
+using Microsoft.Inventory.Item;
+using System.AI;
+using Microsoft.Inventory.Item.Attribute;
+using System.Text;
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved. 
 // Licensed under the MIT License. See License.txt in the project root for license information. 
@@ -10,7 +16,6 @@ codeunit 139592 "Item Attr Populate Test"
 
     var
         Assert: Codeunit Assert;
-        NotificationHandled: Boolean;
 
 
     [Test]
@@ -23,7 +28,6 @@ codeunit 139592 "Item Attr Populate Test"
         ItemAttrPopulate: Codeunit "Item Attr Populate";
         JsonManagement: Codeunit "JSON Management";
         ConfidencePercent: Decimal;
-        AnalysisType: Option Tags,Faces,Color;
         UpdatedDescription: Text[100];
     begin
         // [Scenario] Check the item is populated correctly in a success case
@@ -35,7 +39,7 @@ codeunit 139592 "Item Attr Populate Test"
       '{"name":"chair","confidence":0.978925347328186},{"name":"blue","confidence":0.90790148973464966}],"requestId":"2c15a4c1-9271-4584-a30e-342d7fdf206b"' +
       ',"metadata":{"width":500,"height":600,"format":"Jpeg"},"faces":[],"color":{"dominantColorForeground":"White","dominantColorBackground":"White",' +
       '"dominantColors":["White","Blue"],"accentColor":"0D48BE","isBWImg":false}}');
-        ImageAnalysisResult.SetJson(JsonManagement, AnalysisType::Tags);
+        ImageAnalysisResult.SetResult(JsonManagement, Enum::"Image Analysis Type"::Tags);
 
         // [When] We try to populate the tags table
         ItemAttrPopulate.BuildTagListPrepopulateCategoryAndAttributes(Item, ImageAnalysisResult, ImageAnalysisTags, ConfidencePercent);
@@ -121,7 +125,6 @@ codeunit 139592 "Item Attr Populate Test"
         ItemAttrPopulate: Codeunit "Item Attr Populate";
         JsonManagement: Codeunit "JSON Management";
         ConfidencePercent: Decimal;
-        AnalysisType: Option Tags,Faces,Color;
     begin
         // [Scenario] Check the item is not populated correctly in a success case
         // [Given] An item and an analysis result with low confidence for everything
@@ -131,7 +134,7 @@ codeunit 139592 "Item Attr Populate Test"
         JsonManagement.InitializeObject('{"tags":[{"name":"furniture","confidence":0.098513400554657},{"name":"seat","confidence":0.09785393476486206},' +
       '{"name":"chair","confidence":0.078925347328186},{"name":"blue","confidence":0.00790148973464966}],"requestId":"2c15a4c1-9271-4584-a30e-342d7fdf206b"' +
       ',"metadata":{"width":500,"height":600,"format":"Jpeg"}}');
-        ImageAnalysisResult.SetJson(JsonManagement, AnalysisType::Tags);
+        ImageAnalysisResult.SetResult(JsonManagement, Enum::"Image Analysis Type"::Tags);
 
         // [When] We try to populate the item
         ItemAttrPopulate.BuildTagListPrepopulateCategoryAndAttributes(Item, ImageAnalysisResult, ImageAnalysisTags, ConfidencePercent);
@@ -154,7 +157,6 @@ codeunit 139592 "Item Attr Populate Test"
     var
         ImageAnalysisSetup: Record "Image Analysis Setup";
     begin
-        NotificationHandled := false;
         ImageAnalysisSetup.DeleteAll();
         ImageAnalysisSetup.GetSingleInstance();
         ImageAnalysisSetup."Image-Based Attribute Recognition Enabled" := true;
@@ -179,7 +181,7 @@ codeunit 139592 "Item Attr Populate Test"
     begin
         ItemAttributeValue.Reset();
         ItemAttributeValue.SetRange(Value, 'Blue');
-        ItemAttributeValue.FindSet();
+        ItemAttributeValue.FindFirst();
         exit(ItemAttributeValueMapping.GET(DATABASE::Item, Item."No.", ItemAttributeValue."Attribute ID") and (ItemAttributeValueMapping."Item Attribute Value ID" = ItemAttributeValue.ID));
     end;
 
@@ -189,7 +191,7 @@ codeunit 139592 "Item Attr Populate Test"
     begin
         ItemAttributeValue.Reset();
         ItemAttributeValue.SetRange(Value, 'Blue');
-        ItemAttributeValue.FindSet();
+        ItemAttributeValue.FindFirst();
         exit((ImageAnalysisTags."Item Attribute Name Id" = ItemAttributeValue."Attribute ID") and (ImageAnalysisTags."Item Attribute Value Id" = ItemAttributeValue.ID));
     end;
 

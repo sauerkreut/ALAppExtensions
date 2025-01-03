@@ -1,4 +1,45 @@
-Codeunit 4037 "Helper Functions"
+namespace Microsoft.DataMigration.GP;
+
+using System.Reflection;
+using System.Utilities;
+using System.Integration;
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.Consolidation;
+using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Location;
+using Microsoft.Finance.Dimension;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Inventory.Setup;
+using Microsoft.Finance.GeneralLedger.Ledger;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Journal;
+using Microsoft.Foundation.AuditCodes;
+using Microsoft.Foundation.Company;
+using Microsoft.Foundation.Period;
+using Microsoft.Manufacturing.Setup;
+using Microsoft.CRM.Setup;
+using Microsoft.Purchases.Setup;
+using Microsoft.Sales.Setup;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Receivables;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Purchases.Payables;
+using Microsoft.Foundation.PaymentTerms;
+using Microsoft.Inventory.Tracking;
+using Microsoft.Inventory.Costing;
+using Microsoft.Bank.BankAccount;
+using Microsoft.Bank.Ledger;
+using Microsoft.Bank.Reconciliation;
+using Microsoft.Purchases.Document;
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Posting;
+using Microsoft.DataMigration;
+using Microsoft.Utilities;
+using Microsoft.Inventory.Posting;
+using Microsoft.Finance.Analysis.StatisticalAccount;
+
+codeunit 4037 "Helper Functions"
 {
     Permissions = tabledata "Dimension Set Entry" = rimd,
                     tabledata "G/L Account" = rimd,
@@ -20,7 +61,6 @@ Codeunit 4037 "Helper Functions"
                     tabledata "Payment Terms" = rimd,
                     tabledata "Payment Term Translation" = rimd,
                     tabledata "Data Migration Entity" = rimd,
-                    tabledata "O365 Payment Terms" = rimd,
                     tabledata "Item Tracking Code" = rimd,
                     tabledata "Gen. Journal Line" = rimd,
                     tabledata "G/L - Item Ledger Relation" = rimd,
@@ -33,7 +73,10 @@ Codeunit 4037 "Helper Functions"
                     tabledata "Purchase Header" = rimd,
                     tabledata "Purchase Line" = rimd,
                     tabledata "Over-Receipt Code" = rimd,
-                    tabledata "Accounting Period" = rimd;
+                    tabledata "Accounting Period" = rimd,
+                    tabledata "Data Migration Error" = rimd,
+                    tabledata "Statistical Acc. Journal Batch" = rimd,
+                    tabledata "Statistical Acc. Journal Line" = rimd;
 
     var
         GPConfiguration: Record "GP Configuration";
@@ -60,33 +103,20 @@ Codeunit 4037 "Helper Functions"
         SavedJrnlLinesFoundMsg: Label 'Saved journal lines are found. In order to use the wizard, you will need to delete the journal lines before you migrate your data.';
         MigrationNotSupportedErr: Label 'This migration does not support the "Specific" costing method. Verify your costing method in Inventory Setup.';
         PostingGroupCodeTxt: Label 'GP', Locked = true;
+#if not CLEAN25
         DocNoOutofBalanceMsg: Label 'Document No. %1 is out of balance by %2. Transactions will not be created. Please check the amount in the import file.', Comment = '%1 = Balance Amount', Locked = true;
+#endif
         CustomerBatchNameTxt: Label 'GPCUST', Locked = true;
         VendorBatchNameTxt: Label 'GPVEND', Locked = true;
         BankBatchNameTxt: Label 'GPBANK', Locked = true;
+#if not CLEAN25
         GlDocNoTxt: Label 'G00001', Locked = true;
+#endif
         MigrationTypeTxt: Label 'Great Plains';
         CloudMigrationTok: Label 'CloudMigration', Locked = true;
         GeneralTemplateNameTxt: Label 'GENERAL', Locked = true;
-
-#if not CLEAN21
-    [Obsolete('Method is not supported, it was using files', '21.0')]
-    procedure GetEntities(EntityName: Text; var JArray: JsonArray): Boolean
-    begin
-        exit(false);
-    end;
-
-    [Obsolete('Method is not supported, it was using files', '21.0')]
-    procedure GetEntitiesAsJToken(EntityName: Text; var JToken: JsonToken): Boolean
-    begin
-        exit(false);
-    end;
-
-    [Obsolete('Method is not supported, it was using files', '21.0')]
-    procedure GetObjectCount(EntityName: Text; var ObjectCount: Integer)
-    begin
-    end;
-#endif
+        NotAllJournalLinesPostedMsg: Label 'Not all journal lines were posted. Number of unposted lines - %1.', Comment = '%1 Number of unposted lines';
+        MigrationLogAreaBatchPostingTxt: Label 'Batch Posting', Locked = true;
 
     procedure GetTextFromJToken(JToken: JsonToken; Path: Text): Text
     var
@@ -109,6 +139,7 @@ Codeunit 4037 "Helper Functions"
         DecimalVar: Decimal;
         DummyDateVar: Date;
     begin
+        Clear(DummyDateVar);
         TextToWrite := TrimStringQuotes(TextToWrite);
         case Format(DestinationFieldRef.Type()) of
             'Text', 'Code':
@@ -303,55 +334,17 @@ Codeunit 4037 "Helper Functions"
         CustomerDataMigrationFacade.CreateCountryIfNeeded(CountryCode, CountryName, AddressFormatToSet::"City+County+Post Code", ContactAddressFormatToSet::"After Company Name");
     end;
 
+#if not CLEAN24
+    [Obsolete('Data cleanup is no longer performed before migration.', '24.0')]
     procedure CleanupGenJournalBatches()
-    var
-        GenJournalBatch: Record "Gen. Journal Batch";
     begin
-        GenJournalBatch.Reset();
-        GenJournalBatch.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-        GenJournalBatch.SetFilter(Name, PostingGroupCodeTxt + '*');
-        if GenJournalBatch.FindSet() then
-            repeat
-                GenJournalBatch.Delete(true);
-            until GenJournalBatch.Next() = 0;
-
-        if ValidateCountry('GB') then begin
-            GenJournalBatch.Reset();
-            GenJournalBatch.SetFilter(Name, '= CASH');
-            GenJournalBatch.SetFilter("No. Series", '= GJNL-PMT');
-            if GenJournalBatch.FindFirst() then begin
-                GenJournalBatch."No. Series" := '';
-                GenJournalBatch.Modify(true);
-                Commit();
-            end;
-        end;
     end;
 
+    [Obsolete('Data cleanup is no longer performed before migration.', '24.0')]
     procedure CleanupVatPostingSetup()
-    var
-        VATPostingSetup: Record "VAT Posting Setup";
     begin
-        if ValidateCountry('GB') then
-            if VATPostingSetup.FindSet(true, false) then begin
-                repeat
-                    VATPostingSetup."Sales VAT Account" := '';
-                    VATPostingSetup."Purchase VAT Account" := '';
-                    VATPostingSetup."Reverse Chrg. VAT Acc." := '';
-                    VATPostingSetup.Modify(TRUE);
-                until VATPostingSetup.Next() = 0;
-                Commit();
-            end;
     end;
-
-    local procedure ValidateCountry(CountryCode: Code[10]): Boolean
-    var
-        ApplicationSystemConstants: Codeunit "Application System Constants";
-    begin
-        if StrPos(ApplicationSystemConstants.ApplicationVersion(), CountryCode) = 1 then
-            exit(true);
-
-        exit(false);
-    end;
+#endif
 
     local procedure GetAcctCategoryEntryNo(Category: Option): Integer
     var
@@ -365,55 +358,55 @@ Codeunit 4037 "Helper Functions"
 
     procedure AssignSubAccountCategory(GPAccount: Record "GP Account") AcctSubCategory: Integer
     var
-        GLAccount: Record "G/L Account";
+        GLAccountCategory: Record "G/L Account Category";
     begin
         case GPAccount.AccountCategory of
             1:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, CashTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, CashTxt);
             2, 4, 6:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, CurrentAssetsTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, CurrentAssetsTxt);
             3:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, ARTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, ARTxt);
             5:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, InventoryTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, InventoryTxt);
             7:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, PrepaidExpensesTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, PrepaidExpensesTxt);
             8, 11, 12:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, InventoryTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, InventoryTxt);
             9:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, EquipementTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, EquipementTxt);
             10:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Assets, AccumDeprecTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Assets, AccumDeprecTxt);
             13, 14, 15, 16, 17, 18, 19, 20, 21:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Liabilities, CurrentLiabilitiesTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Liabilities, CurrentLiabilitiesTxt);
             22:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Liabilities, LongTermLiabilitiesTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Liabilities, LongTermLiabilitiesTxt);
             23:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Equity, CommonStockTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Equity, CommonStockTxt);
             24, 25, 26, 28:
-                AcctSubCategory := GetAcctCategoryEntryNo(GLAccount."Account Category"::Equity);
+                AcctSubCategory := GetAcctCategoryEntryNo(GLAccountCategory."Account Category"::Equity);
             27:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Equity, RetEarningsTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Equity, RetEarningsTxt);
             29, 30:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Equity, DistrToShareholdersTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Equity, DistrToShareholdersTxt);
             31:
-                AcctSubCategory := GetAcctCategoryEntryNo(GLAccount."Account Category"::Income);
+                AcctSubCategory := GetAcctCategoryEntryNo(GLAccountCategory."Account Category"::Income);
             32:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Income, IncomeSalesReturnsTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Income, IncomeSalesReturnsTxt);
             33:
-                AcctSubCategory := GetAcctCategoryEntryNo(GLAccount."Account Category"::"Cost of Goods Sold");
+                AcctSubCategory := GetAcctCategoryEntryNo(GLAccountCategory."Account Category"::"Cost of Goods Sold");
             34, 35:
-                AcctSubCategory := GetAcctCategoryEntryNo(GLAccount."Account Category"::Expense);
+                AcctSubCategory := GetAcctCategoryEntryNo(GLAccountCategory."Account Category"::Expense);
             36:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Expense, PayrollExpenseTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Expense, PayrollExpenseTxt);
             37:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Expense, BenefitsExpenseTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Expense, BenefitsExpenseTxt);
             38:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Expense, InterestExpenseTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Expense, InterestExpenseTxt);
             39, 41:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Expense, TaxExpenseTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Expense, TaxExpenseTxt);
             40, 42, 43, 44, 45, 46, 47:
-                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccount."Account Category"::Expense, OtherIncomeExpenseTxt);
+                AcctSubCategory := GetAcctSubCategoryEntryNo(GLAccountCategory."Account Category"::Expense, OtherIncomeExpenseTxt);
             else
                 AcctSubCategory := 0;
         end;
@@ -563,6 +556,13 @@ Codeunit 4037 "Helper Functions"
         CreateCustomerClassesImp();
     end;
 
+    local procedure CreateKitItems()
+    var
+        GPItemMigrator: Codeunit "GP Item Migrator";
+    begin
+        GPItemMigrator.MigrateKitItems();
+    end;
+
     procedure CreateSetupRecordsIfNeeded()
     var
         CompanyInformation: Record "Company Information";
@@ -615,7 +615,7 @@ Codeunit 4037 "Helper Functions"
         end;
     end;
 
-    local procedure CalculateDueDateFormula(GPPaymentTerms: Record "GP Payment Terms"; Use_Discount_Calc: Boolean; Discount_Calc: Text[32]): Text[50]
+    internal procedure CalculateDueDateFormula(GPPaymentTerms: Record "GP Payment Terms"; Use_Discount_Calc: Boolean; Discount_Calc: Text[32]): Text[50]
     var
         working_number: integer;
         extra_month: integer;
@@ -623,14 +623,17 @@ Codeunit 4037 "Helper Functions"
         working_string: Text[20];
         working_discount_calc: Text[50];
         final_string: Text[50];
+        MonthAsInteger: Integer;
     begin
         // BC Only supports GPPaymentTerms.CalculateDateFrom = Transaction Date
         // Set date formula to a string '<1M>'
         working_number := GPPaymentTerms.CalculateDateFromDays;  // Always add this many days to the due date.
+        if working_number < 0 then
+            working_number := 0;
 
         if Use_Discount_Calc and (Discount_Calc <> '') then
             // Need to get the date formula text minus the brackets...
-            working_discount_calc := copystr(copystr(Discount_Calc, 2, (strlen(Discount_Calc) - 2)), 1, 50)
+            working_discount_calc := CopyStr(CopyStr(Discount_Calc, 2, (StrLen(Discount_Calc) - 2)), 1, 50)
         else
             // In case use discount is true, but the passed-in formula string is empty
             Use_Discount_Calc := false;
@@ -639,63 +642,69 @@ Codeunit 4037 "Helper Functions"
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::"Net Days" then
             if GPPaymentTerms.DUEDTDS > 0 then begin
                 working_number := working_number + GPPaymentTerms.DUEDTDS;
-                working_string := '<' + format(working_number) + 'D>';
-            END;
+                working_string := '<' + Format(working_number, 0, 9) + 'D>';
+            end;
 
         // Get the first day of the current month, then add appropriate days.
         // Need to remove one day since setting the date should fall on that number chosen, whereas the formula will add to the first of the month,
         // giving you one extra day we need to remove.
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::Date then
             if GPPaymentTerms.DUEDTDS > 0 then
-                working_string := '<D' + format(GPPaymentTerms.DUEDTDS) + '>';
+                working_string := '<D' + Format(GPPaymentTerms.DUEDTDS, 0, 9) + '>';
 
         // Go to the end of the current month, then add appropriate days
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::EOM then begin
             if GPPaymentTerms.DUEDTDS > 0 then
                 working_number := working_number + GPPaymentTerms.DUEDTDS;
             if working_number > 0 then
-                working_string := '<CM+' + format(working_number) + 'D>'
-            ELSE
+                working_string := '<CM+' + Format(working_number, 0, 9) + 'D>'
+            else
                 working_string := '<CM>';
         end;
 
         // Just add the number of initial days to the current date
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::None then
-            working_string := '<' + format(working_number) + 'D>';
+            working_string := '<' + Format(working_number, 0, 9) + 'D>';
 
         // Set the day of the next month
         // Need to remove one day, see the comments above for DUETYPE::Date
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::"Next Month" then begin
             if GPPaymentTerms.DUEDTDS > 0 then
                 working_number := GPPaymentTerms.DUEDTDS;
+
+            if working_number < 1 then
+                working_number := 1;
+
             // First day of current month, + 1 month + the number of days
-            working_string := '<-CM+1M+' + format(working_number - 1) + 'D>';
+            working_string := '<-CM+1M+' + Format(working_number - 1, 0, 9) + 'D>';
         end;
 
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::Months then begin
             if GPPaymentTerms.DUEDTDS > 0 then
                 extra_month := GPPaymentTerms.DUEDTDS;
             // Add the extra months, then the extra days
-            working_string := '<' + format(extra_month) + 'M+' + format(working_number) + 'D>';
+            working_string := '<' + Format(extra_month, 0, 9) + 'M+' + Format(working_number, 0, 9) + 'D>';
         end;
 
-        if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::"Month/Day" then
-            working_string := '<M' + format(GPPaymentTerms.DueMonth) + '+D' + format(GPPaymentTerms.DUEDTDS) + '>';
+        if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::"Month/Day" then begin
+            MonthAsInteger := GPPaymentTerms.DueMonth;
+            working_string := '<M' + Format(MonthAsInteger, 0, 9) + '+D' + Format(GPPaymentTerms.DUEDTDS, 0, 9) + '>';
+        end;
 
         if GPPaymentTerms.DUETYPE = GPPaymentTerms.DUETYPE::Annual then begin
             if GPPaymentTerms.DUEDTDS > 0 then
                 extra_year := GPPaymentTerms.DUEDTDS;
             // Add the extra months, then the extra days
-            working_string := '<' + format(extra_year) + 'Y+' + format(working_number) + 'D>'
+            working_string := '<' + Format(extra_year, 0, 9) + 'Y+' + Format(working_number, 0, 9) + 'D>'
         end;
 
         if Use_Discount_Calc then begin
-            final_string := copystr('<' + working_discount_calc, 1, 50);
-            if (copystr(working_string, 2, 1) = '-') or (copystr(working_string, 2, 1) = '+') then
-                final_string := final_string + copystr(working_string, 2)
+            final_string := CopyStr('<' + working_discount_calc, 1, 50);
+            if (CopyStr(working_string, 2, 1) = '-') or (CopyStr(working_string, 2, 1) = '+') then
+                final_string := final_string + CopyStr(working_string, 2)
             else
                 if working_string <> '' then
-                    final_string += '+' + copystr(working_string, 2)
+                    final_string += '+' + CopyStr(working_string, 2)
                 else
                     final_string += '>';
             exit(final_string);
@@ -704,7 +713,7 @@ Codeunit 4037 "Helper Functions"
         // Back in the calling proc, EVALUATE(variable,forumlastring) will set the variable to the correct formula
     end;
 
-    local procedure CalculateDiscountDateFormula(GPPaymentTerms: Record "GP Payment Terms"): Text[50]
+    internal procedure CalculateDiscountDateFormula(GPPaymentTerms: Record "GP Payment Terms"): Text[50]
     var
         working_number: integer;
         extra_month: integer;
@@ -713,59 +722,65 @@ Codeunit 4037 "Helper Functions"
     begin
         // Set date formula to a string '<1M>'
         working_number := GPPaymentTerms.CalculateDateFromDays;  // Always add this many days to the due date.
+        if working_number < 0 then
+            working_number := 0;
 
         // Add base days + discount days
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::Days then
             if GPPaymentTerms.DISCDTDS > 0 then begin
                 working_number := working_number + GPPaymentTerms.DISCDTDS;
-                working_string := '<' + format(working_number) + 'D>';
-            END;
+                working_string := '<' + Format(working_number, 0, 9) + 'D>';
+            end;
 
         // Get the first day of the current month, then add appropriate days.
         // Need to remove one day since setting the date should fall on that number chosen, whereas the formula will add to the first of the month,
         // giving you one extra day we need to remove.
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::Date then
             if GPPaymentTerms.DISCDTDS > 0 then
-                working_string := '<D' + format(GPPaymentTerms.DISCDTDS) + '>';
+                working_string := '<D' + Format(GPPaymentTerms.DISCDTDS, 0, 9) + '>';
 
         // Go to the end of the current month, then add appropriate days
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::EOM then begin
             if GPPaymentTerms.DISCDTDS > 0 then
                 working_number := working_number + GPPaymentTerms.DISCDTDS;
             if working_number > 0 then
-                working_string := '<CM+' + format(working_number) + 'D>'
+                working_string := '<CM+' + Format(working_number, 0, 9) + 'D>'
             else
                 working_string := '<CM>';
         end;
 
         // Just add the number of initial days to the current date
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::None then
-            working_string := '<+' + format(working_number) + 'D>';
+            working_string := '<+' + Format(working_number, 0, 9) + 'D>';
 
         // Set the day of the next month
         // Need to remove one day, see the comments above for DISCTYPE::Date
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::"Next Month" then begin
             if GPPaymentTerms.DISCDTDS > 0 then
                 working_number := GPPaymentTerms.DISCDTDS;
+
+            if working_number < 1 then
+                working_number := 1;
+
             // First day of current month, + 1 month + the number of days
-            working_string := '<-CM+1M+' + format(working_number - 1) + 'D>;'
+            working_string := '<-CM+1M+' + Format(working_number - 1, 0, 9) + 'D>;'
         end;
 
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::Months then begin
             if GPPaymentTerms.DISCDTDS > 0 then
                 extra_month := GPPaymentTerms.DISCDTDS;
             // Add the extra months, then the extra days
-            working_string := '<' + format(extra_month) + 'M+' + format(working_number) + 'D>;'
+            working_string := '<' + Format(extra_month, 0, 9) + 'M+' + Format(working_number, 0, 9) + 'D>;'
         end;
 
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::"Month/Day" then
-            working_string := '<M' + format(GPPaymentTerms.DiscountMonth) + '+D' + format(GPPaymentTerms.DISCDTDS) + '>';
+            working_string := '<M' + Format(GPPaymentTerms.DiscountMonth, 0, 9) + '+D' + Format(GPPaymentTerms.DISCDTDS, 0, 9) + '>';
 
         if GPPaymentTerms.DISCTYPE = GPPaymentTerms.DISCTYPE::Annual then begin
             if GPPaymentTerms.DISCDTDS > 0 then
                 extra_year := GPPaymentTerms.DISCDTDS;
             // Add the extra months, then the extra days
-            working_string := '<' + format(extra_year) + 'Y+' + format(working_number) + 'D>;'
+            working_string := '<' + Format(extra_year, 0, 9) + 'Y+' + Format(working_number, 0, 9) + 'D>;'
         end;
 
         exit(working_string);
@@ -793,7 +808,8 @@ Codeunit 4037 "Helper Functions"
         GPPOPReceiptHist: Record "GPPOPReceiptHist"; //4116
         GPPOPPOHist: Record "GPPOPPOHist"; //4123
         GPPMHist: Record "GPPMHist"; //4126
-        GPPOPPOHeader: Record "GP POPPOHeader";
+        GPPOP10100: Record "GP POP10100";
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
         PaymentTerm: Text[22];
         PaymentTerm_New: Text[10];
     begin
@@ -801,87 +817,76 @@ Codeunit 4037 "Helper Functions"
             exit;
 
         repeat
+            DataMigrationErrorLogging.SetLastRecordUnderProcessing(Format(GPPaymentTerms.RecordId));
             PaymentTerm := DELCHR(GPPaymentTerms.PYMTRMID, '>', ' ');
             PaymentTerm_New := DELCHR(GPPaymentTerms.PYMTRMID_New, '>', ' ');
             // if the "old" and "new" payment terms are the same, skip
-            if PaymentTerm <> PaymentTerm_New THEN begin
+            if PaymentTerm <> PaymentTerm_New then begin
                 // update the payment terms in the tables that have this field
-                WITH GPCustomer DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
+                Clear(GPCustomer);
+                GPCustomer.SetRange(GPCustomer."PYMTRMID", PaymentTerm);
+                if not GPCustomer.IsEmpty() then
+                    GPCustomer.MODIFYALL(GPCustomer."PYMTRMID", PaymentTerm_New);
 
-                WITH GPCustomerTrans DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
 
-                WITH GPVendor DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
+                Clear(GPCustomerTrans);
+                GPCustomerTrans.SetRange(GPCustomerTrans."PYMTRMID", PaymentTerm);
+                if not GPCustomerTrans.IsEmpty() then
+                    GPCustomerTrans.MODIFYALL(GPCustomerTrans."PYMTRMID", PaymentTerm_New);
 
-                WITH GPVendorTransactions DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
 
-                WITH GPSOPTrxHist DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
+                Clear(GPVendor);
+                GPVendor.SetRange(GPVendor."PYMTRMID", PaymentTerm);
+                if not GPVendor.IsEmpty() then
+                    GPVendor.MODIFYALL(GPVendor."PYMTRMID", PaymentTerm_New);
 
-                WITH GPRMOpen DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
 
-                WITH GPRMHist DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
+                Clear(GPVendorTransactions);
+                GPVendorTransactions.SetRange(GPVendorTransactions."PYMTRMID", PaymentTerm);
+                if not GPVendorTransactions.IsEmpty() then
+                    GPVendorTransactions.MODIFYALL(GPVendorTransactions."PYMTRMID", PaymentTerm_New);
 
-                WITH GPPOPReceiptHist DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
 
-                WITH GPPOPPOHist DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
+                Clear(GPSOPTrxHist);
+                GPSOPTrxHist.SetRange(GPSOPTrxHist."PYMTRMID", PaymentTerm);
+                if not GPSOPTrxHist.IsEmpty() then
+                    GPSOPTrxHist.MODIFYALL(GPSOPTrxHist."PYMTRMID", PaymentTerm_New);
 
-                WITH GPPMHist DO BEGIN
-                    RESET();
-                    SetRange("PYMTRMID", PaymentTerm);
-                    if FINDFIRST() then
-                        MODIFYALL("PYMTRMID", PaymentTerm_New);
-                END;
 
-                with GPPOPPOHeader do begin
-                    Reset();
-                    SetRange(PYMTRMID, PaymentTerm);
-                    if FindFirst() then
-                        ModifyAll(PYMTRMID, PaymentTerm_New);
-                end;
+                Clear(GPRMOpen);
+                GPRMOpen.SetRange(GPRMOpen."PYMTRMID", PaymentTerm);
+                if not GPRMOpen.IsEmpty() then
+                    GPRMOpen.MODIFYALL(GPRMOpen."PYMTRMID", PaymentTerm_New);
+
+
+                Clear(GPRMHist);
+                GPRMHist.SetRange(GPRMHist."PYMTRMID", PaymentTerm);
+                if not GPRMHist.IsEmpty() then
+                    GPRMHist.MODIFYALL(GPRMHist."PYMTRMID", PaymentTerm_New);
+
+
+                Clear(GPPOPReceiptHist);
+                GPPOPReceiptHist.SetRange(GPPOPReceiptHist."PYMTRMID", PaymentTerm);
+                if not GPPOPReceiptHist.IsEmpty() then
+                    GPPOPReceiptHist.MODIFYALL(GPPOPReceiptHist."PYMTRMID", PaymentTerm_New);
+
+
+                Clear(GPPOPPOHist);
+                GPPOPPOHist.SetRange(GPPOPPOHist."PYMTRMID", PaymentTerm);
+                if not GPPOPPOHist.IsEmpty() then
+                    GPPOPPOHist.MODIFYALL(GPPOPPOHist."PYMTRMID", PaymentTerm_New);
+
+
+                Clear(GPPMHist);
+                GPPMHist.SetRange(GPPMHist."PYMTRMID", PaymentTerm);
+                if not GPPMHist.IsEmpty() then
+                    GPPMHist.MODIFYALL(GPPMHist."PYMTRMID", PaymentTerm_New);
+
+                Clear(GPPOP10100);
+                GPPOP10100.SetRange(GPPOP10100.PYMTRMID, PaymentTerm);
+                if not GPPOP10100.IsEmpty() then
+                    GPPOP10100.ModifyAll(GPPOP10100.PYMTRMID, PaymentTerm_New);
+
             end;
         until GPPaymentTerms.Next() = 0;
     end;
@@ -933,13 +938,6 @@ Codeunit 4037 "Helper Functions"
             until GPCodes.Next() = 0;
     end;
 
-#if not CLEAN21
-    [Obsolete('Method is not supported, it was using files', '21.0')]
-    procedure GetDimensionInfo()
-    begin
-    end;
-#endif
-
     procedure AnyCompaniesWithTooManySegments(var CompanyList: List of [Text])
     var
         GPCompanyMigrationSettings: Record "GP Company Migration Settings";
@@ -952,260 +950,19 @@ Codeunit 4037 "Helper Functions"
             until GPCompanyMigrationSettings.Next() = 0;
     end;
 
-    local procedure GetSegmentsFromJson(JArray: JsonArray)
-    var
-        GPSegments: Record "GP Segments";
-        RecordVariant: Variant;
-        ChildJToken: JsonToken;
-        EntityId: Text[75];
-        i: Integer;
-    begin
-        i := 0;
-
-        while JArray.Get(i, ChildJToken) do begin
-            EntityId := CopyStr(TrimStringQuotes(GetTextFromJToken(ChildJToken, 'SEGMENTCODE')), 1, MaxStrLen(GPSegments.Id));
-
-            if not GPSegments.Get(EntityId) then begin
-                GPSegments.Init();
-                GPSegments.Validate(GPSegments.Id, EntityId);
-                GPSegments.Insert(true);
-            end;
-
-            RecordVariant := GPSegments;
-            UpdateSegmentFromJson(RecordVariant, ChildJToken);
-            GPSegments := RecordVariant;
-            GPSegments.Modify(false);
-
-            i := i + 1;
-        end;
-    end;
-
-    local procedure UpdateSegmentFromJson(var RecordVariant: Variant; JToken: JsonToken)
-    var
-        GPSegments: Record "GP Segments";
-    begin
-        UpdateFieldValue(RecordVariant, GPSegments.FieldNo(Name), JToken.AsObject(), 'SGMTNAME');
-        UpdateFieldValue(RecordVariant, GPSegments.FieldNo(CodeCaption), JToken.AsObject(), 'SEGMENTCODECAPTION');
-        UpdateFieldValue(RecordVariant, GPSegments.FieldNo(FilterCaption), JToken.AsObject(), 'SEGMENTFILTERCAPTION');
-    end;
-
-    local procedure GetCodesFromJson(JArray: JsonArray)
-    var
-        GPCodes: Record "GP Codes";
-        RecordVariant: Variant;
-        ChildJToken: JsonToken;
-        EntityId: Text[75];
-        Name: Text[50];
-        i: Integer;
-    begin
-        i := 0;
-
-        while JArray.Get(i, ChildJToken) do begin
-            EntityId := CopyStr(TrimStringQuotes(GetTextFromJToken(ChildJToken, 'SGMTNUMB')), 1, MaxStrLen(GPCodes.Id));
-            Name := CopyStr(TrimStringQuotes(GetTextFromJToken(ChildJToken, 'SGMTNAME')), 1, MaxStrLen(GPCodes.Name));
-
-            if not GPCodes.Get(EntityId, Name) then begin
-                GPCodes.Init();
-                GPCodes.Validate(GPCodes.Id, EntityId);
-                GPCodes.Validate(GPCodes.Name, Name);
-                GPCodes.Insert(true);
-            end;
-
-            RecordVariant := GPCodes;
-            UpdateCodeFromJson(RecordVariant, ChildJToken);
-            GPCodes := RecordVariant;
-            GPCodes.Modify(false);
-
-            i := i + 1;
-        end;
-    end;
-
-    local procedure UpdateCodeFromJson(var RecordVariant: Variant; JToken: JsonToken)
-    var
-        GPCodes: Record "GP Codes";
-    begin
-        UpdateFieldValue(RecordVariant, GPCodes.FieldNo(Description), JToken.AsObject(), 'DSCRIPTN');
-    end;
-
+#if not CLEAN24
+    [Obsolete('Cleaning up tables before running the migration is no longer wanted.', '24.0')]
     procedure Cleanup();
-    var
-        GPGLTransactions: Record "GP GLTransactions";
-        GPAccount: Record "GP Account";
-        GPCustomer: Record "GP Customer";
-        GPCustomerAddress: Record "GP Customer Address";
-        GPCustomerTransactions: Record "GP Customer Transactions";
-        GPItem: Record "GP Item";
-        GPItemLocation: Record "GP Item Location";
-        GPVendor: Record "GP Vendor";
-        GPVendorAddress: Record "GP Vendor Address";
-        GPVendorTransactions: Record "GP Vendor Transactions";
-        GPCodes: Record "GP Codes";
-        GPPostingAccounts: Record "GP Posting Accounts";
-        GPSegments: Record "GP Segments";
-        GPFiscalPeriods: Record "GP Fiscal Periods";
-        GPPaymentTerms: Record "GP Payment Terms";
-        GPBankMSTR: Record "GP Bank MSTR";
-        GPCheckbookMSTR: Record "GP Checkbook MSTR";
-        GPCheckbookTransactions: Record "GP Checkbook Transactions";
-        GPSY40100: Record "GP SY40100";
-        GPSY40101: Record "GP SY40101";
-        GPSY06000: Record "GP SY06000";
-        GPMC40200: Record "GP MC40200";
-        GPPM00100: Record "GP PM00100";
-        GPPM00200: Record "GP PM00200";
-        GPRM00101: Record "GP RM00101";
-        GPRM00201: Record "GP RM00201";
-        GPIV00101: Record "GP IV00101";
-        GPIV40400: Record "GP IV40400";
     begin
-        GPAccount.DeleteAll();
-        GPGLTransactions.DeleteAll();
-
-        GPCustomer.DeleteAll();
-        GPCustomerAddress.DeleteAll();
-        GPCustomerTransactions.DeleteAll();
-
-        GPItem.DeleteAll();
-        GPItemLocation.DeleteAll();
-
-        GPVendor.DeleteAll();
-        GPVendorAddress.DeleteAll();
-        GPVendorTransactions.DeleteAll();
-
-        GPCodes.DeleteAll();
-        GPPostingAccounts.DeleteAll();
-        GPSegments.DeleteAll();
-        GPFiscalPeriods.DeleteAll();
-        GPPaymentTerms.DeleteAll();
-
-        GPBankMSTR.DeleteAll();
-        GPCheckbookMSTR.DeleteAll();
-        GPCheckbookTransactions.DeleteAll();
-
-        GPSY40100.DeleteAll();
-        GPSY40101.DeleteAll();
-
-        GPSY06000.DeleteAll();
-        GPMC40200.DeleteAll();
-
-        GPPM00100.DeleteAll();
-        GPPM00200.DeleteAll();
-
-        GPRM00101.DeleteAll();
-        GPRM00201.DeleteAll();
-        
-        GPIV00101.DeleteAll();
-        GPIV40400.DeleteAll();
-
-        Session.LogMessage('00007GH', 'Cleaned up staging tables.', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
     end;
 
+    [Obsolete('Cleaning up tables before running the migration is no longer wanted.', '24.0')]
     procedure CleanupBeforeSynchronization();
-    var
-        GLAccount: Record "G/L Account";
-        GLEntry: Record "G/L Entry";
-        Customer: Record Customer;
-        CustLedgerEntry: Record "Cust. Ledger Entry";
-        Dimension: Record Dimension;
-        DimensionValue: Record "Dimension Value";
-        DimensionSetEntry: Record "Dimension Set Entry";
-        DetailedCustLedgEntry: Record "Detailed Cust. Ledg. Entry";
-        Vendor: Record Vendor;
-        VendorLedgerEntry: Record "Vendor Ledger Entry";
-        DetailedVendorLedgEntry: Record "Detailed Vendor Ledg. Entry";
-        DataMigrationStatus: Record "Data Migration Status";
-        Item: Record Item;
-        ItemLedgerEntry: Record "Item Ledger Entry";
-        AvgCostAdjmtEntryPoint: Record "Avg. Cost Adjmt. Entry Point";
-        ValueEntry: Record "Value Entry";
-        ItemUnitOfMeasure: Record "Item Unit of Measure";
-        PaymentTerms: Record "Payment Terms";
-        PaymentTermTranslation: Record "Payment Term Translation";
-        DataMigrationEntity: Record "Data Migration Entity";
-        O365PaymentTerms: Record "O365 Payment Terms";
-        ItemTrackingCode: Record "Item Tracking Code";
-        GenJournalLine: Record "Gen. Journal Line";
-        GLItemLedgerRelation: Record "G/L - Item Ledger Relation";
-        GLRegister: Record "G/L Register";
-        Location: Record Location;
-        TrackingSpecification: Record "Tracking Specification";
-        ReservationEntry: Record "Reservation Entry";
-        ItemJournalLine: Record "Item Journal Line";
-        PostValueEntryToGL: Record "Post Value Entry to G/L";
-        BankAccount: Record "Bank Account";
-        BankAccountPostingGroup: Record "Bank Account Posting Group";
-        BankAccountLedgerEntry: Record "Bank Account Ledger Entry";
-        BankAccReconciliation: Record "Bank Acc. Reconciliation";
-        BankAccReconciliationLine: Record "Bank Acc. Reconciliation Line";
-        PurchaseHeader: Record "Purchase Header";
-        PurchaseLine: Record "Purchase Line";
-        OverReceiptCode: Record "Over-Receipt Code";
-        AccountingPeriod: Record "Accounting Period";
     begin
-        GPConfiguration.DeleteAll();
-        GLEntry.DeleteAll(true);
-        GLRegister.DeleteAll(true);
-        CustLedgerEntry.DeleteAll(true);
-        DetailedCustLedgEntry.DeleteAll(true);
-        Customer.DeleteAll(true);
-        PurchaseLine.ModifyAll("Qty. Rcd. Not Invoiced", 0);
-        PurchaseLine.DeleteAll(true);
-        PurchaseHeader.DeleteAll(true);
-        VendorLedgerEntry.DeleteAll(true);
-        DetailedVendorLedgEntry.DeleteAll(true);
-        Vendor.DeleteAll(true);
-        ItemLedgerEntry.DeleteAll(true);
-        AvgCostAdjmtEntryPoint.DeleteAll(true);
-        ValueEntry.DeleteAll(true);
-        PostValueEntryToGL.DeleteAll(true);
-        TrackingSpecification.DeleteAll(true);
-        ReservationEntry.DeleteAll(true);
-        ItemJournalLine.DeleteAll(true);
-        Item.DeleteAll(true);
-        ItemUnitOfMeasure.DeleteAll(true);
-        GLItemLedgerRelation.DeleteAll(true);
-        ResetGLDimensionSetup();
-        DimensionSetEntry.DeleteAll(true);
-        DimensionValue.DeleteAll(true);
-        Dimension.DeleteAll(true);
-        PaymentTerms.DeleteAll(true);
-        PaymentTermTranslation.DeleteAll(true);
-        O365PaymentTerms.DeleteAll(true);
-        DataMigrationEntity.DeleteAll();
-        Location.DeleteAll(true);
-        ItemTrackingCode.DeleteAll(true);
-        BankAccountLedgerEntry.DeleteAll(true);
-        BankAccount.DeleteAll(true);
-
-        if OverReceiptCode.Get('GP') then
-            OverReceiptCode.Delete(true);
-
-        BankAccountPostingGroup.Reset();
-        BankAccountPostingGroup.SetFilter(Code, PostingGroupCodeTxt + '*');
-        if not BankAccountPostingGroup.IsEmpty() then
-            BankAccountPostingGroup.DeleteAll();
-
-        BankAccReconciliationLine.DeleteAll(true);
-        BankAccReconciliation.DeleteAll(true);
-
-        DataMigrationStatus.Reset();
-        DataMigrationStatus.SetRange("Migration Type", GetMigrationTypeTxt());
-        if not DataMigrationStatus.IsEmpty() then
-            DataMigrationStatus.DeleteAll();
-
-        CleanupGenJournalBatches();
-        CleanupVatPostingSetup();
-        GenJournalLine.DeleteAll(true);
-        GLAccount.DeleteAll(true);
-
-        AccountingPeriod.DeleteAll();
-
-        Commit();
-        Session.LogMessage('00007GI', 'Cleaned up before Synchronization.', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
-        SetPreMigrationCleanupCompleted();
     end;
+#endif
 
-    procedure SetTransactionProcessedFlag();
+    procedure SetTransactionProcessedFlag()
     begin
         GPConfiguration.GetSingleInstance();
         GPConfiguration."GL Transactions Processed" := true;
@@ -1218,14 +975,14 @@ Codeunit 4037 "Helper Functions"
         exit(GPConfiguration."GL Transactions Processed");
     end;
 
-    procedure SetAccountValidationError();
+    procedure SetAccountValidationError()
     begin
         GPConfiguration.GetSingleInstance();
         GPConfiguration."Account Validation Error" := true;
         GPConfiguration.Modify();
     end;
 
-    procedure ClearAccountValidationError();
+    procedure ClearAccountValidationError()
     begin
         GPConfiguration.GetSingleInstance();
         GPConfiguration."Account Validation Error" := false;
@@ -1247,26 +1004,59 @@ Codeunit 4037 "Helper Functions"
 
     procedure GetNumberOfItems(): Integer;
     var
-        GPItem: Record "GP Item";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+        GPIV00101: Record "GP IV00101";
     begin
-        exit(GPItem.Count());
+        if not GPCompanyAdditionalSettings.GetInventoryModuleEnabled() then
+            exit(0);
+
+        if not GPCompanyAdditionalSettings.GetMigrateKitItems() then
+            GPIV00101.SetFilter(ITEMTYPE, '<>%1', GPIV00101.KitItemTypeId());
+
+        if not GPCompanyAdditionalSettings.GetMigrateInactiveItems() then
+            GPIV00101.SetRange(INACTIVE, false);
+
+        if not GPCompanyAdditionalSettings.GetMigrateDiscontinuedItems() then
+            GPIV00101.SetFilter(ITEMTYPE, '<>%1&<>%2', GPIV00101.DiscontinuedItemTypeId(), GPIV00101.KitItemTypeId());
+
+        exit(GPIV00101.Count());
     end;
 
     procedure GetNumberOfCustomers(): Integer;
     var
         GPCustomer: Record "GP Customer";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
     begin
+        if not GPCompanyAdditionalSettings.GetReceivablesModuleEnabled() then
+            exit(0);
+
         exit(GPCustomer.Count());
     end;
 
     procedure GetNumberOfVendors(): Integer;
     var
         GPVendor: Record "GP Vendor";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+        GPVendorMigrator: Codeunit "GP Vendor Migrator";
+        IsTemporaryVendor: Boolean;
+        HasOpenPurchaseOrders: Boolean;
+        HasOpenTransactions: Boolean;
+        VendorCount: Integer;
     begin
-        exit(GPVendor.Count());
+        if not GPCompanyAdditionalSettings.GetPayablesModuleEnabled() then
+            exit(0);
+
+        if GPVendor.FindSet() then
+            repeat
+                if GPVendorMigrator.ShouldMigrateVendor(GPVendor.VENDORID, IsTemporaryVendor, HasOpenPurchaseOrders, HasOpenTransactions) then
+                    VendorCount := VendorCount + 1;
+
+            until GPVendor.Next() = 0;
+
+        exit(VendorCount);
     end;
 
-    procedure RemoveEmptyGLTransactions();
+    procedure RemoveEmptyGLTransactions()
     var
         GPGLTransactions: Record "GP GLTransactions";
     begin
@@ -1275,10 +1065,171 @@ Codeunit 4037 "Helper Functions"
         GPGLTransactions.DeleteAll();
     end;
 
-    procedure PostGLTransactions();
+    procedure RaiseNotificationForUnpostedJournals()
+    var
+        HybridReplicationSummary: Record "Hybrid Replication Summary";
+        HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        UnpostedJournalLines: Notification;
+        UnpostedLines: Integer;
+    begin
+        UnpostedJournalLines.Id := '99b0853c-3c62-420a-8d7e-497b4133ada2';
+        UnpostedJournalLines.Recall();
+
+        if not HybridCloudManagement.GetLastReplicationSummary(HybridReplicationSummary) then
+            exit;
+
+        if not (HybridReplicationSummary.Status = HybridReplicationSummary.Status::Completed) then
+            exit;
+
+        UnpostedLines := GetUnpostedLines(GeneralTemplateNameTxt, PostingGroupCodeTxt + '*');
+        UnpostedLines += GetUnpostedLines(GeneralTemplateNameTxt, CustomerBatchNameTxt);
+        UnpostedLines += GetUnpostedLines(GeneralTemplateNameTxt, VendorBatchNameTxt);
+        UnpostedLines += GetUnpostedLines(GeneralTemplateNameTxt, BankBatchNameTxt);
+
+        if (UnpostedLines = 0) then
+            exit;
+
+        UnpostedJournalLines.Message := StrSubstNo(NotAllJournalLinesPostedMsg, UnpostedLines);
+        UnpostedJournalLines.Scope := NotificationScope::LocalScope;
+        UnpostedJournalLines.Send();
+    end;
+
+    local procedure GetUnpostedLines(TemplateName: Text; BatchNameFilter: text): Integer
+    var
+        GenJournalBatch: Record "Gen. Journal Batch";
+        GenJournalLine: Record "Gen. Journal Line";
+        UnpostedLines: Integer;
+    begin
+        GenJournalBatch.SetRange("Journal Template Name", TemplateName);
+        GenJournalBatch.SetFilter(Name, BatchNameFilter);
+        if GenJournalBatch.FindSet() then
+            repeat
+                GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                GenJournalLine.SetRange("Journal Batch Name", BatchNameFilter);
+                if not GenJournalLine.IsEmpty() then
+                    UnpostedLines += GenJournalLine.Count();
+            until GenJournalBatch.Next() = 0;
+
+        exit(UnpostedLines);
+    end;
+
+    local procedure GetGLBatchCountWithUnpostedLinesForCompany(CompanyNameTxt: Text; TemplateName: Text; BatchNameFilter: text): Integer
+    var
+        GenJournalBatch: Record "Gen. Journal Batch";
+        GenJournalLine: Record "Gen. Journal Line";
+        UnpostedBatchCount: Integer;
+    begin
+        if not GenJournalBatch.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        if not GenJournalLine.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        GenJournalBatch.SetRange("Journal Template Name", TemplateName);
+        GenJournalBatch.SetFilter(Name, BatchNameFilter);
+        if GenJournalBatch.FindSet() then
+            repeat
+                GenJournalLine.SetRange("Journal Template Name", GenJournalBatch."Journal Template Name");
+                GenJournalLine.SetRange("Journal Batch Name", GenJournalBatch.Name);
+                if not GenJournalLine.IsEmpty() then
+                    UnpostedBatchCount := UnpostedBatchCount + 1;
+            until GenJournalBatch.Next() = 0;
+
+        exit(UnpostedBatchCount);
+    end;
+
+    local procedure GetItemBatchCountWithUnpostedLinesForCompany(CompanyNameTxt: Text): Integer
+    var
+        ItemJournalBatch: Record "Item Journal Batch";
+        ItemJournalLine: Record "Item Journal Line";
+        UnpostedBatchCount: Integer;
+    begin
+        if not ItemJournalBatch.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        if not ItemJournalLine.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        ItemJournalBatch.SetFilter(Name, 'GPITM*');
+        if ItemJournalBatch.FindSet() then
+            repeat
+                ItemJournalLine.SetRange("Journal Batch Name", ItemJournalBatch.Name);
+                if not ItemJournalLine.IsEmpty() then
+                    UnpostedBatchCount += UnpostedBatchCount + 1;
+            until ItemJournalBatch.Next() = 0;
+
+        exit(UnpostedBatchCount);
+    end;
+
+    local procedure GetStatisticalBatchCountWithUnpostedLinesForCompany(CompanyNameTxt: Text): Integer
+    var
+        StatisticalAccJournalBatch: Record "Statistical Acc. Journal Batch";
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+        UnpostedBatchCount: Integer;
+    begin
+        if not StatisticalAccJournalBatch.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        if not StatisticalAccJournalLine.ChangeCompany(CompanyNameTxt) then
+            exit;
+
+        StatisticalAccJournalBatch.SetFilter(Name, 'GP*');
+        if StatisticalAccJournalBatch.FindSet() then
+            repeat
+                StatisticalAccJournalLine.SetRange("Journal Batch Name", StatisticalAccJournalBatch.Name);
+                if not StatisticalAccJournalLine.IsEmpty() then
+                    UnpostedBatchCount += UnpostedBatchCount + 1;
+            until StatisticalAccJournalBatch.Next() = 0;
+
+        exit(UnpostedBatchCount);
+    end;
+
+    internal procedure GetUnpostedBatchCountForCompany(CompanyNameTxt: Text; var TotalGLBatchCount: Integer; var TotalStatisticalBatchCount: Integer; var TotalItemBatchCount: Integer)
+    var
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+    begin
+        TotalGLBatchCount := 0;
+        TotalStatisticalBatchCount := 0;
+        TotalItemBatchCount := 0;
+
+        if not HybridCompanyStatus.Get(CompanyNameTxt) then
+            exit;
+
+        if not (HybridCompanyStatus."Upgrade Status" = HybridCompanyStatus."Upgrade Status"::Completed) then
+            exit;
+
+
+        if not GPCompanyAdditionalSettings.Get(CompanyNameTxt) then
+            exit;
+
+        if not GPCompanyAdditionalSettings."Skip Posting Account Batches" then begin
+            TotalGLBatchCount := GetGLBatchCountWithUnpostedLinesForCompany(CompanyNameTxt, GeneralTemplateNameTxt, PostingGroupCodeTxt + '*');
+            TotalStatisticalBatchCount := GetStatisticalBatchCountWithUnpostedLinesForCompany(CompanyNameTxt);
+        end;
+
+        if not GPCompanyAdditionalSettings."Skip Posting Customer Batches" then
+            TotalGLBatchCount += GetGLBatchCountWithUnpostedLinesForCompany(CompanyNameTxt, GeneralTemplateNameTxt, CustomerBatchNameTxt);
+
+        if not GPCompanyAdditionalSettings."Skip Posting Vendor Batches" then
+            TotalGLBatchCount += GetGLBatchCountWithUnpostedLinesForCompany(CompanyNameTxt, GeneralTemplateNameTxt, VendorBatchNameTxt);
+
+        if not GPCompanyAdditionalSettings."Skip Posting Bank Batches" then
+            TotalGLBatchCount += GetGLBatchCountWithUnpostedLinesForCompany(CompanyNameTxt, GeneralTemplateNameTxt, BankBatchNameTxt);
+
+        if not GPCompanyAdditionalSettings."Skip Posting Item Batches" then
+            TotalItemBatchCount := GetItemBatchCountWithUnpostedLinesForCompany(CompanyNameTxt);
+    end;
+
+    procedure PostGLTransactions()
     var
         GenJournalLine: Record "Gen. Journal Line";
         GenJournalBatch: Record "Gen. Journal Batch";
+        ItemJournalLine: Record "Item Journal Line";
+        ItemJournalBatch: Record "Item Journal Batch";
+        StatisticalAccJournalBatch: Record "Statistical Acc. Journal Batch";
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
         JournalBatchName: Text;
         DurationAsInt: BigInteger;
         StartTime: DateTime;
@@ -1288,58 +1239,88 @@ Codeunit 4037 "Helper Functions"
         StartTime := CurrentDateTime();
         Session.LogMessage('00007GJ', 'Posting GL transactions started.', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
 
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipAllPosting();
         OnSkipPostingGLAccounts(SkipPosting);
         if SkipPosting then
             exit;
 
+        // Item batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingItemBatches();
+        OnSkipPostingItemBatches(SkipPosting);
+        if not SkipPosting then
+            if ItemJournalBatch.FindSet() then
+                repeat
+                    ItemJournalLine.SetRange("Journal Template Name", ItemJournalBatch."Journal Template Name");
+                    ItemJournalLine.SetRange("Journal Batch Name", ItemJournalBatch.Name);
+                    ItemJournalLine.SetFilter("Item No.", '<>%1', '');
+                    if not ItemJournalLine.IsEmpty() then
+                        SafePostItemBatch(ItemJournalBatch);
+                until ItemJournalBatch.Next() = 0;
+
+        // Account batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingAccountBatches();
         OnSkipPostingAccountBatches(SkipPosting);
         if not SkipPosting then begin
-            // Post the Account batches
+            // GL
             GenJournalBatch.Reset();
             GenJournalBatch.SetRange("Journal Template Name", GeneralTemplateNameTxt);
             GenJournalBatch.SetFilter(Name, PostingGroupCodeTxt + '*');
             if GenJournalBatch.FindSet() then
                 repeat
-                    JournalBatchName := GenJournalBatch.Name;
-                    GenJournalLine.Reset();
-                    GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-                    GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
-                    if not GenJournalLine.IsEmpty() then
-                        PostGLBatch(CopyStr(JournalBatchName, 1, 10));
+                    if (GenJournalBatch.Name <> CustomerBatchNameTxt) and (GenJournalBatch.Name <> VendorBatchNameTxt) and (GenJournalBatch.Name <> BankBatchNameTxt) then begin
+                        JournalBatchName := GenJournalBatch.Name;
+                        GenJournalLine.Reset();
+                        GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                        GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+                        if not GenJournalLine.IsEmpty() then
+                            SafePostGLBatch(CopyStr(JournalBatchName, 1, 10));
+                    end;
                 until GenJournalBatch.Next() = 0;
+
+            // Statistical
+            StatisticalAccJournalBatch.SetFilter(Name, PostingGroupCodeTxt + '*');
+            if StatisticalAccJournalBatch.FindSet() then
+                repeat
+                    StatisticalAccJournalLine.SetRange("Journal Batch Name", StatisticalAccJournalBatch.Name);
+                    if not StatisticalAccJournalLine.IsEmpty() then
+                        SafePostStatisticalAccBatch(StatisticalAccJournalBatch.Name);
+                until StatisticalAccJournalBatch.Next() = 0;
         end;
 
+        // Customer batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingCustomerBatches();
         OnSkipPostingCustomerBatches(SkipPosting);
         if not SkipPosting then begin
-            // Post the Customer Batch, if created...
             JournalBatchName := CustomerBatchNameTxt;
             GenJournalLine.Reset();
             GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
             GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
             if not GenJournalLine.IsEmpty() then
-                PostGLBatch(CopyStr(JournalBatchName, 1, 10));
+                SafePostGLBatch(CopyStr(JournalBatchName, 1, 10));
         end;
 
+        // Vendor batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingVendorBatches();
         OnSkipPostingVendorBatches(SkipPosting);
         if not SkipPosting then begin
-            // Post the Vendor Batch, if created...
             JournalBatchName := VendorBatchNameTxt;
             GenJournalLine.Reset();
             GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
             GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
             if not GenJournalLine.IsEmpty() then
-                PostGLBatch(CopyStr(JournalBatchName, 1, 10));
+                SafePostGLBatch(CopyStr(JournalBatchName, 1, 10));
         end;
 
+        // Bank batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingBankBatches();
         OnSkipPostingBankBatches(SkipPosting);
         if not SkipPosting then begin
-            // Post the Bank Batch, if created...
             JournalBatchName := BankBatchNameTxt;
             GenJournalLine.Reset();
             GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
             GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
             if not GenJournalLine.IsEmpty() then
-                PostGLBatch(CopyStr(JournalBatchName, 1, 10));
+                SafePostGLBatch(CopyStr(JournalBatchName, 1, 10));
         end;
 
         // Remove posted batches
@@ -1348,6 +1329,8 @@ Codeunit 4037 "Helper Functions"
         Session.LogMessage('00007GK', StrSubstNo(FinishedTelemetryTxt, DurationAsInt), Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
     end;
 
+#if not CLEAN25
+    [Obsolete('This procedure will be soon removed.', '25.0')]
     procedure PostGLBatch(JournalBatchName: Code[10])
     var
         GenJournalLine: Record "Gen. Journal Line";
@@ -1373,70 +1356,214 @@ Codeunit 4037 "Helper Functions"
             if GenJournalLine.FindFirst() then
                 codeunit.Run(codeunit::"Gen. Jnl.-Post Batch", GenJournalLine);
     end;
+#endif
+
+    local procedure SafePostGLBatch(JournalBatchName: Code[10])
+    var
+        GenJournalLine: Record "Gen. Journal Line";
+    begin
+        GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+        GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+        if GenJournalLine.FindFirst() then begin
+            // Commit is required to safely handle errors that may occur during posting.
+            Commit();
+            if not Codeunit.Run(Codeunit::"Gen. Jnl.-Post Batch", GenJournalLine) then
+                LogWarningAndClearLastError(JournalBatchName);
+        end;
+    end;
+
+#if not CLEAN25
+    [Obsolete('This procedure will be soon removed.', '25.0')]
+    procedure PostStatisticalAccBatch(JournalBatchName: Code[10])
+    var
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+    begin
+        StatisticalAccJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+        if StatisticalAccJournalLine.FindFirst() then
+            Codeunit.Run(Codeunit::"Stat. Acc. Post. Batch", StatisticalAccJournalLine);
+    end;
+#endif
+
+    local procedure SafePostStatisticalAccBatch(JournalBatchName: Code[10])
+    var
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+    begin
+        StatisticalAccJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+        if StatisticalAccJournalLine.FindFirst() then begin
+            // Commit is required to safely handle errors that may occur during posting.
+            Commit();
+            if not Codeunit.Run(Codeunit::"Stat. Acc. Post. Batch", StatisticalAccJournalLine) then
+                LogWarningAndClearLastError(JournalBatchName);
+        end;
+    end;
+
+    local procedure SafePostItemBatch(ItemJournalBatch: Record "Item Journal Batch")
+    var
+        ItemJournalLine: Record "Item Journal Line";
+    begin
+        ItemJournalLine.SetRange("Journal Template Name", ItemJournalBatch."Journal Template Name");
+        ItemJournalLine.SetRange("Journal Batch Name", ItemJournalBatch.Name);
+        if ItemJournalLine.FindFirst() then begin
+            // Commit is required to safely handle errors that may occur during posting.
+            Commit();
+            if not Codeunit.Run(Codeunit::"Item Jnl.-Post Batch", ItemJournalLine) then
+                LogWarningAndClearLastError(ItemJournalBatch.Name);
+        end;
+    end;
+
+    internal procedure LogWarningAndClearLastError(ContextValue: Text[50])
+    var
+        GPMigrationWarnings: Record "GP Migration Warnings";
+        WarningText: Text[500];
+    begin
+        WarningText := CopyStr(GetLastErrorText(false), 1, MaxStrLen(WarningText));
+        GPMigrationWarnings.InsertWarning(MigrationLogAreaBatchPostingTxt, ContextValue, WarningText);
+        ClearLastError();
+    end;
+
+    local procedure GLBatchHasLines(TemplateName: Code[10]; BatchName: Code[10]; AccountType: Enum "Gen. Journal Account Type"): Boolean
+    var
+        GenJournalLine: Record "Gen. Journal Line";
+    begin
+        GenJournalLine.SetRange("Journal Template Name", TemplateName);
+        GenJournalLine.SetRange("Journal Batch Name", BatchName);
+        GenJournalLine.SetRange("Account Type", AccountType);
+        GenJournalLine.SetFilter("Account No.", '<>%1', '');
+        exit(not GenJournalLine.IsEmpty());
+    end;
+
+    local procedure StatisticalBatchHasLines(BatchName: Code[10]): Boolean
+    var
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+    begin
+        StatisticalAccJournalLine.SetRange("Journal Batch Name", BatchName);
+        StatisticalAccJournalLine.SetFilter("Statistical Account No.", '<>%1', '');
+        exit(not StatisticalAccJournalLine.IsEmpty());
+    end;
 
     procedure RemoveBatches();
     var
         GenJournalLine: Record "Gen. Journal Line";
         GenJournalBatch: Record "Gen. Journal Batch";
-        JournalBatchName: Text;
+        ItemJournalBatch: Record "Item Journal Batch";
+        ItemJournalLine: Record "Item Journal Line";
+        StatisticalAccJournalBatch: Record "Statistical Acc. Journal Batch";
+        StatisticalAccJournalLine: Record "Statistical Acc. Journal Line";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+        JournalBatchName: Code[10];
+        SkipPosting: Boolean;
     begin
-        // GL Batches
-        GenJournalBatch.Reset();
-        GenJournalBatch.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-        if GenJournalBatch.FindSet() then
-            repeat
-                if strpos(GenJournalBatch.Name, PostingGroupCodeTxt) = 1 then begin
-                    GenJournalLine.Reset();
-                    GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-                    GenJournalLine.SetRange("Journal Batch Name", GenJournalBatch.Name);
-                    GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::"G/L Account");
-                    GenJournalLine.SetRange("Account No.", '');
-                    If GenJournalLine.Count() = 1 then begin
-                        GenJournalLine.DeleteAll();
-                        GenJournalBatch.Delete();
-                    end else
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipAllPosting();
+        OnSkipPostingGLAccounts(SkipPosting);
+        if SkipPosting then
+            exit;
+
+        // Account batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingAccountBatches();
+        OnSkipPostingAccountBatches(SkipPosting);
+        if not SkipPosting then begin
+            // GL
+            GenJournalBatch.Reset();
+            GenJournalBatch.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+            if GenJournalBatch.FindSet() then
+                repeat
+                    if StrPos(GenJournalBatch.Name, PostingGroupCodeTxt) = 1 then
+                        if (GenJournalBatch.Name <> CustomerBatchNameTxt) and (GenJournalBatch.Name <> VendorBatchNameTxt) and (GenJournalBatch.Name <> BankBatchNameTxt) then
+                            if not GLBatchHasLines(GeneralTemplateNameTxt, GenJournalBatch.Name, GenJournalLine."Account Type"::"G/L Account") then begin
+                                GenJournalLine.Reset();
+                                GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                                GenJournalLine.SetRange("Journal Batch Name", GenJournalBatch.Name);
+                                GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::"G/L Account");
+                                GenJournalLine.SetRange("Account No.", '');
+                                if GenJournalLine.Count() <= 1 then begin
+                                    GenJournalLine.DeleteAll();
+                                    GenJournalBatch.Delete();
+                                end
+                            end;
+                until GenJournalBatch.Next() = 0;
+
+            // Statistical
+            if StatisticalAccJournalBatch.FindSet() then
+                repeat
+                    if StrPos(StatisticalAccJournalBatch.Name, PostingGroupCodeTxt) = 1 then
+                        if not StatisticalBatchHasLines(StatisticalAccJournalBatch.Name) then begin
+                            StatisticalAccJournalLine.SetRange("Journal Batch Name", StatisticalAccJournalBatch.Name);
+                            if StatisticalAccJournalLine.Count() <= 1 then begin
+                                StatisticalAccJournalLine.DeleteAll();
+                                StatisticalAccJournalBatch.Delete();
+                            end;
+                        end;
+                until StatisticalAccJournalBatch.Next() = 0;
+        end;
+
+        // Customer batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingCustomerBatches();
+        OnSkipPostingCustomerBatches(SkipPosting);
+        if not SkipPosting then begin
+            JournalBatchName := CustomerBatchNameTxt;
+            if not GLBatchHasLines(GeneralTemplateNameTxt, JournalBatchName, GenJournalLine."Account Type"::Customer) then begin
+                GenJournalLine.Reset();
+                GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+                GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::Customer);
+                GenJournalLine.SetRange("Account No.", '');
+                if GenJournalLine.Count() <= 1 then begin
+                    GenJournalLine.DeleteAll();
+                    if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
                         GenJournalBatch.Delete();
                 end;
-            until GenJournalBatch.Next() = 0;
-
-
-        // Customer Batch
-        JournalBatchName := CustomerBatchNameTxt;
-        GenJournalLine.Reset();
-        GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-        GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
-        GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::Customer);
-        GenJournalLine.SetRange("Account No.", '');
-        If GenJournalLine.Count() = 1 then begin
-            GenJournalLine.DeleteAll();
-            if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
-                GenJournalBatch.Delete();
+            end;
         end;
 
-        // Vendor Batch
-        JournalBatchName := VendorBatchNameTxt;
-        GenJournalLine.Reset();
-        GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-        GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
-        GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::Vendor);
-        GenJournalLine.SetRange("Account No.", '');
-        If GenJournalLine.Count() = 1 then begin
-            GenJournalLine.DeleteAll();
-            if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
-                GenJournalBatch.Delete();
+        // Vendor batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingVendorBatches();
+        OnSkipPostingVendorBatches(SkipPosting);
+        if not SkipPosting then begin
+            JournalBatchName := VendorBatchNameTxt;
+            if not GLBatchHasLines(GeneralTemplateNameTxt, JournalBatchName, GenJournalLine."Account Type"::Vendor) then begin
+                GenJournalLine.Reset();
+                GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+                GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::Vendor);
+                GenJournalLine.SetRange("Account No.", '');
+                if GenJournalLine.Count() <= 1 then begin
+                    GenJournalLine.DeleteAll();
+                    if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
+                        GenJournalBatch.Delete();
+                end;
+            end;
         end;
 
-        // Bank Batch
-        JournalBatchName := BankBatchNameTxt;
-        GenJournalLine.Reset();
-        GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
-        GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
-        GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::"Bank Account");
-        If GenJournalLine.Count() = 1 then begin
-            GenJournalLine.DeleteAll();
-            if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
-                GenJournalBatch.Delete();
+        // Bank batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingBankBatches();
+        OnSkipPostingBankBatches(SkipPosting);
+        if not SkipPosting then begin
+            JournalBatchName := BankBatchNameTxt;
+            if not GLBatchHasLines(GeneralTemplateNameTxt, JournalBatchName, GenJournalLine."Account Type"::"Bank Account") then begin
+                GenJournalLine.Reset();
+                GenJournalLine.SetRange("Journal Template Name", GeneralTemplateNameTxt);
+                GenJournalLine.SetRange("Journal Batch Name", JournalBatchName);
+                GenJournalLine.SetRange("Account Type", GenJournalLine."Account Type"::"Bank Account");
+                if GenJournalLine.Count() <= 1 then begin
+                    GenJournalLine.DeleteAll();
+                    if GenJournalBatch.Get(GeneralTemplateNameTxt, JournalBatchName) then
+                        GenJournalBatch.Delete();
+                end;
+            end;
         end;
+
+        // Item batches
+        SkipPosting := GPCompanyAdditionalSettings.GetSkipPostingItemBatches();
+        OnSkipPostingItemBatches(SkipPosting);
+        if not SkipPosting then
+            if ItemJournalBatch.FindSet() then
+                repeat
+                    ItemJournalLine.SetRange("Journal Template Name", ItemJournalBatch."Journal Template Name");
+                    ItemJournalLine.SetRange("Journal Batch Name", ItemJournalBatch.Name);
+                    ItemJournalLine.SetFilter("Item No.", '<>%1', '');
+                    if ItemJournalLine.IsEmpty() then
+                        ItemJournalBatch.Delete();
+                until ItemJournalBatch.Next() = 0;
     end;
 
     procedure SetGlobalDimensions(GlobalDim1: Code[20]; GlobalDim2: Code[20])
@@ -1534,24 +1661,6 @@ Codeunit 4037 "Helper Functions"
             GLSetup.Modify();
     end;
 
-    local procedure ResetGLDimensionSetup()
-    var
-        GLSetup: Record "General Ledger Setup";
-    begin
-        GLSetup.Get();
-        GLSetup."Global Dimension 1 Code" := '';
-        GLSetup."Global Dimension 2 Code" := '';
-        GLSetup."Shortcut Dimension 1 Code" := '';
-        GLSetup."Shortcut Dimension 2 Code" := '';
-        GLSetup."Shortcut Dimension 3 Code" := '';
-        GLSetup."Shortcut Dimension 4 Code" := '';
-        GLSetup."Shortcut Dimension 5 Code" := '';
-        GLSetup."Shortcut Dimension 6 Code" := '';
-        GLSetup."Shortcut Dimension 7 Code" := '';
-        GLSetup."Shortcut Dimension 8 Code" := '';
-        GLSetup.Modify();
-    end;
-
     local procedure GetGlobalDimensionNo(DimensionCode: Code[20]): Integer
     var
         GeneralLedgerSetup: Record "General Ledger Setup";
@@ -1583,10 +1692,12 @@ Codeunit 4037 "Helper Functions"
     var
         GPSegments: Record "GP Segments";
         Dimension: Record Dimension;
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
         DimCode: Code[20];
     begin
         if GPSegments.FindSet() then begin
             repeat
+                DataMigrationErrorLogging.SetLastRecordUnderProcessing(Format(GPSegments.RecordId()));
                 DimCode := CheckDimensionName(GPSegments.Id);
                 if not Dimension.Get(DimCode) then begin
                     Dimension.Init();
@@ -1609,46 +1720,57 @@ Codeunit 4037 "Helper Functions"
     var
         GPPaymentTerms: Record "GP Payment Terms";
         PaymentTerms: Record "Payment Terms";
+        GPMigrationWarnings: Record "GP Migration Warnings";
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
         DueDateCalculation: DateFormula;
         DiscountDateCalculation: DateFormula;
         SeedValue: integer;
         PaymentTerm: Text[10];
         DueDateCalculationText: Text[50];
         DiscountDateCalculationText: Text[50];
+        LogMigrationArea: Text[50];
+        IsPaymentTermHandled: Boolean;
     begin
+        LogMigrationArea := 'Payment Terms';
         SeedValue := 0;
         if GPPaymentTerms.FindSet() then begin
             repeat
-                if StrLen(DelChr(GPPaymentTerms.PYMTRMID, '>', ' ')) > 10 then begin
-                    PaymentTerm := GeneratePaymentTerm(SeedValue, GPPaymentTerms.PYMTRMID);
-                    PaymentTerms.Validate(Code, PaymentTerm);
-                    SeedValue := SeedValue + 1;
+                DataMigrationErrorLogging.SetLastRecordUnderProcessing(Format(GPPaymentTerms.RecordId()));
+                IsPaymentTermHandled := false;
+                OnHandlePaymentTerm(GPPaymentTerms, IsPaymentTermHandled);
+                if not IsPaymentTermHandled then begin
+                    if StrLen(DelChr(GPPaymentTerms.PYMTRMID, '>', ' ')) > 10 then begin
+                        PaymentTerm := GeneratePaymentTerm(SeedValue, GPPaymentTerms.PYMTRMID);
+                        PaymentTerms.Validate(Code, PaymentTerm);
+                        SeedValue := SeedValue + 1;
+                    end else
+                        PaymentTerm := CopyStr(DelChr(GPPaymentTerms.PYMTRMID, '>', ' '), 1, 10);
+
+                    if not PaymentTerms.Get(PaymentTerm) then begin
+                        PaymentTerms.Init();
+                        PaymentTerms.Validate(Code, PaymentTerm);
+                        PaymentTerms.Validate(Description, DelChr(GPPaymentTerms.PYMTRMID, '>', ' '));
+                        PaymentTerms.Validate("Discount %", (GPPaymentTerms.DSCPCTAM / 100));
+
+                        DiscountDateCalculationText := CalculateDiscountDateFormula(GPPaymentTerms);
+                        Evaluate(DiscountDateCalculation, DiscountDateCalculationText);
+                        PaymentTerms.Validate("Discount Date Calculation", DiscountDateCalculation);
+
+                        if GPPaymentTerms.CalculateDateFrom = GPPaymentTerms.CalculateDateFrom::"Transaction Date" then
+                            DueDateCalculationText := CalculateDueDateFormula(GPPaymentTerms, false, '')
+                        else
+                            DueDateCalculationText := CalculateDueDateFormula(GPPaymentTerms, true, copystr(DiscountDateCalculationText, 1, 32));
+
+                        Evaluate(DueDateCalculation, DueDateCalculationText);
+                        PaymentTerms.Validate("Due Date Calculation", DueDateCalculation);
+
+                        PaymentTerms.Insert(true);
+
+                        GPPaymentTerms.PYMTRMID_New := PaymentTerm;
+                        GPPaymentTerms.Modify();
+                    end;
                 end else
-                    PaymentTerm := CopyStr(DelChr(GPPaymentTerms.PYMTRMID, '>', ' '), 1, 10);
-
-                if not PaymentTerms.Get(PaymentTerm) then begin
-                    PaymentTerms.Init();
-                    PaymentTerms.Validate(Code, PaymentTerm);
-                    PaymentTerms.Validate(Description, DelChr(GPPaymentTerms.PYMTRMID, '>', ' '));
-                    PaymentTerms.Validate("Discount %", (GPPaymentTerms.DSCPCTAM / 100));
-
-                    DiscountDateCalculationText := CalculateDiscountDateFormula(GPPaymentTerms);
-                    Evaluate(DiscountDateCalculation, DiscountDateCalculationText);
-                    PaymentTerms.Validate("Discount Date Calculation", DiscountDateCalculation);
-
-                    if GPPaymentTerms.CalculateDateFrom = GPPaymentTerms.CalculateDateFrom::"Transaction Date" then
-                        DueDateCalculationText := CalculateDueDateFormula(GPPaymentTerms, false, '')
-                    else
-                        DueDateCalculationText := CalculateDueDateFormula(GPPaymentTerms, true, copystr(DiscountDateCalculationText, 1, 32));
-
-                    Evaluate(DueDateCalculation, DueDateCalculationText);
-                    PaymentTerms.Validate("Due Date Calculation", DueDateCalculation);
-
-                    PaymentTerms.Insert(true);
-
-                    GPPaymentTerms.PYMTRMID_New := PaymentTerm;
-                    GPPaymentTerms.Modify();
-                end;
+                    GPMigrationWarnings.InsertWarning(LogMigrationArea, PaymentTerm, 'Payment Term ' + GPPaymentTerms.PYMTRMID + ' was handled.');
             until GPPaymentTerms.Next() = 0;
 
             SeedValue := 0;
@@ -1664,9 +1786,11 @@ Codeunit 4037 "Helper Functions"
     var
         GPItemLocation: Record "GP Item Location";
         Location: Record Location;
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
     begin
         if GPItemLocation.FindSet() then
             repeat
+                DataMigrationErrorLogging.SetLastRecordUnderProcessing(Format(GPItemLocation.RecordId()));
                 Location.Init();
                 Location.Code := Text.CopyStr(GPItemLocation.LOCNCODE, 1, 10);
                 Location.Name := GPItemLocation.LOCNDSCR;
@@ -1740,9 +1864,9 @@ Codeunit 4037 "Helper Functions"
 
     local procedure CreateOpenPOsImp()
     var
-        GPPOPPOHeader: Record "GP POPPOHeader";
+        GPPOMigrator: Codeunit "GP PO Migrator";
     begin
-        GPPOPPOHeader.MoveStagingData();
+        GPPOMigrator.MigratePOStagingData();
         Session.LogMessage('0000CQP', 'Created Open Purchase Orders', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
         SetOpenPurchaseOrdersCreated();
     end;
@@ -1766,20 +1890,12 @@ Codeunit 4037 "Helper Functions"
     end;
 
     local procedure CreateVendorClassesImp()
-    var
-        GPVendorMigrator: CodeUnit "GP Vendor Migrator";
     begin
-        GPVendorMigrator.MigrateVendorClasses();
-        Session.LogMessage('', 'Created Vendor Classes', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
         SetVendorClassesCreated();
     end;
 
     local procedure CreateCustomerClassesImp()
-    var
-        GPCustomerMigrator: CodeUnit "GP Customer Migrator";
     begin
-        GPCustomerMigrator.MigrateCustomerClasses();
-        Session.LogMessage('', 'Created Customer Classes', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
         SetCustomerClassesCreated();
     end;
 
@@ -1853,13 +1969,6 @@ Codeunit 4037 "Helper Functions"
         GPConfiguration.Modify();
     end;
 
-    local procedure SetPreMigrationCleanupCompleted()
-    begin
-        GPConfiguration.GetSingleInstance();
-        GPConfiguration."PreMigration Cleanup Completed" := true;
-        GPConfiguration.Modify();
-    end;
-
     local procedure DimensionsCreated(): Boolean
     begin
         GPConfiguration.GetSingleInstance();
@@ -1920,11 +2029,16 @@ Codeunit 4037 "Helper Functions"
         exit(GPConfiguration."Customer Classes Created");
     end;
 
+#if not CLEAN24
+    [Obsolete('Cleaning up tables before running the migration is no longer wanted.', '24.0')]
     procedure PreMigrationCleanupCompleted(): Boolean
     begin
         GPConfiguration.GetSingleInstance();
+#pragma warning disable AL0432        
         exit(GPConfiguration."PreMigration Cleanup Completed");
+#pragma warning restore AL0432
     end;
+#endif
 
     procedure GetLastError()
     begin
@@ -1934,6 +2048,8 @@ Codeunit 4037 "Helper Functions"
     end;
 
     procedure CreatePreMigrationData(): Boolean
+    var
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
     begin
         CreateDimensions();
         if not DimensionsCreated() then
@@ -1943,38 +2059,51 @@ Codeunit 4037 "Helper Functions"
         if not PaymentTermsCreated() then
             exit(false);
 
-        CreateItemTrackingCodes();
-        if not ItemTrackingCodesCreated() then
-            exit(false);
+        if GPCompanyAdditionalSettings.GetInventoryModuleEnabled() then begin
+            CreateItemTrackingCodes();
+            if not ItemTrackingCodesCreated() then
+                exit(false);
 
-        CreateLocations();
-        if not LocationsCreated() then
-            exit(false);
+            CreateLocations();
+            if not LocationsCreated() then
+                exit(false);
+        end;
 
         exit(true)
     end;
 
     procedure CreatePostMigrationData(): Boolean
+    var
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
     begin
         // this procedure might run multiple times depending upon migration errors.
 
-        if not FiscalPeriodsCreated() then
-            CreateFiscalPeriods();
+        if GPCompanyAdditionalSettings.GetGLModuleEnabled() then
+            if not FiscalPeriodsCreated() then
+                CreateFiscalPeriods();
 
-        if not CheckBooksCreated() then
-            CreateCheckbooks();
+        if GPCompanyAdditionalSettings.GetBankModuleEnabled() then
+            if not CheckBooksCreated() then
+                CreateCheckbooks();
 
-        if not OpenPurchaseOrdersCreated() then
-            CreateOpenPOs();
+        if GPCompanyAdditionalSettings.GetMigrateOpenPOs() then
+            if not OpenPurchaseOrdersCreated() then
+                CreateOpenPOs();
 
-        if not VendorEFTBankAccountsCreated() then
-            CreateVendorEFTBankAccounts();
+        if GPCompanyAdditionalSettings.GetPayablesModuleEnabled() then
+            if not VendorEFTBankAccountsCreated() then
+                CreateVendorEFTBankAccounts();
 
-        if not VendorClassesCreated() then
-            CreateVendorClasses();
+        if GPCompanyAdditionalSettings.GetMigrateVendorClasses() then
+            if not VendorClassesCreated() then
+                CreateVendorClasses();
 
-        if not CustomerClassesCreated() then
-            CreateCustomerClasses();
+        if GPCompanyAdditionalSettings.GetMigrateCustomerClasses() then
+            if not CustomerClassesCreated() then
+                CreateCustomerClasses();
+
+        if GPCompanyAdditionalSettings.GetMigrateKitItems() then
+            CreateKitItems();
 
         exit(GPConfiguration.IsAllPostMigrationDataCreated());
     end;
@@ -1982,10 +2111,6 @@ Codeunit 4037 "Helper Functions"
     procedure CheckMigrationStatus()
     begin
         GPConfiguration.GetSingleInstance();
-        if not GPConfiguration."PreMigration Cleanup Completed" then begin
-            CreateDataMigrationErrorRecord('PreMigration cleanup not completed.');
-            exit;
-        end;
 
         if not GPConfiguration."Dimensions Created" then
             CreateDataMigrationErrorRecord('Dimensions not created.');
@@ -1997,6 +2122,149 @@ Codeunit 4037 "Helper Functions"
             CreateDataMigrationErrorRecord('Item Tracking Codes not created');
         if not GPConfiguration."Locations Created" then
             CreateDataMigrationErrorRecord('Locations not created.');
+    end;
+
+    local procedure CreateDataMigrationErrorRecord(ErrorMessage: Text[250])
+    var
+        DataMigrationError: Record "Data Migration Error";
+    begin
+        DataMigrationError.Init();
+        DataMigrationError."Migration Type" := MigrationTypeTxt;
+        DataMigrationError."Scheduled For Retry" := false;
+        DataMigrationError."Error Message" := ErrorMessage;
+        DataMigrationError.Insert();
+    end;
+
+    procedure CleanGPPhoneOrFaxNumber(InValue: Text[30]) OutValue: Text[21]
+    begin
+        OutValue := CopyStr(InValue, 1, 21);
+
+        if (CopyStr(InValue, 1, 14) = '00000000000000') then
+            OutValue := '';
+
+        exit(OutValue);
+    end;
+
+    procedure ContainsAlphaChars(InValue: Text[30]): Boolean
+    var
+        NextChar: Char;
+        I: Integer;
+    begin
+        for I := 1 to StrLen(InValue) do begin
+            NextChar := InValue[I];
+            if ((NextChar >= 65) and (NextChar <= 90)) or       // A-Z
+                ((NextChar >= 97) and (NextChar <= 122)) then   // a-z
+                exit(true);
+        end;
+
+        exit(false);
+    end;
+
+    procedure GetGPAccountNumberByIndex(GPAccountIndex: Integer): Code[20]
+    var
+        GPAccount: Record "GP Account";
+    begin
+        if (GPAccountIndex > 0) then
+            if GPAccount.Get(GPAccountIndex) then
+                exit(CopyStr(GPAccount.AcctNum.Trim(), 1, 20));
+
+        exit('');
+    end;
+
+    procedure EnsureAccountHasGenProdPostingAccount(AccountNumber: Code[20])
+    var
+        GLAccount: Record "G/L Account";
+    begin
+        if GLAccount.Get(AccountNumber) then
+            // Ensure the GLAccount has a Gen. Prod. Posting Group.
+            if GLAccount."Gen. Prod. Posting Group" = '' then begin
+                GLAccount."Gen. Prod. Posting Group" := PostingGroupCodeTxt;
+                GLAccount.Modify(true);
+            end;
+    end;
+
+    procedure CreateCurrencyIfNeeded(CurrencyCode: Code[10])
+    var
+        Currency: Record Currency;
+        GPMC40200: Record "GP MC40200";
+    begin
+        if CurrencyCode = '' then
+            exit;
+
+        if not GPMC40200.Get(CurrencyCode) then
+            exit;
+
+        if Currency.Get(CurrencyCode) then
+            exit;
+
+        Currency.Validate("Symbol", GPMC40200.CRNCYSYM);
+        Currency.Validate("Code", CurrencyCode);
+        Currency.Validate("Description", CopyStr(GPMC40200.CRNCYDSC, 1, 30));
+        Currency.Validate("Invoice Rounding Type", Currency."Invoice Rounding Type"::Nearest);
+        Currency.Insert(true);
+    end;
+
+    procedure StringEqualsCaseInsensitive(Text1: Text; Text2: Text): Boolean
+    begin
+        exit(UpperCase(Text1) = UpperCase(Text2));
+    end;
+
+    internal procedure CheckAndLogErrors()
+    var
+        LastError: Text;
+    begin
+        LastError := GetLastErrorText(false);
+        if LastError = '' then
+            exit;
+
+        LogError(LastError);
+        Commit();
+    end;
+
+    local procedure LogError(LastErrorMessage: Text)
+    var
+        ExistingDataMigrationError: Record "Data Migration Error";
+        DataMigrationError: Record "Data Migration Error";
+        DataMigrationErrorLogging: Codeunit "Data Migration Error Logging";
+    begin
+        if LastErrorMessage = '' then
+            exit;
+
+        if ExistingDataMigrationError.FindLast() then;
+        DataMigrationError.Id := ExistingDataMigrationError.Id + 1;
+        DataMigrationError.Insert();
+        DataMigrationError."Last Record Under Processing" := CopyStr(DataMigrationErrorLogging.GetLastRecordUnderProcessing(), 1, MaxStrLen(DataMigrationError."Last Record Under Processing"));
+        DataMigrationError.SetLastRecordUnderProcessingLog(DataMigrationErrorLogging.GetFullListOfLastRecordsUnderProcessingAsText());
+
+        DataMigrationError."Error Message" := CopyStr(LastErrorMessage, 1, MaxStrLen(DataMigrationError."Error Message"));
+        DataMigrationError."Migration Type" := GetMigrationTypeTxt();
+
+        DataMigrationError.SetFullExceptionMessage(GetLastErrorText());
+        DataMigrationError.SetExceptionCallStack(GetLastErrorCallStack());
+
+        DataMigrationErrorLogging.ClearLastRecordUnderProcessing();
+    end;
+
+    internal procedure ShouldMigrateItem(ItemNo: Text): Boolean
+    var
+        GPIV00101: Record "GP IV00101";
+        GPCompanyAdditionalSettings: Record "GP Company Additional Settings";
+    begin
+        if GPIV00101.Get(ItemNo) then begin
+            if not GPCompanyAdditionalSettings.GetMigrateKitItems() then
+                if GPIV00101.ITEMTYPE = 3 then
+                    exit(false);
+
+            if GPIV00101.INACTIVE then
+                if not GPCompanyAdditionalSettings.GetMigrateInactiveItems() then
+                    exit(false);
+
+            if GPIV00101.IsDiscontinued() then
+                if not GPCompanyAdditionalSettings.GetMigrateDiscontinuedItems() then
+                    exit(false);
+        end;
+
+        exit(true);
     end;
 
     [IntegrationEvent(false, false)]
@@ -2024,48 +2292,13 @@ Codeunit 4037 "Helper Functions"
     begin
     end;
 
-    local procedure CreateDataMigrationErrorRecord(ErrorMessage: Text[250])
-    var
-        DataMigrationError: Record "Data Migration Error";
+    [IntegrationEvent(false, false)]
+    local procedure OnSkipPostingItemBatches(var SkipPosting: Boolean)
     begin
-        DataMigrationError.Init();
-        DataMigrationError."Migration Type" := MigrationTypeTxt;
-        DataMigrationError."Scheduled For Retry" := false;
-        DataMigrationError."Error Message" := ErrorMessage;
-        DataMigrationError.Insert();
     end;
 
-    procedure CleanGPPhoneOrFaxNumber(InValue: Text[30]) OutValue: Text[21]
+    [IntegrationEvent(false, false)]
+    local procedure OnHandlePaymentTerm(GPPaymentTerms: Record "GP Payment Terms"; var IsPaymentTermHandled: Boolean)
     begin
-        OutValue := CopyStr(InValue, 1, 21);
-
-        if (CopyStr(InValue, 1, 14) = '00000000000000') then
-            OutValue := '';
-
-        exit(OutValue);
-    end;
-
-    procedure GetGPAccountNumberByIndex(GPAccountIndex: Integer): Code[20]
-    var
-        GPAccount: Record "GP Account";
-    begin
-        if (GPAccountIndex > 0) then
-            if GPAccount.Get(GPAccountIndex) then
-                exit(CopyStr(GPAccount.AcctNum, 1, 20));
-
-        exit('');
-    end;
-
-    procedure EnsureAccountHasGenProdPostingAccount(AccountNumber: Code[20])
-    var
-        GLAccount: Record "G/L Account";
-    begin
-        if GLAccount.Get(AccountNumber) then begin
-            // Ensure the GLAccount has a Gen. Prod. Posting Group.
-            if GLAccount."Gen. Prod. Posting Group" = '' then begin
-                GLAccount."Gen. Prod. Posting Group" := PostingGroupCodeTxt;
-                GLAccount.Modify(true);
-            end;
-        end;
     end;
 }

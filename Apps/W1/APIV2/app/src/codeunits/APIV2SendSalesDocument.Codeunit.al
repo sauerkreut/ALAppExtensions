@@ -1,3 +1,13 @@
+namespace Microsoft.API.V2;
+
+using Microsoft.Foundation.Reporting;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.History;
+using Microsoft.Sales.Document;
+using Microsoft.Utilities;
+using System.Threading;
+using System.Email;
+
 codeunit 30038 "APIV2 - Send Sales Document"
 {
     TableNo = "Job Queue Entry";
@@ -14,6 +24,8 @@ codeunit 30038 "APIV2 - Send Sales Document"
         CancelationEmailSubjectTxt: Label 'Your %1 has been cancelled.', Comment = '%1 - document type';
         CancelationEmailBodyTxt: Label 'Thank you for your business. Your %1 has been cancelled.', Comment = '%1 - document type';
         GreetingTxt: Label 'Hello %1,', Comment = '%1 - customer name';
+        ThereIsNothingToSellInvoiceErr: Label 'Please add at least one line item to the invoice.';
+        ThereIsNothingToSellQuoteErr: Label 'Please add at least one line item to the estimate.';
 
     [Scope('Cloud')]
     procedure SendCreditMemo(var SalesCrMemoHeader: Record "Sales Cr.Memo Header")
@@ -30,6 +42,18 @@ codeunit 30038 "APIV2 - Send Sales Document"
         if SalesHeader."Document Type" <> SalesHeader."Document Type"::Quote then
             exit;
         SendDocument(SalesHeader);
+    end;
+
+    [Scope('Cloud')]
+    procedure CheckDocumentIfNoItemsExists(SalesHeader: Record "Sales Header")
+    begin
+        if not SalesHeader.SalesLinesExist() then
+            case SalesHeader."Document Type" of
+                SalesHeader."Document Type"::Invoice:
+                    Error(ThereIsNothingToSellInvoiceErr);
+                else
+                    Error(ThereIsNothingToSellQuoteErr);
+            end;
     end;
 
     local procedure SendCancelledCreditMemoInBackground(var SalesCrMemoHeader: Record "Sales Cr.Memo Header")

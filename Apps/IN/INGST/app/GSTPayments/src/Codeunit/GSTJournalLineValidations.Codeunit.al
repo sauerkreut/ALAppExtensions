@@ -1,3 +1,23 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Payments;
+
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.TaxBase;
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.FixedAssets.FixedAsset;
+using Microsoft.Foundation.Company;
+using Microsoft.Inventory.Location;
+using Microsoft.Purchases.Setup;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Setup;
+
 codeunit 18244 "GST Journal Line Validations"
 {
     var
@@ -1165,9 +1185,15 @@ codeunit 18244 "GST Journal Line Validations"
             exit;
         end;
 
-        if GenJournalLine."Location State Code" = GenJournalLine.State then
-            GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Intrastate
-        else
-            GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Interstate;
+        if GenJournalLine.State = '' then begin
+            if GenJournalLine."Location State Code" <> GenJournalLine."GST Bill-to/BuyFrom State Code" then
+                GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Interstate
+            else
+                GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Intrastate;
+        end else
+            if GenJournalLine."Location State Code" = GenJournalLine.State then
+                GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Intrastate
+            else
+                GenJournalLine."GST Jurisdiction Type" := GenJournalLine."GST Jurisdiction Type"::Interstate;
     end;
 }

@@ -1,19 +1,33 @@
-// ------------------------------------------------------------------------------------------------
+﻿// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
+
+namespace Microsoft.Bank.Payment;
+
+using Microsoft.Bank.BankAccount;
+using Microsoft.Bank.Setup;
+using Microsoft.Finance.Currency;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Foundation.Company;
+using Microsoft.Purchases.Payables;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Receivables;
+using System.IO;
 
 codeunit 13653 PaymentExportManagement
 {
     var
         PaymentExportMgt: Codeunit "Payment Export Mgt";
-        PaymentTypeShouldBeErr: Label '%1 should be %2 in %3.';
-        PaymentTypeShouldNotBeErr: Label '%1 should not be %2 in %3.';
+        PaymentTypeShouldBeErr: Label '%1 should be %2 in %3.', Comment = '%1 = Payment Type Validation Field Caption; %2 = International Enum Value; %3 = Payment Method Table Caption';
+        PaymentTypeShouldNotBeErr: Label '%1 should not be %2 in %3.', Comment = '%1 = Payment Type Validation Field Caption; %2 = International Enum Value; %3 = Payment Method Table Caption';
         MustBeVendorPmtErr: Label 'The selected export format only supports vendor payments.';
         WrongCreditorCurrencyErr: Label '%1 for one or more %2 is incorrect. You can only use %3.', Comment = '%1=Field;%2=Table;%3=Value';
         WrongTransferCurrencyErr: Label '%1 for one or more %2 is incorrect. You can only use %3 or %4.', Comment = '%1=Field;%2=Table;%3=Value;%4=Value';
 
-        FieldIsNotEmptyErr: Label '%1 must have a value';
+        FieldIsNotEmptyErr: Label '%1 must have a value', Comment = '%1 = Payment Reference Field Caption';
         SimultaneousPaymentDetailsErr: Label '%1 and %2 cannot be used simultaneously for payments.', Comment = '%1=Field;%2=Field';
 
     //cod1206

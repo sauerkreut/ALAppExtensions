@@ -7,6 +7,11 @@
 /// This table holds the individual archive headers.
 /// Data from each table is stored in "Data Archive Table"
 /// </summary>
+
+namespace System.DataAdministration;
+
+using System.Security.AccessControl;
+
 table 600 "Data Archive"
 {
     Access = Public;
@@ -34,7 +39,9 @@ table 600 "Data Archive"
             FieldClass = FlowField;
             CalcFormula = count("Data Archive Table" where("Data Archive Entry No." = field("Entry No.")));
         }
+#pragma warning disable AA0232
         field(8; "No. of Records"; Integer)
+#pragma warning restore AA0232
         {
             Caption = 'No. of Records';
             FieldClass = FlowField;

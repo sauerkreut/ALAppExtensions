@@ -1,3 +1,9 @@
+namespace Microsoft.API.V1;
+
+using System.Environment;
+using System.Apps;
+using Microsoft.API;
+
 page 20006 "APIV1 - Aut. Extension Upload"
 {
     APIGroup = 'automation';
@@ -20,7 +26,13 @@ page 20006 "APIV1 - Aut. Extension Upload"
         {
             repeater(Group)
             {
-                field(content; Content)
+                field(id; Rec.Id)
+                {
+                    Caption = 'id', Locked = true;
+                }
+#pragma warning disable AL0273
+                field(content; Rec.Content)
+#pragma warning restore
                 {
                     Caption = 'content', Locked = true;
                 }
@@ -34,11 +46,11 @@ page 20006 "APIV1 - Aut. Extension Upload"
 
     trigger OnFindRecord(Which: Text): Boolean
     begin
-        IF NOT loaded THEN BEGIN
-            INSERT(true);
-            loaded := TRUE;
-        END;
-        EXIT(TRUE);
+        if not loaded then begin
+            Rec.Insert(true);
+            loaded := true;
+        end;
+        exit(true);
     end;
 
     trigger OnOpenPage()
@@ -49,11 +61,11 @@ page 20006 "APIV1 - Aut. Extension Upload"
     trigger OnModifyRecord(): Boolean
     var
         ExtensionManagement: Codeunit "Extension Management";
-        FileStream: InStream;
+        FileInStream: InStream;
     begin
-        IF Content.HasValue() THEN begin
-            Content.CreateInStream(FileStream);
-            ExtensionManagement.UploadExtension(FileStream, GLOBALLANGUAGE());
+        if Rec.Content.HasValue() then begin
+            Rec.Content.CreateInStream(FileInStream);
+            ExtensionManagement.UploadExtension(FileInStream, GLOBALLANGUAGE());
         end;
     end;
 
@@ -61,5 +73,6 @@ page 20006 "APIV1 - Aut. Extension Upload"
         AutomationAPIManagement: Codeunit "Automation - API Management";
         loaded: Boolean;
 }
+
 
 

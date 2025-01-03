@@ -1,3 +1,11 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.TDS.TDSBase;
+
+using Microsoft.Finance.TaxEngine.JsonExchange;
+
 codeunit 18690 "TDS Tax Engine Setup"
 {
 
@@ -114,6 +122,7 @@ codeunit 18690 "TDS Tax Engine Setup"
         CaseList.Add('{08737F79-35F1-4670-BD1D-E41764E3A9DE}');
         CaseList.Add('{f8bf58d9-7681-458d-9dfc-71ea23a9f853}');
         CaseList.Add('{1abe2c56-9700-4a30-a14a-5e8ecc2f32dd}');
+        CaseList.Add('{b8a33720-278b-45b4-8465-2d9fa273d813}');
     end;
 
     local procedure GetConfig(CaseID: Guid; var Handled: Boolean): Text
@@ -148,6 +157,7 @@ codeunit 18690 "TDS Tax Engine Setup"
         "{08737F79-35F1-4670-BD1D-E41764E3A9DE}Lbl": Label 'TDS Use Cases';
         "{f8bf58d9-7681-458d-9dfc-71ea23a9f853}Lbl": Label 'TDS Use Cases';
         "{1abe2c56-9700-4a30-a14a-5e8ecc2f32dd}Lbl": Label 'TDS Use Cases';
+        "{b8a33720-278b-45b4-8465-2d9fa273d813}Lbl": Label 'TDS Use Cases';
     begin
         Handled := true;
 
@@ -212,6 +222,8 @@ codeunit 18690 "TDS Tax Engine Setup"
                 exit("{f8bf58d9-7681-458d-9dfc-71ea23a9f853}Lbl");
             '{1abe2c56-9700-4a30-a14a-5e8ecc2f32dd}':
                 exit("{1abe2c56-9700-4a30-a14a-5e8ecc2f32dd}Lbl");
+            '{b8a33720-278b-45b4-8465-2d9fa273d813}':
+                exit("{b8a33720-278b-45b4-8465-2d9fa273d813}Lbl");
         end;
 
         Handled := false;

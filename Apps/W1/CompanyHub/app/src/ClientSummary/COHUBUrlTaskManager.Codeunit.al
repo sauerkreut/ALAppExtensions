@@ -1,3 +1,7 @@
+namespace Mirosoft.Integration.CompanyHub;
+
+using System.Telemetry;
+
 codeunit 1154 "COHUB Url Task Manager"
 {
     TableNo = "COHUB Enviroment";
@@ -22,6 +26,8 @@ codeunit 1154 "COHUB Url Task Manager"
     procedure FetchCompanies(var COHUBEnviroment: Record "COHUB Enviroment"): Boolean
     var
         COHUBAPIRequest: Codeunit "COHUB API Request";
+        COHUBCore: Codeunit "COHUB Core";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
         CouldNotFetchCompaniesNotification: Notification;
         CompanyJsonObject: JsonObject;
         CompanyJsonArray: JsonArray;
@@ -38,6 +44,9 @@ codeunit 1154 "COHUB Url Task Manager"
         CompanyUrl: Text;
         EvaluationCompanyPropNameValue: Boolean;
     begin
+        FeatureTelemetry.LogUptake('0000IFJ', COHUBCore.GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::Used);
+        FeatureTelemetry.LogUsage('0000IFK', COHUBCore.GetFeatureTelemetryName(), 'Fetching Companies');
+
         if COHUBEnviroment.Link = '' then
             exit(false);
 
@@ -77,7 +86,7 @@ codeunit 1154 "COHUB Url Task Manager"
                 CouldNotFetchCompaniesNotification.Id := GetCouldNotFetchCompaniesGuid();
                 CouldNotFetchCompaniesNotification.Recall();
                 CouldNotFetchCompaniesNotification.Message(CouldNotFetchCompaniesNotificationMsg);
-                CouldNotFetchCompaniesNotification.Scope := NotificationScope::GlobalScope;
+                CouldNotFetchCompaniesNotification.Scope := NotificationScope::LocalScope;
                 CouldNotFetchCompaniesNotification.Send();
             end;
 

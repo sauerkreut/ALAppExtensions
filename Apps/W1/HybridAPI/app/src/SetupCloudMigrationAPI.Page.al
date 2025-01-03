@@ -1,3 +1,8 @@
+namespace Microsoft.DataMigration.API;
+
+using Microsoft.DataMigration;
+using System.Telemetry;
+
 page 40023 "Setup Cloud Migration API"
 {
     PageType = API;
@@ -82,7 +87,10 @@ page 40023 "Setup Cloud Migration API"
     var
         TempHybridProductType: Record "Hybrid Product Type" temporary;
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
+        FeatureTelemetry.LogUsage('0000JML', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Setup started');
+
         if HybridCloudManagement.CheckNeedsApprovalToRunCloudMigration() then
             Error(DelegatedAdminSetupErr);
 
@@ -100,15 +108,16 @@ page 40023 "Setup Cloud Migration API"
     var
         TempHybridProductType: Record "Hybrid Product Type" temporary;
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
         ShowSettingsStep: Boolean;
     begin
-        // TODO: Need verification event on GP
         HybridCloudManagement.OnGetHybridProductType(TempHybridProductType);
         if not TempHybridProductType.Get(Rec."Product ID") then
             Error(WrongProductIdErr);
 
         HybridCloudManagement.OnBeforeShowProductSpecificSettingsPageStep(TempHybridProductType, ShowSettingsStep);
         HybridCloudManagement.FinishCloudMigrationSetup(Rec);
+        FeatureTelemetry.LogUsage('0000JMM', HybridCloudManagement.GetFeatureTelemetryName(), 'Cloud migration API Setup done');
     end;
 
     local procedure SetActionResponse(var ActionContext: WebServiceActionContext; PageId: Integer; RunId: Guid; KeyFieldNo: Integer)

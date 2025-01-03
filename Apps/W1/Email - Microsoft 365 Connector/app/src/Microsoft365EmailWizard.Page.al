@@ -3,6 +3,8 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 
+namespace System.Email;
+
 /// <summary>
 /// Displays an account that is being registered via the Microsoft 365 connector.
 /// </summary>
@@ -23,7 +25,7 @@ page 4504 "Microsoft 365 Email Wizard"
             group(Header)
             {
                 ShowCaption = false;
-                InstructionalText = 'Enter the email address of your shared mailbox in the Microsoft 365 admin center.';
+                InstructionalText = 'Enter the email address of your mailbox in the Microsoft 365 admin center.';
 
                 field(LearnMoreAboutSharedAccount; LearnMoreTok)
                 {
@@ -44,7 +46,7 @@ page 4504 "Microsoft 365 Email Wizard"
             {
                 ApplicationArea = All;
                 Caption = 'Account Name';
-                ToolTip = 'The name of the account.';
+                ToolTip = 'Specifies the name of the account.';
                 ShowMandatory = true;
                 NotBlank = true;
 
@@ -128,7 +130,7 @@ page 4504 "Microsoft 365 Email Wizard"
         LearnMoreTok: Label 'Learn more';
         LearnMorePermissionsTok: Label 'Learn more about shared mailboxes permissions';
         SharedMailboxesURLTxt: Label 'https://go.microsoft.com/fwlink/?linkid=2139305';
-        SharedMailboxesPermissionsURLTxt: Label 'https://docs.microsoft.com/en-us/exchange/collaboration-exo/shared-mailboxes#which-permissions-should-you-use';
+        SharedMailboxesPermissionsURLTxt: Label 'https://go.microsoft.com/fwlink/?linkid=2206606';
 
     trigger OnOpenPage()
     begin

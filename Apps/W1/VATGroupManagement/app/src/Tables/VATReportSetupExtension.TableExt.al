@@ -1,3 +1,13 @@
+// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.VAT.Group;
+
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.VAT.Reporting;
+
 tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
 {
 
@@ -26,7 +36,21 @@ tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
             Caption = 'Group Representative API URL';
             ExtendedDatatype = URL;
         }
+#if not CLEANSCHEMA25
+#pragma warning disable AL0432
+#pragma warning disable AS0105
         field(4704; "Authentication Type"; Enum "VAT Group Authentication Type OnPrem")
+#pragma warning restore
+#pragma warning restore AS0105
+        {
+            DataClassification = CustomerContent;
+            Caption = 'Authentication Type';
+            ObsoleteReason = 'Replaced by field "VAT Group Authentication Type" as the value Enum is being renamed.';
+            ObsoleteTag = '25.0';
+            ObsoleteState = Removed;
+        }
+#endif
+        field(4719; "VAT Group Authentication Type"; Enum "VAT Group Auth Type OnPrem")
         {
             DataClassification = CustomerContent;
             Caption = 'Authentication Type';
@@ -82,6 +106,7 @@ tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
         {
             DataClassification = SystemMetadata;
             Caption = 'Group Representative Uses Business Central Online';
+            InitValue = true;
         }
         field(4714; "Group Settlement Account"; Code[20])
         {
@@ -115,7 +140,7 @@ tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
 
     [Scope('OnPrem')]
     [NonDebuggable]
-    procedure SetSecret(SecretKey: Guid; ClientSecretText: Text): Guid
+    procedure SetSecret(SecretKey: Guid; ClientSecretText: SecretText): Guid
     var
         NewSecretKey: Guid;
     begin
@@ -124,7 +149,7 @@ tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
 
         NewSecretKey := CreateGuid();
 
-        if (not EncryptionEnabled() or (StrLen(ClientSecretText) > 215)) then
+        if (not EncryptionEnabled() or (StrLen(ClientSecretText.Unwrap()) > 215)) then
             IsolatedStorage.Set(NewSecretKey, ClientSecretText, DataScope::Company)
         else
             IsolatedStorage.SetEncrypted(NewSecretKey, ClientSecretText, DataScope::Company);
@@ -132,11 +157,26 @@ tableextension 4701 "VAT Report Setup Extension" extends "VAT Report Setup"
         exit(NewSecretKey);
     end;
 
+#if not CLEAN24
     [Scope('OnPrem')]
     [NonDebuggable]
+    [Obsolete('Use "GetSecretAsSecretText instead.', '24.0')]
     procedure GetSecret(SecretKey: Guid): Text
     var
         ClientSecretText: Text;
+    begin
+        if not IsNullGuid(SecretKey) then
+            if not GetSecretAsSecretText(SecretKey).IsEmpty() then
+                ClientSecretText := GetSecretAsSecretText(SecretKey).Unwrap();
+
+        exit(ClientSecretText);
+    end;
+#endif
+
+    [Scope('OnPrem')]
+    procedure GetSecretAsSecretText(SecretKey: Guid): SecretText
+    var
+        ClientSecretText: SecretText;
     begin
         if not IsNullGuid(SecretKey) then
             if not IsolatedStorage.Get(SecretKey, DataScope::Company, ClientSecretText) then;

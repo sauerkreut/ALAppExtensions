@@ -2,6 +2,15 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
+namespace Microsoft.Bank.Deposit;
+
+using System.Telemetry;
+using Microsoft.Sales.Setup;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Foundation.AuditCodes;
+using Microsoft.Foundation.NoSeries;
+using Microsoft.Foundation.Reporting;
+
 codeunit 1697 "Setup Bank Deposit Reports"
 {
     local procedure IsSetupCompleted(): Boolean
@@ -18,10 +27,13 @@ codeunit 1697 "Setup Bank Deposit Reports"
     end;
 
     internal procedure InsertSetupData()
+    var
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
         if IsSetupCompleted() then
             exit;
 
+        FeatureTelemetry.LogUptake('0000IG6', 'Bank Deposit', Enum::"Feature Uptake Status"::"Set up");
         SetupNumberSeries();
         SetupJournalTemplateAndBatch();
         SetupReportSelections();
@@ -108,17 +120,17 @@ codeunit 1697 "Setup Bank Deposit Reports"
 
     procedure InitBaseSeries(var SeriesCode: Code[20]; "Code": Code[20]; Description: Text[100]; "Starting No.": Code[20]; "Ending No.": Code[20]; "Last Number Used": Code[20]; "Warning at No.": Code[20]; "Increment-by No.": Integer)
     begin
-        InitBaseSeries(SeriesCode, "Code", Description, "Starting No.", "Ending No.", "Last Number Used", "Warning at No.", "Increment-by No.", false);
+        InitBaseSeries(SeriesCode, "Code", Description, "Starting No.", "Ending No.", "Last Number Used", "Warning at No.", "Increment-by No.", Enum::"No. Series Implementation"::Normal);
     end;
 
-    internal procedure InitBaseSeries(var SeriesCode: Code[20]; "Code": Code[20]; Description: Text[100]; "Starting No.": Code[20]; "Ending No.": Code[20]; "Last Number Used": Code[20]; "Warning at No.": Code[20]; "Increment-by No.": Integer; "Allow Gaps": Boolean)
+    internal procedure InitBaseSeries(var SeriesCode: Code[20]; "Code": Code[20]; Description: Text[100]; "Starting No.": Code[20]; "Ending No.": Code[20]; "Last Number Used": Code[20]; "Warning at No.": Code[20]; "Increment-by No.": Integer; Implementation: Enum "No. Series Implementation")
     begin
         InsertSeries(
           SeriesCode, Code, Description,
-          "Starting No.", "Ending No.", "Last Number Used", "Warning at No.", "Increment-by No.", true, "Allow Gaps");
+          "Starting No.", "Ending No.", "Last Number Used", "Warning at No.", "Increment-by No.", true, Implementation);
     end;
 
-    local procedure InsertSeries(var SeriesCode: Code[20]; "Code": Code[20]; Description: Text[100]; "Starting No.": Code[20]; "Ending No.": Code[20]; "Last Number Used": Code[20]; "Warning No.": Code[20]; "Increment-by No.": Integer; "Manual Nos.": Boolean; "Allow Gaps": Boolean)
+    local procedure InsertSeries(var SeriesCode: Code[20]; "Code": Code[20]; Description: Text[100]; "Starting No.": Code[20]; "Ending No.": Code[20]; "Last Number Used": Code[20]; "Warning No.": Code[20]; "Increment-by No.": Integer; "Manual Nos.": Boolean; Implementation: Enum "No. Series Implementation")
     var
         NoSeries: Record "No. Series";
         NoSeriesLine: Record "No. Series Line";
@@ -141,7 +153,7 @@ codeunit 1697 "Setup Bank Deposit Reports"
         if "Warning No." <> '' then
             NoSeriesLine.Validate("Warning No.", "Warning No.");
         NoSeriesLine.Validate("Increment-by No.", "Increment-by No.");
-        NoSeriesLine.Validate("Allow Gaps in Nos.", "Allow Gaps");
+        NoSeriesLine.Validate(Implementation, Implementation);
         NoSeriesLine."Line No." := 10000;
         NoSeriesLine.Insert(true);
 
@@ -149,7 +161,7 @@ codeunit 1697 "Setup Bank Deposit Reports"
     end;
 
     var
-        BankDepositNoSeriesCodeTxt: Label 'BNKDEPOSIT', Locked = true;
+        BankDepositNoSeriesCodeTxt: Label 'BNKDEPOSIT';
         BankDepositJournalTemplateDescriptionTxt: Label 'Bank Deposit Journals';
         BankDepositJournalBatchDescriptionTxt: Label 'Bank Deposit Journal';
         BankDepositNoSeriesDescriptionTxt: Label 'Bank Deposit';

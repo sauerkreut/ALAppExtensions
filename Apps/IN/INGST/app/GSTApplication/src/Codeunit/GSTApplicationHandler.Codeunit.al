@@ -1,3 +1,34 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Application;
+
+using Microsoft.Finance.Dimension;
+using Microsoft.Finance.GeneralLedger.Journal;
+using Microsoft.Finance.GeneralLedger.Ledger;
+using Microsoft.Finance.GeneralLedger.Posting;
+using Microsoft.Finance.GeneralLedger.Preview;
+using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Finance.GST.Base;
+using Microsoft.Finance.GST.Subcontracting;
+using Microsoft.Finance.ReceivablesPayables;
+using Microsoft.FixedAssets.Depreciation;
+using Microsoft.FixedAssets.FixedAsset;
+using Microsoft.FixedAssets.Ledger;
+using Microsoft.Foundation.AuditCodes;
+using Microsoft.Inventory.Costing;
+using Microsoft.Inventory.Journal;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Posting;
+using Microsoft.Manufacturing.Document;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.Payables;
+using Microsoft.Purchases.Posting;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Receivables;
+
 codeunit 18430 "GST Application Handler"
 {
     var
@@ -64,7 +95,12 @@ codeunit 18430 "GST Application Handler"
         InvoiceGSTAmount: Decimal;
         InvoiceBase: Decimal;
         TotalTDSInclSHECessAmount: Decimal;
+        IsHandled: Boolean;
     begin
+        OnBeforePostGSTPurchaseApplication(GenJournalLine, CVLedgerEntryBuffer, OldCVLedgerEntryBuffer, AmountToApply, IsHandled);
+        if IsHandled then
+            exit;
+
         if AmountToApply = 0 then
             exit;
 
@@ -213,7 +249,12 @@ codeunit 18430 "GST Application Handler"
         SourceCodeSetup: Record "Source Code Setup";
         GSTApplicationBuffer: Record "GST Application Buffer";
         TransactionType: Enum "Detail Ledger Transaction Type";
+        IsHandled: Boolean;
     begin
+        OnBeforePostPurchaseGSTApplicationGL(GenJournalLine, PaymentDocNo, InvoiceNo, PaymentEntryNo, GSTGroupCode, IsHandled);
+        if IsHandled then
+            exit;
+
         SourceCodeSetup.Get();
         GSTApplicationBuffer.SetRange("Transaction Type", GSTApplicationBuffer."Transaction Type"::Purchase);
         GSTApplicationBuffer.SetRange("Account No.", GenJournalLine."Account No.");
@@ -222,6 +263,7 @@ codeunit 18430 "GST Application Handler"
         GSTApplicationBuffer.SetRange("Applied Doc. Type", GSTApplicationBuffer."Applied Doc. Type"::Invoice);
         GSTApplicationBuffer.SetRange("Applied Doc. No.", InvoiceNo);
         GSTApplicationBuffer.SetRange("GST Group Code", GSTGroupCode);
+        OnFindGSTApplicationBufferInPostPurchGSTApplicationGL(GSTApplicationBuffer, GenJournalLine);
         if GSTApplicationBuffer.FindSet() then
             repeat
                 UpdateApplyDetailedGSTLedgerEntryPurchTables(GenJournalLine, Invoiceno, PaymentEntryNo, GSTApplicationBuffer, SourceCodeSetup);
@@ -259,7 +301,12 @@ codeunit 18430 "GST Application Handler"
         AppliedBaseAmountInvoiceLCY: Decimal;
         AppliedAmountInvoiceLCY: Decimal;
         HigherInvoiceExchangeRate: Boolean;
+        IsHandled: Boolean;
     begin
+        OnBeforeUpdateApplyDetailedGSTLedgerEntryPurchTables(GenJournalLine, InvoiceNo, PaymentEntryNo, GSTApplicationBuffer, IsHandled);
+        if IsHandled then
+            exit;
+
         DetailedGSTLedgerEntry.SetCurrentKey("Transaction Type", "Source No.", "Document Type", "Document No.", "GST Group Code");
         DetailedGSTLedgerEntry.SetRange("Transaction Type", DetailedGSTLedgerEntry."Transaction Type"::Purchase);
         DetailedGSTLedgerEntry.SetRange("Source No.", GenJournalLine."Account No.");
@@ -274,6 +321,7 @@ codeunit 18430 "GST Application Handler"
         DetailedGSTLedgerEntry.SetRange("Entry Type", DetailedGSTLedgerEntry."Entry Type"::"Initial Entry");
         DetailedGSTLedgerEntry.SetRange("GST Component Code", GSTApplicationBuffer."GST Component Code");
         DetailedGSTLedgerEntry.SetRange("GST Exempted Goods", false);
+        OnFindDetailedGSTLedgerEntryInPurchGSTApplicationLoop(DetailedGSTLedgerEntry, GenJournalLine, GSTApplicationBuffer);
         if DetailedGSTLedgerEntry.FindSet() then begin
             RemainingBase := GSTApplicationBuffer."Applied Base Amount";
             RemainingAmount := GSTApplicationBuffer."Applied Amount";
@@ -306,16 +354,21 @@ codeunit 18430 "GST Application Handler"
                         GSTApplicationBufferToCheck.SetRange("Applied Doc. No.", GSTApplicationBuffer."Original Document No.");
                         GSTApplicationBufferToCheck.SetRange("GST Group Code", GSTApplicationBuffer."GST Group Code");
                         GSTApplicationBufferToCheck.SetRange("GST Component Code", GSTApplicationBuffer."GST Component Code");
+                        OnFindGSTApplicationBufferToCheck(GSTApplicationBufferToCheck, GSTApplicationBuffer, DetailedGSTLedgerEntry);
                         if GSTApplicationBufferToCheck.FindFirst() then
                             ApplicationRatio :=
                                 GSTApplicationBuffer."Total Base(LCY)" / Round(GSTApplicationBuffer."Amt to Apply" / GSTApplicationBufferToCheck."Currency Factor");
                     end;
+
+                    OnBeforeCalculateGSTPurchApplicationAmount(GSTApplicationBuffer, DetailedGSTLedgerEntry, ApplicableRemainingGSTAmount, ApplicationRatio, RemainingBase, RemainingAmount);
 
                     GSTApplicationLibrary.GetAppliedAmount(
                         Abs(RemainingBase),
                         Abs(RemainingAmount),
                         Abs(DetailedGSTLedgerEntry."Remaining Base Amount" * ApplicationRatio),
                         Abs(ApplicableRemainingGSTAmount * ApplicationRatio), AppliedBase, AppliedAmount);
+
+                    OnAfterCalculateGSTPurchApplicationAmount(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo, ApplicationRatio, RemainingBase, RemainingAmount);
 
                     CreateDetailedGSTApplicationEntry(
                         ApplyDetailedGSTLedgerEntry,
@@ -348,6 +401,8 @@ codeunit 18430 "GST Application Handler"
                         AppliedBaseAmountInvoiceLCY := Round(
                             Abs(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."Amt to Apply (Applied)" / GSTApplicationBuffer."Amt to Apply"));
                         AppliedAmountInvoiceLCY := Round(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."GST %" / 100);
+
+                        OnAfterCalculatePurchaseAppliedAmountInvoice(GSTApplicationBuffer, AppliedBaseAmountInvoiceLCY, AppliedAmountInvoiceLCY);
 
                         CreateDetailedGSTApplicationEntry(
                             ApplyDetailedGSTLedgerEntryNew,
@@ -433,7 +488,12 @@ codeunit 18430 "GST Application Handler"
         VendorLedgerEntry: Record "Vendor Ledger Entry";
         ApplyingVendorLedgerEntry: Record "Vendor Ledger Entry";
         TransactionType: Enum "Detail Ledger Transaction Type";
+        IsHandled: Boolean;
     begin
+        OnBeforePostGSTWithNormalPaymentOffline(GenJournalLine, AmountToApply, IsHandled);
+        if IsHandled then
+            exit;
+
         if not ApplyingVendorLedgerEntry.Get(OldCVLedgerEntryBuffer."Entry No.") then
             exit;
 
@@ -463,7 +523,7 @@ codeunit 18430 "GST Application Handler"
                         ApplyingVendorLedgerEntry."Vendor No.",
                         VendorLedgerEntry."Document No.",
                         ApplyingVendorLedgerEntry."Total TDS Including SHE CESS",
-                        OldCVLedgerEntryBuffer."Amount to Apply",
+                        AmountToApply,
                         VendorLedgerEntry."Original Currency Factor")
                     then
                         exit;
@@ -526,7 +586,12 @@ codeunit 18430 "GST Application Handler"
         ApplyingVendorLedgerEntry: Record "Vendor Ledger Entry";
         TransactionType: Enum "Detail Ledger Transaction Type";
         TotalTDSInclSHECessAmount: Decimal;
+        IsHandled: Boolean;
     begin
+        OnBeforePostGSTWithNormalPaymentOnline(GenJournalLine, AmountToApply, IsHandled);
+        if IsHandled then
+            exit;
+
         if not ApplyingVendorLedgerEntry.Get(OldCVLedgerEntryBuffer."Entry No.") then
             exit;
 
@@ -631,7 +696,12 @@ codeunit 18430 "GST Application Handler"
         AppliedBaseAmountInvoiceLCY: Decimal;
         AppliedAmountInvoiceLCY: Decimal;
         HigherInvoiceExchangeRate: Boolean;
+        IsHandled: Boolean;
     begin
+        OnBeforePostPurchGSTApplicationNormalPaymentGL(GenJournalLine, PaymentDocNo, InvoiceNo, RCMExempt, PaymentCurrencyFactor, PaymentOriginalAmountLCY, IsHandled);
+        if IsHandled then
+            exit;
+
         SourceCodeSetup.Get();
 
         GSTApplicationBuffer.SetRange("Transaction Type", GSTApplicationBuffer."Transaction Type"::Purchase);
@@ -640,6 +710,7 @@ codeunit 18430 "GST Application Handler"
         GSTApplicationBuffer.SetRange("Original Document No.", InvoiceNo);
         GSTApplicationBuffer.SetRange("Applied Doc. Type", GSTApplicationBuffer."Applied Doc. Type"::Payment);
         GSTApplicationBuffer.SetRange("Applied Doc. No.", PaymentDocNo);
+        OnFindGSTApplBufferLoopForPurchGSTApplNormalPaymentsGL(GSTApplicationBuffer, GenJournalLine);
         if GSTApplicationBuffer.FindSet() then
             repeat
                 DetailedGSTLedgerEntry.SetCurrentKey("Transaction Type", "Source No.", "Document Type", "Document No.", "GST Group Code");
@@ -651,6 +722,7 @@ codeunit 18430 "GST Application Handler"
                 DetailedGSTLedgerEntry.SetRange("Entry Type", DetailedGSTLedgerEntry."Entry Type"::"Initial Entry");
                 DetailedGSTLedgerEntry.SetRange("GST Component Code", GSTApplicationBuffer."GST Component Code");
                 DetailedGSTLedgerEntry.SetRange("GST Exempted Goods", false);
+                OnFindDetGSTLedgEntryLoopForPurchGSTApplNormalPaymentsGL(DetailedGSTLedgerEntry, GSTApplicationBuffer, GenJournalLine);
                 if DetailedGSTLedgerEntry.FindSet() then begin
                     RemainingBase := GSTApplicationBuffer."Applied Base Amount";
                     RemainingAmount := GSTApplicationBuffer."Applied Amount";
@@ -671,12 +743,17 @@ codeunit 18430 "GST Application Handler"
                             then
                                 ApplicationRatio := PaymentOriginalAmountLCY / Round(GSTApplicationBuffer."Amt to Apply" / GSTApplicationBuffer."Currency Factor");
 
+                            if DetailedGSTLedgerEntry."Reverse Charge" then
+                                ApplicationRatio := 1;
+
+                            OnBeforeCalculateGSTAppliedAmount(PaymentCurrencyFactor, DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo, ApplicationRatio, RemainingBase, RemainingAmount, AppliedBase, AppliedAmount);
                             GSTApplicationLibrary.GetAppliedAmount(
                                 Abs(RemainingBase),
                                 Abs(RemainingAmount),
                                 Abs(DetailedGSTLedgerEntry."Remaining Base Amount" * ApplicationRatio),
                                 Abs(DetailedGSTLedgerEntry."Remaining GST Amount" * ApplicationRatio), AppliedBase, AppliedAmount);
 
+                            OnAfterCalculateGSTApplicationAmount(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo, ApplicationRatio, RemainingBase, RemainingAmount);
                             CreateDetailedGSTApplicationEntry(
                                 ApplyDetailedGSTLedgerEntry,
                                 DetailedGSTLedgerEntry,
@@ -702,41 +779,43 @@ codeunit 18430 "GST Application Handler"
                                     Abs(GSTApplicationBuffer."Applied Base Amount") * AppliedBase;
                                 GSTApplicationBuffer.Modify();
 
-                                AppliedBaseAmountInvoiceLCY := Round(
-                                    Abs(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."Amt to Apply (Applied)" / GSTApplicationBuffer."Amt to Apply"));
-                                AppliedAmountInvoiceLCY := Round(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."GST %" / 100);
-                                CreateDetailedGSTApplicationEntry(
-                                    ApplyDetailedGSTLedgerEntryNew,
-                                    DetailedGSTLedgerEntry,
-                                    GenJournalLine,
-                                    InvoiceNo,
-                                    AppliedBaseAmountInvoiceLCY,
-                                    AppliedAmountInvoiceLCY);
+                                if (not ApplyDetailedGSTLedgerEntry."Reverse Charge") then begin
+                                    AppliedBaseAmountInvoiceLCY := Round(
+                                        Abs(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."Amt to Apply (Applied)" / GSTApplicationBuffer."Amt to Apply"));
+                                    AppliedAmountInvoiceLCY := Round(AppliedBaseAmountInvoiceLCY * GSTApplicationBuffer."GST %" / 100);
+                                    CreateDetailedGSTApplicationEntry(
+                                        ApplyDetailedGSTLedgerEntryNew,
+                                        DetailedGSTLedgerEntry,
+                                        GenJournalLine,
+                                        InvoiceNo,
+                                        AppliedBaseAmountInvoiceLCY,
+                                        AppliedAmountInvoiceLCY);
 
-                                ApplyDetailedGSTLedgerEntry."Forex Fluctuation" := true;
-                                ApplyDetailedGSTLedgerEntry."Payment Type" := ApplyDetailedGSTLedgerEntry."Payment Type"::Normal;
-                                ApplyDetailedGSTLedgerEntry.Quantity := 0;
+                                    ApplyDetailedGSTLedgerEntry."Forex Fluctuation" := true;
+                                    ApplyDetailedGSTLedgerEntry."Payment Type" := ApplyDetailedGSTLedgerEntry."Payment Type"::Normal;
+                                    ApplyDetailedGSTLedgerEntry.Quantity := 0;
 
-                                if ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment" then
-                                    ApplyDetailedGSTLedgerEntry."Amount Loaded on Item" := ApplyDetailedGSTLedgerEntry."GST Amount";
-
-                                if PaymentCurrencyFactor < DetailedGSTLedgerEntry."Currency Factor" then
                                     if ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment" then
-                                        ApplyDetailedGSTLedgerEntry."Liable to Pay" := true
-                                    else
-                                        if ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::Availment then begin
-                                            ApplyDetailedGSTLedgerEntry."Credit Availed" := true;
-                                            ApplyDetailedGSTLedgerEntry."Liable to Pay" := true;
-                                        end;
+                                        ApplyDetailedGSTLedgerEntry."Amount Loaded on Item" := ApplyDetailedGSTLedgerEntry."GST Amount";
 
-                                if (PaymentCurrencyFactor > DetailedGSTLedgerEntry."Currency Factor") and
-                                    (ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment")
-                                then
-                                    ApplyDetailedGSTLedgerEntry."Fluctuation Amt. Credit" := true;
+                                    if PaymentCurrencyFactor < DetailedGSTLedgerEntry."Currency Factor" then
+                                        if ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment" then
+                                            ApplyDetailedGSTLedgerEntry."Liable to Pay" := true
+                                        else
+                                            if ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::Availment then begin
+                                                ApplyDetailedGSTLedgerEntry."Credit Availed" := true;
+                                                ApplyDetailedGSTLedgerEntry."Liable to Pay" := true;
+                                            end;
 
-                                ApplyDetailedGSTLedgerEntryNew.Insert(true);
-                                CreateDetailedGSTApplicationEntryInfo(ApplyDetailedGSTLedgerEntryNew, DetailedGSTLedgerEntry, PaymentDocNo, false);
-                                FillGSTPostingBufferWithApplication(ApplyDetailedGSTLedgerEntryNew, true, HigherInvoiceExchangeRate);
+                                    if (PaymentCurrencyFactor > DetailedGSTLedgerEntry."Currency Factor") and
+                                        (ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment")
+                                    then
+                                        ApplyDetailedGSTLedgerEntry."Fluctuation Amt. Credit" := true;
+
+                                    ApplyDetailedGSTLedgerEntryNew.Insert(true);
+                                    CreateDetailedGSTApplicationEntryInfo(ApplyDetailedGSTLedgerEntryNew, DetailedGSTLedgerEntry, PaymentDocNo, false);
+                                    FillGSTPostingBufferWithApplication(ApplyDetailedGSTLedgerEntryNew, true, HigherInvoiceExchangeRate);
+                                end;
                             end;
 
                             GSTApplicationLibrary.GetApplicationDocTypeFromGSTDocumentType(DetailedGSTLedgerEntry."Application Doc. Type", ApplyDetailedGSTLedgerEntry."Document Type");
@@ -835,6 +914,8 @@ codeunit 18430 "GST Application Handler"
                     GSTGLAccountType::"Payable Account",
                     DetailedGSTLedgerEntryInfo."Location State Code",
                     GSTPostingBuffer."GST Component Code");
+
+            OnAfterGetCreditAccountAdvancePaymentGoods(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo, GSTPostingBuffer, AccountNo, BalanceAccountNo);
         end;
     end;
 
@@ -848,7 +929,12 @@ codeunit 18430 "GST Application Handler"
     var
         GeneralPostingSetup: Record "General Posting Setup";
         GSTGLAccountType: Enum "GST GL Account Type";
+        IsHandled: Boolean;
     begin
+        OnBeforeGetCreditAccountAdvancePaymentService(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo, GSTPostingBuffer, AccountNo, BalanceAccountNo, BalanceAccountNo2, IsHandled);
+        if IsHandled then
+            exit;
+
         if DetailedGSTLedgerEntry."Associated Enterprises" then begin
             AccountNo := GSTApplicationLibrary.GetGSTGLAccountNo(
                 GSTGLAccountType::"Receivable Account (Interim)",
@@ -1022,11 +1108,16 @@ codeunit 18430 "GST Application Handler"
         GeneralPostingSetup: Record "General Posting Setup";
         DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
         GSTGLAccountType: Enum "GST GL Account Type";
+        IsHandled: Boolean;
     begin
         Clear(AccountNo);
         Clear(AccountNo2);
         Clear(BalanceAccountNo);
         Clear(BalanceAccountNo2);
+
+        OnBeforeGetCreditAccountNormalPayment(DetailedGSTLedgerEntry, GSTPostingBuffer, AccountNo, AccountNo2, BalanceAccountNo, BalanceAccountNo2, RCMExempt, IsHandled);
+        if IsHandled then
+            exit;
         GSTApplicationLibrary.GetDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo);
 
         if GSTPostingBuffer.Availment then
@@ -1087,6 +1178,8 @@ codeunit 18430 "GST Application Handler"
                             GSTGLAccountType::"Payables Account (Interim)",
                             DetailedGSTLedgerEntryInfo."Location State Code",
                             GSTPostingBuffer."GST Component Code");
+
+                        OnAfterGetHigherExcRateGSTGLAccounts(GSTPostingBuffer, AccountNo, BalanceAccountNo);
                     end else begin
                         AccountNo := GSTApplicationLibrary.GetGSTGLAccountNo(
                             GSTGLAccountType::"Payable Account",
@@ -1097,6 +1190,8 @@ codeunit 18430 "GST Application Handler"
                             GSTGLAccountType::"Receivable Account",
                             DetailedGSTLedgerEntryInfo."Location State Code",
                             GSTPostingBuffer."GST Component Code");
+
+                        OnAfterGetLessExcRateGSTGLAccounts(GSTPostingBuffer, AccountNo, BalanceAccountNo);
                     end;
             end else
             case GSTPostingBuffer."Forex Fluctuation" of
@@ -1109,6 +1204,7 @@ codeunit 18430 "GST Application Handler"
                             if GSTPostingBuffer.Type in [GSTPostingBuffer.Type::"G/L Account", GSTPostingBuffer.Type::"Fixed Asset"] then
                                 AccountNo := GSTPostingBuffer."Account No.";
 
+                        OnAfterGetGLGSTPostingAccountNo(DetailedGSTLedgerEntryInfo, GSTPostingBuffer, AccountNo);
                         BalanceAccountNo := GSTApplicationLibrary.GetGSTGLAccountNo(
                             GSTGLAccountType::"Payables Account (Interim)",
                             DetailedGSTLedgerEntryInfo."Location State Code",
@@ -1125,6 +1221,7 @@ codeunit 18430 "GST Application Handler"
                             DetailedGSTLedgerEntryInfo."Location State Code",
                             GSTPostingBuffer."GST Component Code");
 
+                        OnAfterGetGSTGLAccountNoForLowerExchRate(DetailedGSTLedgerEntryInfo, GSTPostingBuffer, AccountNo);
                         if GSTPostingBuffer.Type = GSTPostingBuffer.Type::Item then begin
                             GeneralPostingSetup.Get(GSTPostingBuffer."Gen. Bus. Posting Group", GSTPostingBuffer."Gen. Prod. Posting Group");
                             BalanceAccountNo := GeneralPostingSetup."Purch. Account";
@@ -1132,6 +1229,7 @@ codeunit 18430 "GST Application Handler"
                             if GSTPostingBuffer.Type in [GSTPostingBuffer.Type::"G/L Account", GSTPostingBuffer.Type::"Fixed Asset"] then
                                 BalanceAccountNo := GSTPostingBuffer."Account No.";
 
+                        OnAfterGetGSTGLBalAccountNoForLowerExchRate(DetailedGSTLedgerEntryInfo, GSTPostingBuffer, BalanceAccountNo);
                         if GSTPostingBuffer.Type = GSTPostingBuffer.Type::Item then
                             PostRevaluationEntry(GSTPostingBuffer, DetailedGSTLedgerEntry."Document No.", false, false)
                         else
@@ -1308,7 +1406,7 @@ codeunit 18430 "GST Application Handler"
                         ApplyingCustLedgEntry,
                         CustLedgerEntry,
                         AmountToApply,
-                        CVLedgerEntryBuffer."Remaining Amt. (LCY)",
+                        OldCVLedgerEntryBuffer."Remaining Amt. (LCY)",
                         InvoiceGSTAmount,
                         AppliedGSTAmount,
                         InvoiceAmount)
@@ -1317,7 +1415,7 @@ codeunit 18430 "GST Application Handler"
                         ApplyingCustLedgEntry,
                         CustLedgerEntry,
                         AmountToApply,
-                        CVLedgerEntryBuffer."Remaining Amt. (LCY)",
+                        OldCVLedgerEntryBuffer."Remaining Amt. (LCY)",
                         InvoiceGSTAmount,
                         AppliedGSTAmount,
                         InvoiceAmount);
@@ -1494,7 +1592,12 @@ codeunit 18430 "GST Application Handler"
         AppliedAmount: Decimal;
         RemainingBase: Decimal;
         RemainingAmount: Decimal;
+        IsHandled: Boolean;
     begin
+        OnBeforeUpdateApplyDetailedGSTLedgerEntryTables(GenJournalLine, InvoiceNo, EntryNo, GSTApplicationBuffer, IsHandled);
+        if IsHandled then
+            exit;
+
         DetailedGSTLedgerEntry.SetCurrentKey("Transaction Type", "Source No.", "Document Type", "Document No.", "GST Group Code");
         DetailedGSTLedgerEntry.SetRange("Transaction Type", DetailedGSTLedgerEntry."Transaction Type"::Sales);
         DetailedGSTLedgerEntry.SetRange("Source No.", GenJournalLine."Account No.");
@@ -1504,6 +1607,7 @@ codeunit 18430 "GST Application Handler"
         DetailedGSTLedgerEntry.SetRange("Entry Type", DetailedGSTLedgerEntry."Entry Type"::"Initial Entry");
         DetailedGSTLedgerEntry.SetRange("GST Component Code", GSTApplicationBuffer."GST Component Code");
         DetailedGSTLedgerEntry.SetRange("GST Exempted Goods", false);
+        OnFindDetailedGSTLedgerEntryInSalesGSTApplicationLoop(DetailedGSTLedgerEntry, GenJournalLine, GSTApplicationBuffer);
         if DetailedGSTLedgerEntry.FindFirst() then begin
             RemainingBase := GSTApplicationBuffer."Applied Base Amount";
             RemainingAmount := GSTApplicationBuffer."Applied Amount";
@@ -1543,6 +1647,7 @@ codeunit 18430 "GST Application Handler"
                     DetailedGSTLedgerEntry."Application Doc. No" := ApplyDetailedGSTLedgerEntry."Document No.";
                     DetailedGSTLedgerEntry."Remaining Base Amount" += AppliedBase;
                     DetailedGSTLedgerEntry."Remaining GST Amount" += AppliedAmount;
+                    OnBeforeModifyDetailedGSTLedgerEntryInSalesGSTApplication(DetailedGSTLedgerEntry, ApplyDetailedGSTLedgerEntry, ApplyDetailedGSTLedgerEntryInfo, GenJournalLine, GSTApplicationBuffer);
                     DetailedGSTLedgerEntry.Modify();
 
                     RemainingBase := Abs(RemainingBase) - Abs(AppliedBase);
@@ -1561,6 +1666,7 @@ codeunit 18430 "GST Application Handler"
                 ApplyDetailedGSTLedgerEntryInfo."Location State Code",
                 ApplyDetailedGSTLedgerEntry."GST Component Code");
 
+            OnAfterGetGSTPayableGLAccounts(ApplyDetailedGSTLedgerEntryInfo, ApplyDetailedGSTLedgerEntry, AccountNo, BalanceAccountNo);
             if GSTPostingBuffer[1].FindLast() then
                 repeat
                     CreateApplicationGSTLedger(
@@ -1584,11 +1690,18 @@ codeunit 18430 "GST Application Handler"
         ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
         EntryNo: Integer;
         var ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info")
+    var
+        IsHandled: Boolean;
     begin
+        OnBeforeCreateApplyDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntryInfo, ApplyDetailedGSTLedgerEntry, EntryNo, ApplyDetailedGSTLedgerEntryInfo, IsHandled);
+        if IsHandled then
+            exit;
+
         ApplyDetailedGSTLedgerEntryInfo.Init();
         ApplyDetailedGSTLedgerEntryInfo.TransferFields(DetailedGSTLedgerEntryInfo);
         ApplyDetailedGSTLedgerEntryInfo."Entry No." := ApplyDetailedGSTLedgerEntry."Entry No.";
         ApplyDetailedGSTLedgerEntryInfo."CLE/VLE Entry No." := EntryNo;
+        OnAfterCreateApplyDetailedGSTLedgerEntryInfo(ApplyDetailedGSTLedgerEntryInfo, DetailedGSTLedgerEntryInfo, ApplyDetailedGSTLedgerEntry);
         ApplyDetailedGSTLedgerEntryInfo.Insert(true);
     end;
 
@@ -1618,7 +1731,13 @@ codeunit 18430 "GST Application Handler"
         InvoiceNo: Code[20];
         AppliedBase: Decimal;
         AppliedAmount: Decimal)
+    var
+        IsHandled: Boolean;
     begin
+        OnBeforeCreateDetailedGSTApplicationEntry(ApplyDetailedGSTLedgerEntry, DetailedGSTLedgerEntry, GenJournalLine, InvoiceNo, AppliedBase, AppliedAmount, IsHandled);
+        if IsHandled then
+            exit;
+
         ApplyDetailedGSTLedgerEntry.Init();
         ApplyDetailedGSTLedgerEntry.TransferFields(DetailedGSTLedgerEntry);
         ApplyDetailedGSTLedgerEntry."Entry No." := 0;
@@ -1644,6 +1763,8 @@ codeunit 18430 "GST Application Handler"
                 0.01)
         else
             ApplyDetailedGSTLedgerEntry.Quantity := -DetailedGSTLedgerEntry.Quantity;
+
+        OnAfterCreateDetailedGSTApplicationEntry(ApplyDetailedGSTLedgerEntry, DetailedGSTLedgerEntry, GenJournalLine);
     end;
 
     local procedure CreateDetailedGSTApplicationEntryInfo(
@@ -1695,7 +1816,12 @@ codeunit 18430 "GST Application Handler"
         RCMExempt: Boolean)
     var
         ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        IsHandled: Boolean;
     begin
+        OnBeforeUpdateDetailedGSTApplicationEntry(ApplyDetailedGSTLedgerEntry, PaymentEntryNo, RCMExempt, IsHandled);
+        if IsHandled then
+            exit;
+
         GSTApplicationLibrary.GetDetailedGSTLedgerEntryInfo(ApplyDetailedGSTLedgerEntry, ApplyDetailedGSTLedgerEntryInfo);
         if ApplyDetailedGSTLedgerEntryInfo."RCM Exempt Transaction" then begin
             ApplyDetailedGSTLedgerEntry."GST %" := Abs(Round(ApplyDetailedGSTLedgerEntry."GST Amount" * 100 /
@@ -1726,10 +1852,12 @@ codeunit 18430 "GST Application Handler"
                     if (ApplyDetailedGSTLedgerEntry."GST Credit" = ApplyDetailedGSTLedgerEntry."GST Credit"::"Non-Availment") then
                         ApplyDetailedGSTLedgerEntry."Credit Availed" := false;
         ApplyDetailedGSTLedgerEntry.Paid := false;
+        OnBeforeModifyApplyDetailedGSTLedgerEntry(ApplyDetailedGSTLedgerEntry);
         ApplyDetailedGSTLedgerEntry.Modify();
 
         ApplyDetailedGSTLedgerEntryInfo."RCM Exempt" := false;
         ApplyDetailedGSTLedgerEntryInfo."CLE/VLE Entry No." := PaymentEntryNo;
+        OnBeforeModifyApplyDetailedGSTLedgerEntryInfo(ApplyDetailedGSTLedgerEntryInfo);
         ApplyDetailedGSTLedgerEntryInfo.Modify();
     end;
 
@@ -1737,7 +1865,13 @@ codeunit 18430 "GST Application Handler"
         var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
         PaymentCurrencyFactor: Decimal;
         DtldGSTLedgerEntCurrencyFactor: Decimal)
+    var
+        IsHandled: Boolean;
     begin
+        OnBeforeUpdateDetailedGSTApplicationEntryForex(ApplyDetailedGSTLedgerEntry, PaymentCurrencyFactor, DtldGSTLedgerEntCurrencyFactor, IsHandled);
+        if IsHandled then
+            exit;
+
         ApplyDetailedGSTLedgerEntry."Forex Fluctuation" := true;
         ApplyDetailedGSTLedgerEntry.Quantity := 0;
 
@@ -1762,8 +1896,13 @@ codeunit 18430 "GST Application Handler"
         FADepreciationBook: Record "FA Depreciation Book";
         FAPostingGroup: Record "FA Posting Group";
         DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        IsHandled: Boolean;
     begin
         Clear(GSTPostingBuffer[1]);
+        OnBeforeFillGSTPostingBufferWithApplication(DetailedGSTLedgerEntry, ForexFluctuation, HigherInvoiceExchangeRate, GSTPostingBuffer[1], IsHandled);
+        if IsHandled then
+            exit;
+
         GSTApplicationLibrary.GetDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo);
         if DetailedGSTLedgerEntry."Transaction Type" = DetailedGSTLedgerEntry."Transaction Type"::Purchase then
             GSTPostingBuffer[1]."Transaction Type" := GSTPostingBuffer[1]."Transaction Type"::Purchase
@@ -1812,6 +1951,7 @@ codeunit 18430 "GST Application Handler"
                 if GSTPostingBuffer[1].Type = GSTPostingBuffer[1].Type::"G/L Account" then
                     GSTPostingBuffer[1]."Account No." := DetailedGSTLedgerEntry."No.";
 
+        OnAfterFillGSTPostingBufferWithApplication(GSTPostingBuffer[1], DetailedGSTLedgerEntry);
         UpdateGSTPostingBufferWithApplication();
     end;
 
@@ -1832,7 +1972,12 @@ codeunit 18430 "GST Application Handler"
         var HigherInvoiceExchangeRate: Boolean) AppliedBaseAmountInvoiceLCY: Decimal
     var
         GSTApplicationBufferToCheck: Record "GST Application Buffer";
+        IsHandled: Boolean;
     begin
+        OnBeforeCalculateAndFillGSTPostingBufferForexFluctuation(GSTApplicationBuffer, PaymentCurrencyFactor, HigherInvoiceExchangeRate, AppliedBaseAmountInvoiceLCY, IsHandled);
+        if IsHandled then
+            exit(AppliedBaseAmountInvoiceLCY);
+
         if PaymentCurrencyFactor = 0 then begin
             GSTApplicationBufferToCheck.SetRange("Transaction Type", GSTApplicationBufferToCheck."Transaction Type"::Purchase);
             GSTApplicationBufferToCheck.SetRange("Account No.", GSTApplicationBuffer."Account No.");
@@ -1844,6 +1989,7 @@ codeunit 18430 "GST Application Handler"
             GSTApplicationBufferToCheck.SetRange("Applied Doc. No.", GSTApplicationBuffer."Original Document No.");
             GSTApplicationBufferToCheck.SetRange("GST Group Code", GSTApplicationBuffer."GST Group Code");
             GSTApplicationBufferToCheck.SetRange("GST Component Code", GSTApplicationBuffer."GST Component Code");
+            OnFindGSTApplicationBufferToCheckForForexCalcualtion(GSTApplicationBufferToCheck, GSTApplicationBuffer);
             if GSTApplicationBufferToCheck.FindFirst() then
                 if GSTApplicationBufferToCheck."Currency Factor" <> GSTApplicationBuffer."Currency Factor" then
                     if GSTApplicationBufferToCheck."Currency Factor" < GSTApplicationBuffer."Currency Factor" then
@@ -1880,7 +2026,12 @@ codeunit 18430 "GST Application Handler"
     var
         GSTLedgerEntry: Record "GST Ledger Entry";
         DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        IsHandled: Boolean;
     begin
+        OnBeforeCreateApplicationGSTLedger(GSTPostingBuffer, DetailedGSTLedgerEntry, PostingDate, SourceCode, PaymentType, AccountNo, BalanceAccountNo, BalanceAccountNo2, AccountNo2, IsHandled);
+        if IsHandled then
+            exit;
+
         GSTApplicationLibrary.GetDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo);
 
         GSTLedgerEntry.Init();
@@ -1921,6 +2072,7 @@ codeunit 18430 "GST Application Handler"
         GSTLedgerEntry."Bal. Account No." := BalanceAccountNo;
         GSTLedgerEntry."Bal. Account No. 2" := BalanceAccountNo2;
         GSTLedgerEntry."Account No. 2" := AccountNo2;
+        OnAfterCreateApplicationGSTLedger(GSTLedgerEntry, GSTPostingBuffer, DetailedGSTLedgerEntry);
         GSTLedgerEntry.Insert(true);
     end;
 
@@ -2049,17 +2201,22 @@ codeunit 18430 "GST Application Handler"
     var
         DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
         DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        IsHandled: Boolean;
     begin
+        OnBeforeUnApplyGSTApplication(GenJournalLine, TransactionType, TransactionNo, IsHandled);
+        if IsHandled then
+            exit;
+
         if GenJournalLine."Document Type" = GenJournalLine."Document Type"::Refund then
             exit;
 
         DetailedGSTLedgerEntry.SetCurrentKey("Transaction No.");
         DetailedGSTLedgerEntry.SetRange("Transaction No.", TransactionNo);
-        DetailedGSTLedgerEntry.SetRange("Document No.", DocumentNo);
         DetailedGSTLedgerEntry.SetRange("Transaction Type", TransactionType);
         DetailedGSTLedgerEntry.SetRange("Entry Type", DetailedGSTLedgerEntry."Entry Type"::Application);
         DetailedGSTLedgerEntry.SetRange(UnApplied, false);
         if DetailedGSTLedgerEntry.FindSet() then begin
+            DocumentNo := DetailedGSTLedgerEntry."Document No.";
             GSTApplicationLibrary.GetDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntry, DetailedGSTLedgerEntryInfo);
             CreateUnapplicationGSTLedger(GenJournalLine, TransactionType, TransactionNo, DocumentNo, DetailedGSTLedgerEntryInfo."RCM Exempt Transaction");
             GSTPostingBuffer[1].DeleteAll();
@@ -2068,6 +2225,8 @@ codeunit 18430 "GST Application Handler"
                 InsertUnApplicationDetailedGSTLedgerEntry(DetailedGSTLedgerEntry);
             until DetailedGSTLedgerEntry.Next() = 0;
         end;
+
+        OnAfterUnApplyGSTApplication(GenJournalLine, TransactionType, TransactionNo);
     end;
 
     local procedure InsertUnApplicationDetailedGSTLedgerEntry(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
@@ -2082,7 +2241,7 @@ codeunit 18430 "GST Application Handler"
         DetailedGSTLedgerEntryNew.TransferFields(DetailedGSTLedgerEntry);
         DetailedGSTLedgerEntryNew."Entry No." := 0;
         DetailedGSTLedgerEntryNew."Document No." := DetailedGSTLedgerEntryNew."Document No.";
-        DetailedGSTLedgerEntryNew."Transaction No." := TransactionNo;
+        DetailedGSTLedgerEntryNew."Transaction No." := DetailedGSTLedgerEntry."Transaction No.";
         DetailedGSTLedgerEntryNew."Entry Type" := DetailedGSTLedgerEntryNew."Entry Type"::Application;
         DetailedGSTLedgerEntryNew."GST Base Amount" := -DetailedGSTLedgerEntry."GST Base Amount";
         DetailedGSTLedgerEntryNew."GST Amount" := -DetailedGSTLedgerEntry."GST Amount";
@@ -2380,18 +2539,19 @@ codeunit 18430 "GST Application Handler"
     var
         Customer: Record Customer;
         Vendor: Record Vendor;
+        VendLedgEntry: Record "Vendor Ledger Entry";
         AppliedForeignCurrAmt: Decimal;
         VendNo: Code[20];
         CustNo: Code[20];
         AppliedAmt: Decimal;
         AppliedAmtLCY: Decimal;
     begin
-        if Customer.Get(NewCVLedgEntryBuf."CV No.") then begin
+        if Customer.Get(NewCVLedgEntryBuf."CV No.") and (GenJnlLine."Account Type" = GenJnlLine."Account Type"::Customer) then begin
             SetGSTApplicationSourceSales(NewCVLedgEntryBuf, GenJnlLine, Customer);
             GSTApplSessionMgt.GetGSTTransactionType(GSTTransactionType);
         end
         else
-            if Vendor.Get(NewCVLedgEntryBuf."CV No.") then begin
+            if Vendor.Get(NewCVLedgEntryBuf."CV No.") and (GenJnlLine."Account Type" = GenJnlLine."Account Type"::Vendor) then begin
                 SetGSTApplicationSourcePurch(NewCVLedgEntryBuf, GenJnlLine, Vendor);
                 GSTApplSessionMgt.GetGSTTransactionType(GSTTransactionType);
             end;
@@ -2406,12 +2566,15 @@ codeunit 18430 "GST Application Handler"
                         if GenJnlLine."Document Type" in [GenJnlLine."Document Type"::Invoice, GenJnlLine."Document Type"::Payment] then
                             if OldCVLedgEntryBuf."Currency Code" <> '' then begin
                                 if (NewCVLedgEntryBuf."Original Currency Factor" > OldCVLedgEntryBuf."Original Currency Factor") or (NewCVLedgEntryBuf."Original Currency Factor" < OldCVLedgEntryBuf."Original Currency Factor") then begin
-                                    AppliedForeignCurrAmt := Round(AppliedAmt / NewCVLedgEntryBuf."Adjusted Currency Factor");
+                                    VendLedgEntry.Get(OldCVLedgEntryBuf."Entry No.");
+                                    if VendLedgEntry."GST Reverse Charge" then
+                                        AppliedForeignCurrAmt := Round(AppliedAmt / OldCVLedgEntryBuf."Adjusted Currency Factor")
+                                    else
+                                        AppliedForeignCurrAmt := Round(AppliedAmt / NewCVLedgEntryBuf."Adjusted Currency Factor");
                                     PostGSTPurchaseApplication(GenJnlLine, NewCVLedgEntryBuf, OldCVLedgEntryBuf, AppliedForeignCurrAmt);
-                                    if Vendor."GST Vendor Type" <> Vendor."GST Vendor Type"::" " then
-                                        GSTApplSessionMgt.SetOnlinePostApplication(true);
                                 end else
                                     PostGSTPurchaseApplication(GenJnlLine, NewCVLedgEntryBuf, OldCVLedgEntryBuf, AppliedAmtLCY);
+                                SetPostApplication(Vendor, GenJnlLine);
                             end else
                                 PostGSTPurchaseApplication(GenJnlLine, NewCVLedgEntryBuf, OldCVLedgEntryBuf, AppliedAmtLCY);
 
@@ -2468,19 +2631,17 @@ codeunit 18430 "GST Application Handler"
                 UnApplyGSTApplicationCreditMemo(TransactionType::Purchase, VendorLedgerEntry."Document No.");
     end;
 
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Line", 'OnBeforeCreateGLEntriesForTotalAmountsUnapplyVendorV19', '', false, false)]
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Line", 'OnAfterUnapplyVendLedgEntry', '', false, false)]
     local procedure OnBeforeCreateGLEntriesForTotalAmountsUnapplyVendor(
         DetailedVendorLedgEntry: Record "Detailed Vendor Ledg. Entry";
-        var VendorPostingGroup: Record "Vendor Posting Group";
-        GenJournalLine: Record "Gen. Journal Line";
-        var TempDimPostingBuffer: Record "Dimension Posting Buffer" temporary)
+        GenJournalLine2: Record "Gen. Journal Line")
     var
         VendorLedgerEntry: Record "Vendor Ledger Entry";
         GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line";
         TransactionType: Enum "Detail Ledger Transaction Type";
     begin
         VendorLedgerEntry.Get(DetailedVendorLedgEntry."Vendor Ledger Entry No.");
-        UnApplyGSTApplication(GenJournalLine, TransactionType::Purchase, VendorLedgerEntry."Transaction No.", DetailedVendorLedgEntry."Document No.");
+        UnApplyGSTApplication(GenJournalLine2, TransactionType::Purchase, VendorLedgerEntry."Transaction No.", DetailedVendorLedgEntry."Document No.");
         GSTApplSessionMgt.PostApplicationGenJournalLine(GenJnlPostLine);
         GSTApplSessionMgt.ClearAllSessionVariables();
     end;
@@ -2506,10 +2667,12 @@ codeunit 18430 "GST Application Handler"
         GenJournalLine: Record "Gen. Journal Line";
         var TempIDimPostingBuffer: Record "Dimension Posting Buffer" temporary)
     var
+        CustLedgerEntry: Record "Cust. Ledger Entry";
         GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line";
         TransactionType: Enum "Detail Ledger Transaction Type";
     begin
-        UnApplyGSTApplication(GenJournalLine, TransactionType::Sales, DetailedCustLedgEntry."Transaction No.", DetailedCustLedgEntry."Document No.");
+        CustLedgerEntry.Get(DetailedCustLedgEntry."Cust. Ledger Entry No.");
+        UnApplyGSTApplication(GenJournalLine, TransactionType::Sales, CustLedgerEntry."Transaction No.", DetailedCustLedgEntry."Document No.");
         GSTApplSessionMgt.PostApplicationGenJournalLine(GenJnlPostLine);
         GSTApplSessionMgt.ClearAllSessionVariables();
     end;
@@ -2547,11 +2710,7 @@ codeunit 18430 "GST Application Handler"
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"VendEntry-Apply Posted Entries", 'OnAfterPostApplyVendLedgEntry', '', false, false)]
     local procedure OnAfterPostApplyVendLedgEntry(GenJournalLine: Record "Gen. Journal Line"; VendorLedgerEntry: Record "Vendor Ledger Entry"; var GenJnlPostLine: Codeunit "Gen. Jnl.-Post Line")
     begin
-        if GSTApplSessionMgt.GetOnlinePostApplication() then begin
-            GSTApplSessionMgt.SetOnlinePostApplication(false);
-            GSTApplSessionMgt.SetOnlinePostApplicationLastEntryNo(0);
-            GSTApplSessionMgt.SetOnlinePostApplicationLastEntryNoForGLRegister(0);
-        end;
+        ClearPostApplication();
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Line", 'OnAfterInitGLRegister', '', false, false)]
@@ -2573,11 +2732,174 @@ codeunit 18430 "GST Application Handler"
         end
     end;
 
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Preview", 'OnRunPreview', '', false, false)]
+    local procedure OnRunPreview(var Result: Boolean; Subscriber: Variant; RecVar: Variant)
+    begin
+        ClearPostApplication();
+    end;
+
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Line", 'OnBeforeUpdateGLReg', '', false, false)]
     local procedure OnBeforeUpdateGLReg(IsTransactionConsistent: Boolean; var IsGLRegInserted: Boolean; var GLReg: Record "G/L Register"; var IsHandled: Boolean; var GenJnlLine: Record "Gen. Journal Line"; GlobalGLEntry: Record "G/L Entry")
     begin
+        BeforeUpdateGLReg(IsTransactionConsistent, IsGLRegInserted, GLReg);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnBeforePostPurchaseDoc', '', false, false)]
+    local procedure PurchPostOnBeforePostPurchaseDoc(var PurchaseHeader: Record "Purchase Header")
+    begin
+        CheckGSTVendorType(PurchaseHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnAfterPostPurchaseDoc', '', false, false)]
+    local procedure PurchPostOnAfterPostPurchaseDoc(var PurchaseHeader: Record "Purchase Header")
+    begin
+        UpdateSubconPurchaseHeader(PurchaseHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Item Jnl.-Post Line", 'OnAfterPostItemJnlLine', '', false, false)]
+    local procedure OnAfterPostItemJnlLine(
+        var ItemJournalLine: Record "Item Journal Line";
+        ItemLedgerEntry: Record "Item Ledger Entry";
+        var ValueEntryNo: Integer;
+        var InventoryPostingToGL: Codeunit "Inventory Posting To G/L";
+        CalledFromAdjustment: Boolean;
+        CalledFromInvtPutawayPick: Boolean;
+        var ItemRegister: Record "Item Register";
+        var ItemLedgEntryNo: Integer;
+        var ItemApplnEntryNo: Integer)
+    begin
+        SubcontractingEntryNosAfterPostItemJnlLine(ItemJournalLine, ItemLedgEntryNo, ItemApplnEntryNo, ValueEntryNo);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Item Jnl.-Post Line", 'OnBeforePostItemJnlLine', '', false, false)]
+    local procedure OnBeforePostItemJnlLine(
+        var ItemJournalLine: Record "Item Journal Line";
+        CalledFromAdjustment: Boolean;
+        CalledFromInvtPutawayPick: Boolean;
+        var ItemRegister: Record "Item Register";
+        var ItemLedgEntryNo: Integer;
+        var ValueEntryNo: Integer;
+        var ItemApplnEntryNo: Integer)
+    begin
+        SubcontractingEntryNosBeforePostItemJnlLine(ItemJournalLine, ItemLedgEntryNo, ValueEntryNo, ItemApplnEntryNo);
+    end;
+
+    [EventSubscriber(ObjectType::Page, Page::"Order Subcon Details Receipt", 'OnBeforeActionEvent', '&Receive', true, true)]
+    local procedure OnBeforeActionEvent(var Rec: Record "Purchase Line")
+    begin
+        SubconOrderReceiptBeforeActionEvent(Rec);
+    end;
+
+    [EventSubscriber(ObjectType::Page, Page::"Order Subcon Details Receipt", 'OnAfterActionEvent', '&Receive', true, true)]
+    local procedure OnAfterActionEvent(Rec: Record "Purchase Line")
+    begin
+        SubconOrderReceiptAfterActionEvent(Rec);
+    end;
+
+    [EventSubscriber(ObjectType::Page, Page::"Multiple Order Subcon Receipt", 'OnBeforeActionEvent', '&Receive', true, true)]
+    local procedure OnBeforeActionEventMultipleSubCon(var Rec: Record "Multiple Subcon. Order Details")
+    begin
+        MultipleSubconOrderReceiptBeforeActionEvent(Rec);
+    end;
+
+    [EventSubscriber(ObjectType::Page, Page::"Multiple Order Subcon Receipt", 'OnAfterActionEvent', '&Receive', true, true)]
+    local procedure OnAfterActionEventMultipleSubCon(Rec: Record "Multiple Subcon. Order Details")
+    begin
+        MultipleSubconOrderReceiptAfterActionEvent(Rec."Subcontractor No.");
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnCopyToTempLinesOnAfterSetFilters', '', false, false)]
+    local procedure OnCopyToTempLinesOnAfterSetFilters(var PurchaseLine: Record "Purchase Line"; PurchaseHeader: Record "Purchase Header")
+    begin
+        PurchPostOnCopyToTempLinesOnAfterSetFilters(PurchaseLine, PurchaseHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post", 'OnBeforePostPurchLine', '', false, false)]
+    local procedure OnBeforePostPurchLine(var PurchHeader: Record "Purchase Header"; var PurchLine: Record "Purchase Line"; var IsHandled: Boolean)
+    begin
+        SubcontractingPurchPostBeforePostPurchLine(PurchHeader, PurchLine, IsHandled);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Gen. Jnl.-Post Line", 'OnAfterInitGLEntry', '', false, false)]
+    local procedure SubcontractingOnAfterInitGLEntry(var GLEntry: Record "G/L Entry"; GenJournalLine: Record "Gen. Journal Line"; Amount: Decimal; AddCurrAmount: Decimal; UseAddCurrAmount: Boolean; var CurrencyFactor: Decimal)
+    begin
+        InitSubconMultipleRecieptNextGLEntry(GLEntry);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Purch.-Post (Yes/No)", 'OnBeforeConfirmPost', '', false, false)]
+    local procedure OnBeforeConfirmPost(var PurchaseHeader: Record "Purchase Header"; var HideDialog: Boolean; var IsHandled: Boolean; var DefaultOption: Integer)
+    begin
+        SubcontractingPurchPostYesNoBeforeConfirmPost(PurchaseHeader, DefaultOption);
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Item Journal Line", 'OnBeforeCopyFromProdOrderComp', '', false, false)]
+    local procedure OnBeforeCopyFromProdOrderComp(var ItemJournalLine: Record "Item Journal Line"; var ProdOrderComp: Record "Prod. Order Component"; var IsHandled: Boolean)
+    begin
+        OnBeforeCopyFromProdOrderCompSubcontract(IsHandled);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Subcontracting Post", 'OnAfterValidateUnitofMeasureCodeSubcontract', '', false, false)]
+    local procedure OnAfterValidateUnitofMeasureCodeSubcontract(var ItemJournalLine: Record "Item Journal Line"; ProdOrderComponent: Record "Prod. Order Component")
+    begin
+        CopyFromProdOrderCompSubcontract(ItemJournalLine, ProdOrderComponent);
+    end;
+
+    local procedure OnBeforeCopyFromProdOrderCompSubcontract(var IsHandled: Boolean): Boolean
+    begin
+        if not GSTApplSessionMgt.GetSubcontracting() then
+            exit;
+
+        IsHandled := true;
+    end;
+
+    local procedure CopyFromProdOrderCompSubcontract(var ItemJournalLine: Record "Item Journal Line"; ProdOrderComp: Record "Prod. Order Component")
+    begin
+        if not GSTApplSessionMgt.GetSubcontracting() then
+            exit;
+
+        ItemJournalLine.Validate("Order Line No.", ProdOrderComp."Prod. Order Line No.");
+        ItemJournalLine.Validate("Prod. Order Comp. Line No.", ProdOrderComp."Line No.");
+        ItemJournalLine."Unit of Measure Code" := ProdOrderComp."Unit of Measure Code";
+        ItemJournalLine."Location Code" := ProdOrderComp."Location Code";
+        ItemJournalLine.Validate("Variant Code", ProdOrderComp."Variant Code");
+        ItemJournalLine.Validate("Bin Code", ProdOrderComp."Bin Code");
+    end;
+
+    local procedure SetPostApplication(Vendor: Record Vendor; GenJnlLine: Record "Gen. Journal Line")
+    var
+        IsHandled: Boolean;
+    begin
+        OnBeforeSetPostApplication(Vendor, GenJnlLine, IsHandled);
+        if IsHandled then
+            exit;
+
+        if (Vendor."GST Vendor Type" = Vendor."GST Vendor Type"::" ") then
+            exit;
+
+        if (GenJnlLine."Source Type" <> GenJnlLine."Source Type"::Vendor) then
+            exit;
+
+        if GenJnlLine."Offline Application" then
+            GSTApplSessionMgt.SetOnlinePostApplication(true);
+    end;
+
+    local procedure ClearPostApplication()
+    begin
+        if GSTApplSessionMgt.GetOnlinePostApplication() then begin
+            GSTApplSessionMgt.SetOnlinePostApplication(false);
+            GSTApplSessionMgt.SetOnlinePostApplicationLastEntryNo(0);
+            GSTApplSessionMgt.SetOnlinePostApplicationLastEntryNoForGLRegister(0);
+        end;
+    end;
+
+    local procedure BeforeUpdateGLReg(IsTransactionConsistent: Boolean; var IsGLRegInserted: Boolean; var GLReg: Record "G/L Register")
+    var
+        GLRegister: Record "G/L Register";
+    begin
         if GSTApplSessionMgt.GetOnlinePostApplication() then
-            IsGLRegInserted := true;
+            if IsTransactionConsistent then
+                if GLRegister.Get(GLReg."No.") then
+                    IsGLRegInserted := true;
     end;
 
     local procedure InitNextEntryNo(): Integer
@@ -2604,8 +2926,459 @@ codeunit 18430 "GST Application Handler"
         exit(LastEntryNo);
     end;
 
+    local procedure CheckGSTVendorType(PurchaseHeader: Record "Purchase Header")
+    var
+        Vendor: Record vendor;
+    begin
+        if not PurchaseHeader.Subcontracting then
+            exit;
+
+        Vendor.Get(PurchaseHeader."Buy-From Vendor No.");
+        GSTApplSessionMgt.SetSubcontracting(Vendor."GST Vendor Type" <> Vendor."GST Vendor Type"::" ");
+    end;
+
+    local procedure UpdateSubconPurchaseHeader(var PurchaseHeader: Record "Purchase Header")
+    var
+        AppliestoIDReceipt: Code[50];
+    begin
+        if not PurchaseHeader.Subcontracting then
+            exit;
+
+        if GSTApplSessionMgt.GetSubcontracting() then begin
+            GSTApplSessionMgt.SetSubcontracting(false);
+
+            if GSTApplSessionMgt.GetSubContractingReceivingMultiple(AppliestoIDReceipt) then begin
+                PurchaseHeader.SubConPostLine := 0;
+                PurchaseHeader."Subcon. Multiple Receipt" := true;
+            end
+        end;
+    end;
+
+    local procedure SubcontractingEntryNosAfterPostItemJnlLine(var ItemJournalLine: Record "Item Journal Line"; var ItemLedgEntryNo: Integer; var ItemApplnEntryNo: Integer; var ValueEntryNo: Integer)
+    begin
+        if not GSTApplSessionMgt.GetSubcontracting() then
+            exit;
+
+        if (ItemJournalLine.Subcontracting) or ((ItemJournalLine."Lot No." <> '') and (ItemJournalLine."Subcon Order No." <> '')) then
+            if (ItemLedgEntryNo <> 0) and (ItemApplnEntryNo <> 0) and (ValueEntryNo <> 0) then
+                GSTApplSessionMgt.SetSubcontractingEntryNo(ItemLedgEntryNo, ItemApplnEntryNo, ValueEntryNo);
+    end;
+
+    local procedure SubcontractingEntryNosBeforePostItemJnlLine(var ItemJournalLine: Record "Item Journal Line"; var ItemLedgEntryNo: Integer; var ValueEntryNo: Integer; var ItemApplnEntryNo: Integer)
+    begin
+        if not GSTApplSessionMgt.GetSubcontracting() then
+            exit;
+
+        if not ItemJournalLine.Subcontracting then
+            exit;
+
+        CheckLastEntryNoAndSet(ItemLedgEntryNo, ValueEntryNo, ItemApplnEntryNo);
+    end;
+
+    local procedure CheckLastEntryNoAndSet(var ItemLedgEntryNo: Integer;
+        var ValueEntryNo: Integer;
+        var ItemApplnEntryNo: Integer)
+    var
+        LastItemLedgEntryNo: Integer;
+        LastItemApplnEntryNo: Integer;
+        LastValueEntryNo: Integer;
+    begin
+        GSTApplSessionMgt.GetSubcontractingEntryNo(LastItemLedgEntryNo, LastItemApplnEntryNo, LastValueEntryNo);
+
+        if (LastItemLedgEntryNo = 0) and (LastItemApplnEntryNo = 0) and (LastValueEntryNo = 0) then
+            exit;
+
+        if LastItemLedgEntryNo <> 0 then
+            if ItemLedgEntryNo = 0 then
+                ItemLedgEntryNo := LastItemLedgEntryNo
+            else
+                ItemLedgEntryNo := LastItemLedgEntryNo + 1;
+
+        if LastItemApplnEntryNo <> 0 then
+            if ItemApplnEntryNo = 0 then
+                ItemApplnEntryNo := LastItemApplnEntryNo
+            else
+                ItemApplnEntryNo := LastItemApplnEntryNo + 1;
+
+        if LastValueEntryNo <> 0 then
+            if ValueEntryNo = 0 then
+                ValueEntryNo := LastValueEntryNo
+            else
+                ValueEntryNo := LastValueEntryNo + 1;
+    end;
+
+    local procedure SubconOrderReceiptBeforeActionEvent(var PurchaseLine: Record "Purchase Line")
+    begin
+        if not PurchaseLine.Subcontracting then
+            exit;
+
+        PurchaseLine.SubConReceive := true;
+        PurchaseLine."Subcon. Receiving" := true;
+        PurchaseLine.Modify(true);
+        GSTApplSessionMgt.SetSubContractingReceiving(true);
+        GSTApplSessionMgt.SetSubcontractingEntryNo(0, 0, 0);
+    end;
+
+    local procedure SubconOrderReceiptAfterActionEvent(var PurchLine: Record "Purchase Line")
+    var
+        PurchaseLine: Record "Purchase Line";
+    begin
+        if not GSTApplSessionMgt.GetSubContractingReceiving() then
+            exit;
+
+        if not PurchLine.Subcontracting then
+            exit;
+
+        if not PurchaseLine.Get(PurchLine."Document Type", PurchLine."Document No.", PurchLine."Line No.") then
+            exit;
+
+        if PurchaseLine."Subcon. Receiving" then begin
+            PurchaseLine."Subcon. Receiving" := false;
+            PurchaseLine.Modify();
+            GSTApplSessionMgt.SetSubContractingReceiving(false);
+            if PurchaseLine.Subcontracting then
+                GSTApplSessionMgt.SetSubcontractingEntryNo(0, 0, 0);
+        end
+    end;
+
+    local procedure MultipleSubconOrderReceiptBeforeActionEvent(var MultipleSubconOrderDetails: Record "Multiple Subcon. Order Details")
+    var
+        PurchaseLine: Record "Purchase Line";
+    begin
+        PurchaseLine.SetCurrentKey("Document Type", "Buy-from Vendor No.", Subcontracting, "Applies-to ID (Receipt)");
+        PurchaseLine.SetRange("Document Type", PurchaseLine."Document Type"::Order);
+        PurchaseLine.SetRange("Buy-from Vendor No.", MultipleSubconOrderDetails."Subcontractor No.");
+        PurchaseLine.SetRange(Subcontracting, true);
+        PurchaseLine.SetRange("Applies-to ID (Receipt)", MultipleSubconOrderDetails."No.");
+        if PurchaseLine.FindFirst() then begin
+            GSTApplSessionMgt.SetSubContractingReceivingMultiple(true, MultipleSubconOrderDetails."No.");
+            GSTApplSessionMgt.SetSubcontractingEntryNo(0, 0, 0);
+            GSTApplSessionMgt.SetSubcontractingLastGLEntryNo(0);
+        end
+    end;
+
+    local procedure MultipleSubconOrderReceiptAfterActionEvent(SubcontractorNo: Code[20])
+    var
+        PurchaseHeader: Record "Purchase Header";
+        AppliestoIDReceipt: Code[50];
+    begin
+        if not GSTApplSessionMgt.GetSubContractingReceivingMultiple(AppliestoIDReceipt) then
+            exit;
+
+        PurchaseHeader.SetCurrentKey("Document Type", "Buy-from Vendor No.", "Subcon. Multiple Receipt", Subcontracting);
+        PurchaseHeader.SetRange("Document Type", PurchaseHeader."Document Type"::Order);
+        PurchaseHeader.SetRange("Buy-from Vendor No.", SubcontractorNo);
+        PurchaseHeader.SetRange("Subcon. Multiple Receipt", true);
+        PurchaseHeader.SetRange(Subcontracting, true);
+        if PurchaseHeader.FindSet() then
+            PurchaseHeader.ModifyAll("Subcon. Multiple Receipt", false);
+
+        AppliestoIDReceipt := '';
+        GSTApplSessionMgt.SetSubContractingReceivingMultiple(false, AppliestoIDReceipt);
+        GSTApplSessionMgt.SetSubcontractingEntryNo(0, 0, 0);
+        GSTApplSessionMgt.SetSubcontractingLastGLEntryNo(0);
+    end;
+
+    local procedure PurchPostOnCopyToTempLinesOnAfterSetFilters(var PurchaseLine: Record "Purchase Line"; PurchaseHeader: Record "Purchase Header")
+    var
+        AppliestoIDReceipt: Code[50];
+    begin
+        if GSTApplSessionMgt.GetSubContractingReceiving() then
+            if PurchaseHeader.Subcontracting then
+                PurchaseLine.SetRange("Subcon. Receiving", true);
+
+        if GSTApplSessionMgt.GetSubContractingReceivingMultiple(AppliestoIDReceipt) then
+            if PurchaseHeader.Subcontracting then
+                PurchaseLine.SetRange("Applies-to ID (Receipt)", AppliestoIDReceipt);
+    end;
+
+    local procedure SubcontractingPurchPostBeforePostPurchLine(var PurchHeader: Record "Purchase Header"; var PurchLine: Record "Purchase Line"; var IsHandled: Boolean)
+    begin
+        if not GSTApplSessionMgt.GetSubContractingReceiving() then
+            exit;
+
+        if (PurchHeader.Subcontracting and PurchLine.Subcontracting) then begin
+            if PurchLine."Vendor Shipment No." = '' then
+                IsHandled := true;
+
+            if not PurchLine."Subcon. Receiving" then
+                IsHandled := true
+            else
+                IsHandled := false;
+        end;
+    end;
+
+    local procedure SubcontractingPurchPostYesNoBeforeConfirmPost(var PurchaseHeader: Record "Purchase Header"; var DefaultOption: Integer)
+    begin
+        if not PurchaseHeader.Subcontracting then
+            exit;
+
+        DefaultOption := 2;
+    end;
+
+    local procedure InitSubconMultipleRecieptNextGLEntry(var GLEntry: Record "G/L Entry")
+    var
+        AppliestoIDReceipt: Code[50];
+        LastEntryNo: Integer;
+    begin
+        if not GSTApplSessionMgt.GetSubcontracting() then
+            exit;
+
+        if GSTApplSessionMgt.GetSubContractingReceivingMultiple(AppliestoIDReceipt) then begin
+            LastEntryNo := GSTApplSessionMgt.GetSubcontractingLastGLEntryNo();
+
+            if LastEntryNo <> 0 then begin
+                GLEntry."Entry No." := LastEntryNo + 1;
+                GSTApplSessionMgt.SetSubcontractingLastGLEntryNo(GLEntry."Entry No.");
+            end
+            else begin
+                LastEntryNo := InitNextEntryNo();
+                GLEntry."Entry No." := LastEntryNo;
+                GSTApplSessionMgt.SetSubcontractingLastGLEntryNo(LastEntryNo);
+            end;
+        end
+    end;
+
     [IntegrationEvent(false, false)]
     local procedure OnBeforeApplyGSTApplicationCreditMemo(CVLedgerEntryBuffer: Record "CV Ledger Entry Buffer"; OldCVLedgerEntryBuffer: Record "CV Ledger Entry Buffer"; TransactionType: Enum "Detail Ledger Transaction Type"; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeSetPostApplication(Vendor: Record Vendor; GenJnlLine: Record "Gen. Journal Line"; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCalculateGSTApplicationAmount(
+        DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
+        DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        var ApplicationRatio: Decimal;
+        var RemainingBase: Decimal;
+        var RemainingAmount: Decimal);
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetHigherExcRateGSTGLAccounts(GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20]; var BalanceAccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetLessExcRateGSTGLAccounts(GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20]; var BalanceAccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetGLGSTPostingAccountNo(DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetGSTGLAccountNoForLowerExchRate(DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetGSTGLBalAccountNoForLowerExchRate(DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GSTPostingBuffer: Record "GST Posting Buffer"; var BalanceAccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCalculateGSTAppliedAmount(
+        PaymentCurrencyFactor: Decimal;
+        DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
+        DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info";
+        var ApplicationRatio: Decimal;
+        var RemainingBase: Decimal;
+        var RemainingAmount: Decimal;
+        var AppliedBase: Decimal;
+        var AppliedAmount: Decimal)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostGSTWithNormalPaymentOnline(var GenJournalLine: Record "Gen. Journal Line"; var AmountToApply: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostGSTWithNormalPaymentOffline(var GenJournalLine: Record "Gen. Journal Line"; var AmountToApply: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeUnApplyGSTApplication(GenJournalLine: Record "Gen. Journal Line"; TransactionType: Enum "Detail Ledger Transaction Type"; TransactionNo: Integer; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterUnApplyGSTApplication(GenJournalLine: Record "Gen. Journal Line"; TransactionType: Enum "Detail Ledger Transaction Type"; TransactionNo: Integer)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostGSTPurchaseApplication(var GenJournalLine: Record "Gen. Journal Line"; var CVLedgerEntryBuffer: Record "CV Ledger Entry Buffer"; var OldCVLedgerEntryBuffer: Record "CV Ledger Entry Buffer"; AmountToApply: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCreateDetailedGSTApplicationEntry(var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GenJournalLine: Record "Gen. Journal Line"; InvoiceNo: Code[20]; AppliedBase: Decimal; AppliedAmount: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCreateDetailedGSTApplicationEntry(var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GenJournalLine: Record "Gen. Journal Line")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeUpdateApplyDetailedGSTLedgerEntryTables(var GenJournalLine: Record "Gen. Journal Line"; InvoiceNo: Code[20]; EntryNo: Integer; GSTApplicationBuffer: Record "GST Application Buffer"; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindDetailedGSTLedgerEntryInSalesGSTApplicationLoop(var DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GenJournalLine: Record "Gen. Journal Line"; GSTApplicationBuffer: Record "GST Application Buffer")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCreateApplyDetailedGSTLedgerEntryInfo(DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; EntryNo: Integer; var ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCreateApplyDetailedGSTLedgerEntryInfo(var ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeModifyDetailedGSTLedgerEntryInSalesGSTApplication(var DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GenJournalLine: Record "Gen. Journal Line"; GSTApplicationBuffer: Record "GST Application Buffer")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetGSTPayableGLAccounts(ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; var AccountNo: Code[20]; var BalanceAccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCreateApplicationGSTLedger(GSTPostingBuffer: Record "GST Posting Buffer"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; PostingDate: Date; SourceCode: Code[10]; PaymentType: Enum "Payment Type"; AccountNo: Code[20]; BalanceAccountNo: Code[20]; BalanceAccountNo2: Code[20]; AccountNo2: Code[20]; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCreateApplicationGSTLedger(var GSTLedgerEntry: Record "GST Ledger Entry"; GSTPostingBuffer: Record "GST Posting Buffer"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeUpdateApplyDetailedGSTLedgerEntryPurchTables(var GenJournalLine: Record "Gen. Journal Line"; InvoiceNo: Code[20]; PaymentEntryNo: Integer; GSTApplicationBuffer: Record "GST Application Buffer"; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindDetailedGSTLedgerEntryInPurchGSTApplicationLoop(var DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GenJournalLine: Record "Gen. Journal Line"; GSTApplicationBuffer: Record "GST Application Buffer")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindGSTApplicationBufferToCheck(GSTApplicationBufferToCheck: Record "GST Application Buffer"; GSTApplicationBuffer: Record "GST Application Buffer"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCalculateGSTPurchApplicationAmount(GSTApplicationBuffer: Record "GST Application Buffer"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; var ApplicableRemainingGSTAmount: Decimal; var ApplicationRatio: Decimal; var RemainingBase: Decimal; var RemainingAmount: Decimal)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeUpdateDetailedGSTApplicationEntry(var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; PaymentEntryNo: Integer; RCMExempt: Boolean; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeModifyApplyDetailedGSTLedgerEntry(var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeModifyApplyDetailedGSTLedgerEntryInfo(var ApplyDetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCalculateAndFillGSTPostingBufferForexFluctuation(GSTApplicationBuffer: Record "GST Application Buffer"; PaymentCurrencyFactor: Decimal; var HigherInvoiceExchangeRate: Boolean; var AppliedBaseAmountInvoiceLCY: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindGSTApplicationBufferToCheckForForexCalcualtion(var GSTApplicationBufferToCheck: Record "GST Application Buffer"; GSTApplicationBuffer: Record "GST Application Buffer")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCalculateGSTPurchApplicationAmount(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; var ApplicationRatio: Decimal; var RemainingBase: Decimal; var RemainingAmount: Decimal);
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCalculatePurchaseAppliedAmountInvoice(GSTApplicationBuffer: Record "GST Application Buffer"; var AppliedBaseAmountInvoiceLCY: Decimal; var AppliedAmountInvoiceLCY: Decimal)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeUpdateDetailedGSTApplicationEntryForex(var ApplyDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; PaymentCurrencyFactor: Decimal; DtldGSTLedgerEntCurrencyFactor: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterGetCreditAccountAdvancePaymentGoods(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20]; var BalanceAccountNo: Code[20])
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeGetCreditAccountAdvancePaymentService(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; DetailedGSTLedgerEntryInfo: Record "Detailed GST Ledger Entry Info"; GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20]; var BalanceAccountNo: Code[20]; var BalanceAccountNo2: Code[20]; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostPurchaseGSTApplicationGL(var GenJournalLine: Record "Gen. Journal Line"; PaymentDocNo: Code[20]; InvoiceNo: Code[20]; PaymentEntryNo: Integer; GSTGroupCode: Code[20]; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindGSTApplicationBufferInPostPurchGSTApplicationGL(var GSTApplicationBuffer: Record "GST Application Buffer"; GenJournalLine: Record "Gen. Journal Line")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeFillGSTPostingBufferWithApplication(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; ForexFluctuation: Boolean; HigherInvoiceExchangeRate: Boolean; var GSTPostingBuffer: Record "GST Posting Buffer"; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterFillGSTPostingBufferWithApplication(var GSTPostingBuffer: Record "GST Posting Buffer"; DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeGetCreditAccountNormalPayment(DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GSTPostingBuffer: Record "GST Posting Buffer"; var AccountNo: Code[20]; var AccountNo2: Code[20]; var BalanceAccountNo: Code[20]; var BalanceAccountNo2: Code[20]; RCMExempt: Boolean; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostPurchGSTApplicationNormalPaymentGL(var GenJournalLine: Record "Gen. Journal Line"; PaymentDocNo: Code[20]; InvoiceNo: Code[20]; RCMExempt: Boolean; PaymentCurrencyFactor: Decimal; PentOriginalAmountLCY: Decimal; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindGSTApplBufferLoopForPurchGSTApplNormalPaymentsGL(var GSTApplicationBuffer: Record "GST Application Buffer"; GenJournalLine: Record "Gen. Journal Line")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnFindDetGSTLedgEntryLoopForPurchGSTApplNormalPaymentsGL(var DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; GSTApplicationBuffer: Record "GST Application Buffer"; GenJournalLine: Record "Gen. Journal Line")
     begin
     end;
 }

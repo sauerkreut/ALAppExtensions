@@ -1,5 +1,31 @@
+﻿// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+namespace Microsoft.Finance.GST.Subcontracting;
+
+using Microsoft.Finance.TaxEngine.TaxTypeHandler;
+using Microsoft.Finance.TaxEngine.UseCaseBuilder;
+using Microsoft.Inventory.Journal;
+using Microsoft.Inventory.Ledger;
+using Microsoft.Inventory.Posting;
+using Microsoft.Inventory.Requisition;
+using Microsoft.Inventory.Tracking;
+using Microsoft.Manufacturing.Document;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Purchases.Posting;
+using Microsoft.Purchases.Setup;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Warehouse.Document;
+
 codeunit 18469 "Subcontracting Subscribers"
 {
+    var
+        DeliveryChallanExistsErr: Label 'You cannot delete this document. Delivery Challan exist for Subcontracting Order no. %1.', Comment = '%1 = Subcontracting Order No.';
+        QutstandingQuantityErr: Label 'Cannot delete Subcontracting order No: %1 as there is remaining quantity pending to be received. Continue with next order?', Comment = '%1 = Document No.';
+        VendorTypeErr: Label 'The field "GST Vendor Type" of Vendor should have a value in Vendor Card, Vendor No: %1', Comment = '%1 = Vendor No.';
+
     [EventSubscriber(ObjectType::Table, Database::"Purchase Header", 'OnBeforeTestNoSeries', '', false, false)]
     local procedure TestSubcontractingNoSeries(var PurchaseHeader: Record "Purchase Header"; Var Ishandled: boolean)
     var
@@ -225,5 +251,120 @@ codeunit 18469 "Subcontracting Subscribers"
     begin
         if PurchaseHeader.Subcontracting then
             Receive := true;
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Req. Wksh.-Make Order", 'OnInitPurchOrderLineOnAfterValidateLineDiscount', '', false, false)]
+    local procedure OnInitPurchOrderLineOnAfterValidateLineDiscount(var PurchOrderLine: Record "Purchase Line"; PurchOrderHeader: Record "Purchase Header"; RequisitionLine: Record "Requisition Line")
+    begin
+        UpdateSubcontractingPostingDate(PurchOrderLine, PurchOrderHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"PostPurch-Delete", 'OnBeforeInitDeleteHeader', '', false, false)]
+    local procedure OnBeforeInitDeleteHeader(var PurchHeader: Record "Purchase Header"; var PurchRcptHeader: Record "Purch. Rcpt. Header"; var PurchInvHeader: Record "Purch. Inv. Header"; var PurchCrMemoHdr: Record "Purch. Cr. Memo Hdr."; var ReturnShptHeader: Record "Return Shipment Header"; var PurchInvHeaderPrepmt: Record "Purch. Inv. Header"; var PurchCrMemoHdrPrepmt: Record "Purch. Cr. Memo Hdr."; var SourceCode: Code[10])
+    begin
+        ValidateDeliveryChallanCreatedForOrder(PurchHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"PostPurch-Delete", 'OnAfterInitDeleteHeader', '', false, false)]
+    local procedure OnAfterInitDeleteHeader(var PurchHeader: Record "Purchase Header"; var PurchRcptHeader: Record "Purch. Rcpt. Header"; var PurchInvHeader: Record "Purch. Inv. Header"; var PurchCrMemoHdr: Record "Purch. Cr. Memo Hdr."; var ReturnShptHeader: Record "Return Shipment Header"; var PurchInvHeaderPrepmt: Record "Purch. Inv. Header"; var PurchCrMemoHdrPrepmt: Record "Purch. Cr. Memo Hdr.")
+    begin
+        RemoveSubcontractingLinkFromProdOrderLine(PurchHeader);
+    end;
+
+    [EventSubscriber(ObjectType::Report, Report::"Delete Invoiced Purch. Orders", 'OnAfterSetPurchLineFilters', '', false, false)]
+    local procedure OnAfterSetPurchLineFilters(var PurchaseLine: Record "Purchase Line")
+    var
+        PurchHeader: Record "Purchase Header";
+    begin
+        if PurchaseLine.FindFirst() then begin
+            PurchHeader.Get(PurchaseLine."Document Type", PurchaseLine."Document No.");
+            if not PurchHeader.Subcontracting then
+                exit;
+
+            if GuiAllowed then
+                if not Confirm(QutstandingQuantityErr, true, PurchaseLine."Document No.") then
+                    Error('Order not deleted');
+        end;
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Purchase Line", 'OnAfterValidateEvent', 'Qty. to Invoice', false, false)]
+    local procedure OnValidateQtyToInvoiceSubcon(var Rec: Record "Purchase Line")
+    var
+        InvalidQtyErr: label 'Quantity should be less than or equal to outstanding quantity.';
+    begin
+        if (Rec.Subcontracting) and
+            (Rec."Prod. Order No." <> '') and
+            (Rec."Prod. Order Line No." <> 0) then
+            if Rec."Qty. to Invoice" > Rec.Quantity then
+                Error(InvalidQtyErr);
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Purchase Line", 'OnAfterInitOutstandingQty', '', false, false)]
+    local procedure OnAfterInitOutstandingQty(var PurchaseLine: Record "Purchase Line")
+    begin
+        if (PurchaseLine.Subcontracting) and
+            (PurchaseLine."Prod. Order No." <> '') and
+            (PurchaseLine."Prod. Order Line No." <> 0) then
+            if PurchaseLine."Outstanding Qty. (Base)" <> 0 then
+                PurchaseLine."Outstanding Qty. (Base)" := 0;
+    end;
+
+    [EventSubscriber(ObjectType::Table, Database::"Requisition Line", 'OnAfterValidateEvent', 'Vendor No.', false, false)]
+    local procedure OnAfterValidateVendorNo(var Rec: Record "Requisition Line")
+    var
+        Vendor: Record Vendor;
+    begin
+        if (Rec."Vendor No." = '') and (Rec."Prod. Order No." = '') then
+            exit;
+
+        if not Vendor.Get(Rec."Vendor No.") then
+            exit;
+
+        if Vendor.Subcontractor then
+            if Vendor."GST Vendor Type" = Vendor."GST Vendor Type"::" " then
+                Error(VendorTypeErr, Vendor."No.");
+    end;
+
+    local procedure ValidateDeliveryChallanCreatedForOrder(PurchHeader: Record "Purchase Header")
+    var
+        DeliveryChallanLine: Record "Delivery Challan Line";
+        PurchaseLine: Record "Purchase Line";
+    begin
+        if not PurchHeader.Subcontracting then
+            exit;
+
+        PurchaseLine.LoadFields("Document Type", "Document No.");
+        PurchaseLine.SetRange("Document Type", PurchHeader."Document Type");
+        PurchaseLine.SetRange("Document No.", PurchHeader."No.");
+        if PurchaseLine.FindSet() then
+            repeat
+                PurchaseLine.TestField("Quantity Received", 0);
+            until PurchaseLine.Next() = 0;
+
+        DeliveryChallanLine.LoadFields("Document No.", "Remaining Quantity");
+        DeliveryChallanLine.SetRange("Document No.", PurchHeader."No.");
+        DeliveryChallanLine.SetFilter("Remaining Quantity", '<>0');
+        if not DeliveryChallanLine.IsEmpty() then
+            Error(DeliveryChallanExistsErr, PurchHeader."No.");
+    end;
+
+    local procedure RemoveSubcontractingLinkFromProdOrderLine(PurchHeader: Record "Purchase Header")
+    var
+        ProdOrderLine: Record "Prod. Order Line";
+    begin
+        if not PurchHeader.Subcontracting then
+            exit;
+
+        ProdOrderLine.SetRange("Subcontracting Order No.", PurchHeader."No.");
+        ProdOrderLine.ModifyAll("Subcontractor Code", '');
+        ProdOrderLine.ModifyAll("Subcontracting Order No.", '');
+    end;
+
+    local procedure UpdateSubcontractingPostingDate(var PurchaseLine: Record "Purchase Line"; PurchaseHeader: Record "Purchase Header")
+    begin
+        if not PurchaseHeader.Subcontracting then
+            exit;
+
+        PurchaseLine."Posting Date" := PurchaseHeader."Posting Date";
     end;
 }

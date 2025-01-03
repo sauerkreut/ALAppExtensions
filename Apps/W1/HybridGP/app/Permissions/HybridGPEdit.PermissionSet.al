@@ -1,3 +1,5 @@
+namespace Microsoft.DataMigration.GP;
+
 permissionset 4031 "HybridGP - Edit"
 {
     Assignable = false;
@@ -47,7 +49,11 @@ permissionset 4031 "HybridGP - Edit"
                     tabledata "GPSOPTrxHist" = IMD,
                     tabledata "GPSOPUserDefinedWorkHist" = IMD,
                     tabledata "GPSOPWorkflowWorkHist" = IMD,
+#if not CLEAN26
+#pragma warning disable AL0432
                     tabledata "GPForecastTemp" = IMD,
+#pragma warning restore AL0432
+#endif
                     tabledata "GP Item" = IMD,
                     tabledata "GP Item Location" = IMD,
                     tabledata "GP Item Transactions" = IMD,
@@ -59,8 +65,6 @@ permissionset 4031 "HybridGP - Edit"
                     tabledata "GP Bank MSTR" = IMD,
                     tabledata "GP Checkbook MSTR" = IMD,
                     tabledata "GP Checkbook Transactions" = IMD,
-                    tabledata "GP POPPOHeader" = IMD,
-                    tabledata "GP POPPOLine" = IMD,
                     tabledata "GP Vendor" = IMD,
                     tabledata "GP Vendor Transactions" = IMD,
                     tabledata "GP Company Migration Settings" = IMD,
@@ -76,7 +80,43 @@ permissionset 4031 "HybridGP - Edit"
                     tabledata "GP PM00200" = IMD,
                     tabledata "GP RM00101" = IMD,
                     tabledata "GP RM00201" = IMD,
+                    tabledata "GP GL00100" = IMD,
+                    tabledata "GP GL10110" = IMD,
+                    tabledata "GP GL10111" = IMD,
+                    tabledata "GP GL40200" = IMD,
                     tabledata "GP IV00101" = IMD,
+                    tabledata "GP IV00102" = IMD,
+                    tabledata "GP IV00105" = IMD,
+                    tabledata "GP IV00200" = IMD,
+                    tabledata "GP IV00300" = IMD,
+                    tabledata "GP IV10200" = IMD,
+                    tabledata "GP IV40201" = IMD,
                     tabledata "GP IV40400" = IMD,
-                    tabledata "GP GL10111" = IMD;
+                    tabledata "GP MC40000" = IMD,
+                    tabledata "GP PM00201" = IMD,
+                    tabledata "GP PM20000" = IMD,
+                    tabledata "GP RM00103" = IMD,
+                    tabledata "GP RM20101" = IMD,
+                    tabledata "GP SY00300" = IMD,
+                    tabledata "GP SY01100" = IMD,
+                    tabledata "GP SY01200" = IMD,
+                    tabledata "GP SY03300" = IMD,
+                    tabledata "GP GL00105" = IMD,
+                    tabledata "GP GL20000" = IMD,
+                    tabledata "GP GL30000" = IMD,
+                    tabledata "GP BM30200" = IMD,
+                    tabledata "GP Hist. Source Progress" = IMD,
+                    tabledata "GP Hist. Source Error" = IMD,
+                    tabledata "GP POP10100" = IMD,
+                    tabledata "GP POP10110" = IMD,
+                    tabledata "GP PM00204" = IMD,
+                    tabledata "GP Upgrade Settings" = IMD,
+                    tabledata "GP Migration Error Overview" = IMD,
+                    tabledata "GP Known Countries" = IMD,
+                    tabledata "GP PM10200" = IMD,
+                    tabledata "GP PM30300" = IMD,
+                    tabledata "GP RM20201" = IMD,
+                    tabledata "GP RM30201" = IMD,
+                    tabledata "GP Migration Warnings" = IMD,
+                    tabledata "GP IV00104" = IMD;
 }

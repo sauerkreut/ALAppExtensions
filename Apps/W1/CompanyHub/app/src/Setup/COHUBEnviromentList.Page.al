@@ -1,3 +1,7 @@
+namespace Mirosoft.Integration.CompanyHub;
+
+using System.Telemetry;
+
 page 1166 "COHUB Enviroment List"
 {
     PageType = List;
@@ -111,7 +115,9 @@ page 1166 "COHUB Enviroment List"
     trigger OnOpenPage()
     var
         COHUBCore: Codeunit "COHUB Core";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
     begin
         COHUBCore.ShowNotSupportedOnPremNotification();
+        FeatureTelemetry.LogUptake('0000IFI', COHUBCore.GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::Discovered);
     end;
 }
