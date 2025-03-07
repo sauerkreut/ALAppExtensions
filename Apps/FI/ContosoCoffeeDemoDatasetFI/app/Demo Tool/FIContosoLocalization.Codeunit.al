@@ -3,6 +3,15 @@ codeunit 13414 "FI Contoso Localization"
     InherentEntitlements = X;
     InherentPermissions = X;
 
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Contoso Demo Tool", 'OnBeforeGeneratingDemoData', '', false, false)]
+    local procedure OnBeforeGenerateDemoData(Module: Enum "Contoso Demo Data Module"; ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
+    var
+        CreatePurchaseOrderFI: Codeunit "Create Purchase Order FI";
+    begin
+        if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Historical Data" then
+            CreatePurchaseOrderFI.UpdateInvoiceMessage();
+    end;
+
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Contoso Demo Tool", 'OnAfterGeneratingDemoData', '', false, false)]
     local procedure OnAfterGeneratingDemoData(Module: Enum "Contoso Demo Data Module"; ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
     begin
@@ -10,18 +19,12 @@ codeunit 13414 "FI Contoso Localization"
             FoundationModule(ContosoDemoDataLevel);
         if Module = Enum::"Contoso Demo Data Module"::Sales then
             SalesModule(ContosoDemoDataLevel);
-        if Module = Enum::"Contoso Demo Data Module"::Bank then
-            BankModule(ContosoDemoDataLevel);
         if Module = Enum::"Contoso Demo Data Module"::Purchase then
             PurchaseModule(ContosoDemoDataLevel);
         if Module = Enum::"Contoso Demo Data Module"::"Human Resources Module" then
             HumanResourceModule(ContosoDemoDataLevel);
         if Module = Enum::"Contoso Demo Data Module"::Finance then
             FinanceModule(ContosoDemoDataLevel);
-        if Module = Enum::"Contoso Demo Data Module"::"Fixed Asset Module" then
-            FixedAssetModule(ContosoDemoDataLevel);
-        if Module = Enum::"Contoso Demo Data Module"::CRM then
-            CRMModule(ContosoDemoDataLevel);
 
         UnBindSubscriptionDemoData(Module);
     end;
@@ -31,22 +34,13 @@ codeunit 13414 "FI Contoso Localization"
         case ContosoDemoDataLevel of
             Enum::"Contoso Demo Data Level"::"Setup Data":
                 begin
-                    Codeunit.Run(Codeunit::"Create Company Information FI");
                     Codeunit.Run(Codeunit::"Create No. Series FI");
                     Codeunit.Run(Codeunit::"Create Post Code FI");
                     Codeunit.Run(Codeunit::"Create Job Queue Category FI");
                     Codeunit.Run(Codeunit::"Create Vat Posting Groups FI");
                 end;
-        end;
-    end;
-
-    local procedure BankModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
-    begin
-        case ContosoDemoDataLevel of
-            Enum::"Contoso Demo Data Level"::"Transactional Data":
-                Codeunit.Run(Codeunit::"Create Gen. Journal Line FI");
-            Enum::"Contoso Demo Data Level"::"Historical Data":
-                Codeunit.Run(Codeunit::"Create Bank Acc. Rec. FI");
+            Enum::"Contoso Demo Data Level"::"Master Data":
+                Codeunit.Run(Codeunit::"Create Company Information FI");
         end;
     end;
 
@@ -62,13 +56,11 @@ codeunit 13414 "FI Contoso Localization"
                     Codeunit.Run(Codeunit::"Create Posting Groups FI");
                     Codeunit.Run(Codeunit::"Create General Ledger Setup FI");
                     Codeunit.Run(Codeunit::"Create VATSetupPostingGrp. FI");
+                    CreateFIGLAccounts.AddCategoriesToGLAccounts();
                 end;
 
             Enum::"Contoso Demo Data Level"::"Master Data":
-                begin
-                    Codeunit.Run(Codeunit::"Create Currency Ex. Rate FI");
-                    CreateFIGLAccounts.AddCategoriesToGLAccounts();
-                end;
+                Codeunit.Run(Codeunit::"Create Currency Ex. Rate FI");
         end;
     end;
 
@@ -92,27 +84,11 @@ codeunit 13414 "FI Contoso Localization"
         end;
     end;
 
-    local procedure FixedAssetModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
-    begin
-        case ContosoDemoDataLevel of
-            Enum::"Contoso Demo Data Level"::"Master Data":
-                Codeunit.Run(Codeunit::"Create FA No. Series FI");
-        end;
-    end;
-
     local procedure HumanResourceModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
     begin
         case ContosoDemoDataLevel of
             Enum::"Contoso Demo Data Level"::"Master Data":
                 Codeunit.Run(Codeunit::"Create Employee FI");
-        end;
-    end;
-
-    local procedure CRMModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
-    begin
-        case ContosoDemoDataLevel of
-            Enum::"Contoso Demo Data Level"::"Setup Data":
-                Codeunit.Run(Codeunit::"Create Marketing Setup FI");
         end;
     end;
 
@@ -130,11 +106,9 @@ codeunit 13414 "FI Contoso Localization"
         CreateCustPostingGroupFI: Codeunit "Create Cust. Posting Group FI";
         CreateReminderLevelFI: Codeunit "Create Reminder Level FI";
         CreateCustomerFI: Codeunit "Create Customer FI";
-        CreateCustomerTemplateFI: Codeunit "Create Customer Template FI";
         CreateSalesDimValueFI: Codeunit "Create Sales Dim Value FI";
         CreateShiptoAddressFI: Codeunit "Create Ship-to Address FI";
         CreateVendorFI: Codeunit "Create Vendor FI";
-        CreateVendorTemplateFI: Codeunit "Create Vendor Template FI";
         CreateVendorPostingGroupFI: Codeunit "Create Vendor Posting Group FI";
         CreatePurchDimValueFI: Codeunit "Create Purch. Dim. Value FI";
         CreateResourceFI: Codeunit "Create Resource FI";
@@ -145,9 +119,7 @@ codeunit 13414 "FI Contoso Localization"
         CreatePaymentTermsFI: Codeunit "Create Payment Terms FI";
         CreateAccScheduleLineFI: Codeunit "Create Acc. Schedule Line FI";
         CreateVatPostingGroupsFI: Codeunit "Create Vat Posting Groups FI";
-        CreateEmployeeTemplateFI: Codeunit "Create Employee Template FI";
         CreateVATSetupPostingGrpFI: Codeunit "Create VATSetupPostingGrp. FI";
-        CreateUnitOfMeasureTransFI: Codeunit "Create UnitOfMeasureTrans. FI";
         CreateVATStatementFI: Codeunit "Create VAT Statement FI";
     begin
         case Module of
@@ -155,7 +127,6 @@ codeunit 13414 "FI Contoso Localization"
                 begin
                     BindSubscription(CreateCountryRegionFI);
                     BindSubscription(CreatePaymentTermsFI);
-                    BindSubscription(CreateUnitOfMeasureTransFI);
                 end;
             Enum::"Contoso Demo Data Module"::Bank:
                 begin
@@ -172,7 +143,6 @@ codeunit 13414 "FI Contoso Localization"
             Enum::"Contoso Demo Data Module"::Sales:
                 begin
                     BindSubscription(CreateCustomerFI);
-                    BindSubscription(CreateCustomerTemplateFI);
                     BindSubscription(CreateShiptoAddressFI);
                     BindSubscription(CreateSalesDimValueFI);
                     BindSubscription(CreateReminderLevelFI);
@@ -181,7 +151,6 @@ codeunit 13414 "FI Contoso Localization"
             Enum::"Contoso Demo Data Module"::Purchase:
                 begin
                     BindSubscription(CreateVendorFI);
-                    BindSubscription(CreateVendorTemplateFI);
                     BindSubscription(CreatePurchDimValueFI);
                     BindSubscription(CreateVendorPostingGroupFI);
                 end;
@@ -201,10 +170,7 @@ codeunit 13414 "FI Contoso Localization"
                     BindSubscription(CreateFAPostingGrpFI);
                 end;
             Enum::"Contoso Demo Data Module"::"Human Resources Module":
-                begin
-                    BindSubscription(CreateEmployeeFI);
-                    BindSubscription(CreateEmployeeTemplateFI)
-                end;
+                BindSubscription(CreateEmployeeFI);
         end;
     end;
 
@@ -221,11 +187,9 @@ codeunit 13414 "FI Contoso Localization"
         CreateCustPostingGroupFI: Codeunit "Create Cust. Posting Group FI";
         CreateReminderLevelFI: Codeunit "Create Reminder Level FI";
         CreateCustomerFI: Codeunit "Create Customer FI";
-        CreateCustomerTemplateFI: Codeunit "Create Customer Template FI";
         CreateSalesDimValueFI: Codeunit "Create Sales Dim Value FI";
         CreateShiptoAddressFI: Codeunit "Create Ship-to Address FI";
         CreateVendorFI: Codeunit "Create Vendor FI";
-        CreateVendorTemplateFI: Codeunit "Create Vendor Template FI";
         CreateVendorPostingGroupFI: Codeunit "Create Vendor Posting Group FI";
         CreatePurchDimValueFI: Codeunit "Create Purch. Dim. Value FI";
         CreateResourceFI: Codeunit "Create Resource FI";
@@ -236,9 +200,7 @@ codeunit 13414 "FI Contoso Localization"
         CreatePaymentTermsFI: Codeunit "Create Payment Terms FI";
         CreateAccScheduleLineFI: Codeunit "Create Acc. Schedule Line FI";
         CreateVatPostingGroupsFI: Codeunit "Create Vat Posting Groups FI";
-        CreateEmployeeTemplateFI: Codeunit "Create Employee Template FI";
         CreateVATSetupPostingGrpFI: Codeunit "Create VATSetupPostingGrp. FI";
-        CreateUnitOfMeasureTransFI: Codeunit "Create UnitOfMeasureTrans. FI";
         CreateVATStatementFI: Codeunit "Create VAT Statement FI";
     begin
         case Module of
@@ -246,7 +208,6 @@ codeunit 13414 "FI Contoso Localization"
                 begin
                     UnBindSubscription(CreateCountryRegionFI);
                     UnbindSubscription(CreatePaymentTermsFI);
-                    UnBindSubscription(CreateUnitOfMeasureTransFI);
                 end;
             Enum::"Contoso Demo Data Module"::Bank:
                 begin
@@ -264,7 +225,6 @@ codeunit 13414 "FI Contoso Localization"
             Enum::"Contoso Demo Data Module"::Sales:
                 begin
                     UnBindSubscription(CreateCustomerFI);
-                    UnBindSubscription(CreateCustomerTemplateFI);
                     UnBindSubscription(CreateShiptoAddressFI);
                     UnBindSubscription(CreateSalesDimValueFI);
                     UnBindSubscription(CreateReminderLevelFI);
@@ -273,7 +233,6 @@ codeunit 13414 "FI Contoso Localization"
             Enum::"Contoso Demo Data Module"::Purchase:
                 begin
                     UnBindSubscription(CreateVendorFI);
-                    UnBindSubscription(CreateVendorTemplateFI);
                     UnBindSubscription(CreatePurchDimValueFI);
                     UnBindSubscription(CreateVendorPostingGroupFI);
                 end;
@@ -294,10 +253,7 @@ codeunit 13414 "FI Contoso Localization"
                 end;
 
             Enum::"Contoso Demo Data Module"::"Human Resources Module":
-                begin
-                    UnBindSubscription(CreateEmployeeFI);
-                    UnBindSubscription(CreateEmployeeTemplateFI)
-                end;
+                UnBindSubscription(CreateEmployeeFI);
         end;
     end;
 }

@@ -8,7 +8,7 @@ pageextension 8071 "Purch Invoice Subform" extends "Purch. Invoice Subform"
     {
         addafter(Description)
         {
-            field("Attached to Contract Line"; Rec."Attached to Contract line")
+            field("Attached to Contract Line"; Rec."Attached to Sub. Contract line")
             {
                 ApplicationArea = All;
                 ToolTip = 'Specifies that the invoice line is linked to a contract line.';
@@ -40,23 +40,25 @@ pageextension 8071 "Purch Invoice Subform" extends "Purch. Invoice Subform"
                 Image = DataEntry;
                 Scope = Repeater;
                 ToolTip = 'Shows the related usage data.';
+                Enabled = UsageDataEnabled;
 
                 trigger OnAction()
                 var
                     UsageDataBilling: Record "Usage Data Billing";
-                    UsageBasedDocTypeConv: Codeunit "Usage Based Doc. Type Conv.";
                 begin
-                    UsageDataBilling.FilterOnDocumentTypeAndDocumentNo(UsageBasedDocTypeConv.ConvertPurchaseDocTypeToUsageBasedBillingDocType(Rec."Document Type"), Rec."Document No.");
-                    UsageDataBilling.SetRange("Document Line No.", Rec."Line No.");
-                    Page.RunModal(Page::"Usage Data Billings", UsageDataBilling);
+                    UsageDataBilling.ShowForPurchaseDocuments(Rec."Document Type", Rec."Document No.", Rec."Line No.");
                 end;
             }
+        }
+        addlast("F&unctions")
+        {
+
             action("Assign Contract Line")
             {
                 ApplicationArea = All;
                 Caption = 'Assign Contract Line';
                 Image = GetOrder;
-                ToolTip = 'Select a corresponding Vendor Contract line.';
+                ToolTip = 'Select a corresponding Vendor Subscription Contract line.';
                 Enabled = ContractLineCanBeAssigned;
 
                 trigger OnAction()
@@ -67,13 +69,17 @@ pageextension 8071 "Purch Invoice Subform" extends "Purch. Invoice Subform"
         }
     }
     trigger OnAfterGetCurrRecord()
+    var
+        UsageDataBilling: Record "Usage Data Billing";
     begin
         IsConnectedToBillingLine := Rec.IsLineAttachedToBillingLine();
         ContractLineCanBeAssigned := Rec.IsContractLineAssignable();
+        UsageDataEnabled := UsageDataBilling.ExistForPurchaseDocuments(Rec."Document Type", Rec."Document No.", Rec."Line No.");
     end;
 
     var
-        ContractsGeneralMgt: Codeunit "Contracts General Mgt.";
+        ContractsGeneralMgt: Codeunit "Sub. Contracts General Mgt.";
         IsConnectedToBillingLine: Boolean;
         ContractLineCanBeAssigned: Boolean;
+        UsageDataEnabled: Boolean;
 }

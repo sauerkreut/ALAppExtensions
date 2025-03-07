@@ -12,11 +12,9 @@ codeunit 8073 "Sales Report Printout Mgmt."
     SingleInstance = true;
 
     var
-        ReportFormatting: Codeunit "Report Formatting";
-        RecurringServicesTotalLbl: Label 'Recurring Services (*)';
-        RecurringServicesPerLineLbl: Label 'Recurring Services*';
-        ServicePriceLbl: Label 'Service Price';
-        ServiceDiscountPercLbl: Label 'Service Discount %';
+        ReportFormattingGlobal: Codeunit "Report Formatting";
+        RecurringServicesTotalLbl: Label 'Recurring Subscriptions (* Part of Recurring Billing)';
+        RecurringServicesPerLineLbl: Label 'Recurring Subscriptions*';
         TotalTextTok: Label 'TotalText', Locked = true;
 
     [InternalEvent(false, false)]
@@ -27,8 +25,8 @@ codeunit 8073 "Sales Report Printout Mgmt."
     internal procedure ExcludeItemFromTotals(var SalesLine: Record "Sales Line"; var TotalSubTotal: Decimal; var TotalInvDiscAmount: Decimal; var TotalAmount: Decimal; var TotalAmountVAT: Decimal; var TotalAmountInclVAT: Decimal)
     var
         Item: Record Item;
-        ContractRenewalMgt: Codeunit "Contract Renewal Mgt.";
-        ContractsItemManagement: Codeunit "Contracts Item Management";
+        ContractRenewalMgt: Codeunit "Sub. Contract Renewal Mgt.";
+        ContractsItemManagement: Codeunit "Sub. Contracts Item Management";
         IsHandled: Boolean;
         IncludeLineInTotals: Boolean;
     begin
@@ -52,7 +50,7 @@ codeunit 8073 "Sales Report Printout Mgmt."
 
     local procedure ReduceTotalsForSalesLine(var SalesLine: Record "Sales Line"; var TotalSubTotal: Decimal; var TotalInvDiscAmount: Decimal; var TotalAmount: Decimal; var TotalAmountVAT: Decimal; var TotalAmountInclVAT: Decimal)
     begin
-        TotalSubTotal -= SalesLine.Amount;
+        TotalSubTotal -= SalesLine."Line Amount";
         TotalInvDiscAmount += SalesLine."Inv. Discount Amount";
         TotalAmount -= SalesLine.Amount;
         TotalAmountVAT -= (SalesLine."Amount Including VAT" - SalesLine.Amount);
@@ -62,13 +60,13 @@ codeunit 8073 "Sales Report Printout Mgmt."
     [EventSubscriber(ObjectType::Report, Report::"Standard Sales - Order Conf.", OnLineOnAfterGetRecordOnBeforeCalcVATAmountLines, '', false, false)]
     local procedure SalesOrderOnBeforeCalcVATAmountLines(var SalesLine: Record "Sales Line")
     begin
-        SetFilterForVatCalculationOnSalesLine(SalesLine);
+        SalesLine.SetRange("Exclude from Doc. Total", false);
     end;
 
     [EventSubscriber(ObjectType::Report, Report::"Standard Sales - Order Conf.", OnHeaderOnAfterGetRecordOnAfterUpdateVATOnLines, '', false, false)]
     local procedure SalesOrderOnAfterUpdateVATOnLines(var SalesLine: Record "Sales Line")
     begin
-        ResetFilterForVatCalculationOnSalesLine(SalesLine);
+        SalesLine.SetRange("Exclude from Doc. Total");
     end;
 
     procedure FillServiceCommitmentsGroups(var SalesHeader: Record "Sales Header"; var ServCommGroupPerPeriod: Record "Name/Value Buffer"; var ServCommGroup: Record "Name/Value Buffer")
@@ -79,7 +77,7 @@ codeunit 8073 "Sales Report Printout Mgmt."
                 ServCommGroup.SetRange("Value Long", ServCommGroupPerPeriod."Value Long");
                 if ServCommGroup.IsEmpty then begin
                     ServCommGroup.Reset();
-                    ReportFormatting.AddValueToBuffer(ServCommGroup, '', '', ServCommGroupPerPeriod."Value Long");
+                    ReportFormattingGlobal.AddValueToBuffer(ServCommGroup, '', '', ServCommGroupPerPeriod."Value Long");
                 end else
                     ServCommGroup.Reset();
             until ServCommGroupPerPeriod.Next() = 0;
@@ -89,7 +87,7 @@ codeunit 8073 "Sales Report Printout Mgmt."
 
     procedure FillServiceCommitmentsGroupPerPeriod(var SalesHeader: Record "Sales Header"; var GroupPerPeriod: Record "Name/Value Buffer")
     var
-        SalesServiceCommitment: Record "Sales Service Commitment";
+        SalesServiceCommitment: Record "Sales Subscription Line";
         TempSalesServiceCommitmentBuff: Record "Sales Service Commitment Buff." temporary;
         FormatDocument: Codeunit "Format Document";
         TotalText: Text[50];
@@ -100,15 +98,15 @@ codeunit 8073 "Sales Report Printout Mgmt."
     begin
         FormatDocument.SetTotalLabels(SalesHeader.GetCurrencySymbol(), TotalText, TotalInclVATText, TotalExclVATText);
         SalesServiceCommitment.CalcVATAmountLines(SalesHeader, TempSalesServiceCommitmentBuff, UniqueRhythmDictionary);
-        OnBeforeFillServiceCommitmentsGroupPerPeriod(SalesHeader, TempSalesServiceCommitmentBuff, GroupPerPeriod, UniqueRhythmDictionary, TotalText, TotalInclVATText, TotalExclVATText, IsHandled);
+        OnBeforeFillSubscriptionLinesGroupPerPeriod(SalesHeader, TempSalesServiceCommitmentBuff, GroupPerPeriod, UniqueRhythmDictionary, TotalText, TotalInclVATText, TotalExclVATText, IsHandled);
         if not IsHandled then
             FillServiceCommitmentsGroupPerPeriod(TempSalesServiceCommitmentBuff, GroupPerPeriod, UniqueRhythmDictionary, SalesHeader."Currency Code", TotalInclVATText, TotalExclVATText);
     end;
 
     procedure FillServiceCommitmentsForLine(var SalesHeader: Record "Sales Header"; var SalesLineServiceCommitments: Record "Sales Line"; var SalesLineServiceCommitmentsCaption: Record "Name/Value Buffer")
     var
-        SalesServiceCommitment: Record "Sales Service Commitment";
-        ShowDiscount: Boolean;
+        SalesServiceCommitment: Record "Sales Subscription Line";
+        SalesLine: Record "Sales Line";
     begin
         SalesServiceCommitment.SetRange("Document Type", SalesHeader."Document Type");
         SalesServiceCommitment.SetRange("Document No.", SalesHeader."No.");
@@ -116,60 +114,34 @@ codeunit 8073 "Sales Report Printout Mgmt."
         SalesServiceCommitment.SetRange("Invoicing via", SalesServiceCommitment."Invoicing via"::Contract);
         if SalesServiceCommitment.FindSet() then begin
             repeat
+                SalesLine.Get(SalesServiceCommitment."Document Type", SalesServiceCommitment."Document No.", SalesServiceCommitment."Document Line No.");
                 SalesLineServiceCommitments.Init();
                 SalesLineServiceCommitments."Document Type" := SalesServiceCommitment."Document Type";
                 SalesLineServiceCommitments."Document No." := Format(SalesServiceCommitment."Document Line No.");
                 SalesLineServiceCommitments."Line No." := SalesServiceCommitment."Line No.";
                 SalesLineServiceCommitments.Description := SalesServiceCommitment.Description;
-                SalesLineServiceCommitments."Line Discount %" := -Round(SalesServiceCommitment."Discount %", 0.1);
+                SalesLineServiceCommitments."Line Discount %" := Round(SalesServiceCommitment."Discount %", 0.1);
                 SalesLineServiceCommitments."Unit Price" := SalesServiceCommitment.Price;
                 SalesLineServiceCommitments.Insert(false);
-                if SalesServiceCommitment."Discount %" <> 0 then
-                    ShowDiscount := true;
             until SalesServiceCommitment.Next() = 0;
             // Adds captions for Line Details
-            ReportFormatting.AddValueToBuffer(SalesLineServiceCommitmentsCaption, TotalTextTok, RecurringServicesTotalLbl);
-            ReportFormatting.AddValueToBuffer(SalesLineServiceCommitmentsCaption, SalesLineServiceCommitments.FieldName(Description), RecurringServicesPerLineLbl);
-            if ShowDiscount then
-                ReportFormatting.AddValueToBuffer(SalesLineServiceCommitmentsCaption, SalesLineServiceCommitments.FieldName("Line Discount %"), ServiceDiscountPercLbl);
-            ReportFormatting.AddValueToBuffer(SalesLineServiceCommitmentsCaption, SalesLineServiceCommitments.FieldName("Unit Price"), ServicePriceLbl);
+            ReportFormattingGlobal.AddValueToBuffer(SalesLineServiceCommitmentsCaption, TotalTextTok, RecurringServicesTotalLbl);
+            ReportFormattingGlobal.AddValueToBuffer(SalesLineServiceCommitmentsCaption, SalesLineServiceCommitments.FieldName(Description), RecurringServicesPerLineLbl);
         end;
-    end;
-
-    local procedure SetFilterForVatCalculationOnSalesLine(var Line: Record "Sales Line")
-    var
-        ContractRenewalMgt: Codeunit "Contract Renewal Mgt.";
-        ContractsItemManagement: Codeunit "Contracts Item Management";
-    begin
-        if Line.FindSet() then
-            repeat
-                Line.Mark(true);
-                if ContractRenewalMgt.IsContractRenewal(Line) then
-                    Line.Mark(false)
-                else
-                    if Line.Type = Enum::"Sales Line Type"::Item then
-                        if ContractsItemManagement.IsServiceCommitmentItem(Line."No.") then
-                            Line.Mark(false);
-            until Line.Next() = 0;
-        Line.MarkedOnly(true);
-    end;
-
-    local procedure ResetFilterForVatCalculationOnSalesLine(var Line: Record "Sales Line")
-    begin
-        Line.MarkedOnly(false);
     end;
 
     local procedure FillServiceCommitmentsGroupPerPeriod(var TempSalesServiceCommitmentBuff: Record "Sales Service Commitment Buff." temporary; var GroupPerPeriod: Record "Name/Value Buffer"; var UniqueRhythmDictionary: Dictionary of [Code[20], Text]; CurrencyCode: Code[10]; TotalInclVATText: Text[50]; TotalExclVATText: Text[50])
     var
         Currency: Record Currency;
         AutoFormat: Codeunit "Auto Format";
-        ContractRenewalMgt: Codeunit "Contract Renewal Mgt.";
+        ContractRenewalMgt: Codeunit "Sub. Contract Renewal Mgt.";
         ReportFormatting: Codeunit "Report Formatting";
         RhythmIdentifier: Code[20];
         AutoFormatType: Enum "Auto Format";
         BillingRhythmLbl: Label 'Per %1', Comment = '%1 = Billing Rhythm Text';
         PlaceholderLbl: Label '%1', Comment = '%1 = Billing Rhythm Text', Locked = true;
-        VATTextLbl: Label 'VAT Amount';
+        VATAmountLbl: Label 'VAT Amount';
+        TaxAmountLbl: Label 'Tax Amount';
         BillingRhythmPlaceholderTxt: Text;
         FormatTotal: Text[50];
         FormatDecimal: Text[50];
@@ -189,7 +161,10 @@ codeunit 8073 "Sales Report Printout Mgmt."
             if TempSalesServiceCommitmentBuff.FindSet() then
                 repeat
                     FormatDecimal := Format(TempSalesServiceCommitmentBuff."VAT Amount", 0, AutoFormat.ResolveAutoFormat(AutoFormatType::AmountFormat, Currency.Code));
-                    ReportFormatting.AddValueToBuffer(GroupPerPeriod, VATTextLbl + ' [' + Format(TempSalesServiceCommitmentBuff."VAT %") + '%]', FormatDecimal, StrSubstNo(BillingRhythmPlaceholderTxt, UniqueRhythmDictionary.Get(RhythmIdentifier)));
+                    if TempSalesServiceCommitmentBuff."VAT Calculation Type" = TempSalesServiceCommitmentBuff."VAT Calculation Type"::"Sales Tax" then
+                        ReportFormatting.AddValueToBuffer(GroupPerPeriod, TaxAmountLbl, FormatDecimal, StrSubstNo(BillingRhythmPlaceholderTxt, UniqueRhythmDictionary.Get(RhythmIdentifier)))
+                    else
+                        ReportFormatting.AddValueToBuffer(GroupPerPeriod, VATAmountLbl + ' [' + Format(TempSalesServiceCommitmentBuff."VAT %") + '%]', FormatDecimal, StrSubstNo(BillingRhythmPlaceholderTxt, UniqueRhythmDictionary.Get(RhythmIdentifier)));
                 until TempSalesServiceCommitmentBuff.Next() = 0;
             // Set VAT Footer with Total
             TempSalesServiceCommitmentBuff.CalcSums("Amount Including VAT");
@@ -199,7 +174,7 @@ codeunit 8073 "Sales Report Printout Mgmt."
     end;
 
     [InternalEvent(false, false)]
-    local procedure OnBeforeFillServiceCommitmentsGroupPerPeriod(SalesHeader: Record "Sales Header"; var TempSalesServiceCommitmentBuff: Record "Sales Service Commitment Buff." temporary; var GroupPerPeriod: Record "Name/Value Buffer"; var UniqueRhythmDictionary: Dictionary of [Code[20], Text]; TotalText: Text[50]; TotalInclVATText: Text[50]; TotalExclVATText: Text[50]; var IsHandled: Boolean)
+    local procedure OnBeforeFillSubscriptionLinesGroupPerPeriod(SalesHeader: Record "Sales Header"; var TempSalesSubscriptionLineBuff: Record "Sales Service Commitment Buff." temporary; var GroupPerPeriod: Record "Name/Value Buffer"; var UniqueRhythmDictionary: Dictionary of [Code[20], Text]; TotalText: Text[50]; TotalInclVATText: Text[50]; TotalExclVATText: Text[50]; var IsHandled: Boolean)
     begin
     end;
 

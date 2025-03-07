@@ -65,6 +65,10 @@ codeunit 6136 "E-Document Create Purch. Doc."
         then
             EDocumentImportHelper.ProcessFieldNoValidate(DocumentHeader, PurchaseHeader.FieldNo("Pay-to Name"), TempDocumentHeader.Field(PurchaseHeader.FieldNo("Pay-to Name")).Value());
 
+        // Process date fields
+        DocumentHeader.Field(PurchaseHeader.FieldNo("Document Date")).Value(TempDocumentHeader.Field(PurchaseHeader.FieldNo("Document Date")).Value());
+        DocumentHeader.Field(PurchaseHeader.FieldNo("Due Date")).Value(TempDocumentHeader.Field(PurchaseHeader.FieldNo("Due Date")).Value());
+        
         // Processing the rest of the header fields
         PurchaseField.Reset();
         PurchaseField.SetRange(TableNo, Database::"Purchase Header");
@@ -180,6 +184,10 @@ codeunit 6136 "E-Document Create Purch. Doc."
         Value := TempDocumentHeader.Field(PurchaseHeader.FieldNo("VAT Base Discount %")).Value();
         if Format(Value) <> '' then
             PurchaseHeader.Validate("VAT Base Discount %", Value);
+
+        Value := TempDocumentHeader.Field(PurchaseHeader.FieldNo("Prices Including VAT")).Value();
+        if Format(Value) <> '' then
+            PurchaseHeader.Validate("Prices Including VAT", Value);
 
         PurchaseHeader.Modify(true);
         RecRef.GetTable(PurchaseHeader);

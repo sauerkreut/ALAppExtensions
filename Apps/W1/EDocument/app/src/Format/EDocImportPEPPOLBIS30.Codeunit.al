@@ -118,11 +118,16 @@ codeunit 6166 "EDoc Import PEPPOL BIS 3.0"
         VATRegistrationNo: Text[20];
         VendorId: Text;
         VendorNo: Code[20];
+        GLN: Code[13];
     begin
-        // Vendor
-        VATRegistrationNo := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID'), 1, MaxStrLen(VATRegistrationNo));
-        VendorNo := EDocumentImportHelper.FindVendor('', '', VATRegistrationNo);
+        // Read GLN or VAT Registration No based on the scheme ID.
+        if GetNodeAttributeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID/@schemeID') = GLNSchemeId() then
+            GLN := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID'), 1, MaxStrLen(GLN));
 
+        VATRegistrationNo := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'), 1, MaxStrLen(VATRegistrationNo));
+        VendorNo := EDocumentImportHelper.FindVendor('', GLN, VATRegistrationNo);
+
+        // If vendor not found, try to find by Service Participant.
         if VendorNo = '' then begin
             VendorId := GetNodeAttributeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID/@schemeID') + ':';
             VendorId += this.GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cbc:EndpointID');
@@ -139,6 +144,7 @@ codeunit 6166 "EDoc Import PEPPOL BIS 3.0"
             VendorNo := ServiceParticipant.Participant;
         end;
 
+        // If vendor not found, try to find by name and address.
         if VendorNo = '' then begin
             VendorName := GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cac:PartyName/cbc:Name');
             VendorAddress := GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cbc:StreetName');
@@ -156,11 +162,32 @@ codeunit 6166 "EDoc Import PEPPOL BIS 3.0"
     local procedure ParseAccountingCustomerParty(var EDocument: Record "E-Document"; var TempXMLBuffer: Record "XML Buffer" temporary; DocumentType: Text)
     var
         ReceivingId: Text[250];
+        SchemaId, CompanyIdentifierValue : Text;
     begin
+        Clear(EDocument."Receiving Company Name");
+        Clear(EDocument."Receiving Company Address");
+        Clear(EDocument."Receiving Company VAT Reg. No.");
+        Clear(EDocument."Receiving Company GLN");
+        Clear(EDocument."Receiving Company Id");
+
         EDocument."Receiving Company Name" := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cac:PartyName/cbc:Name'), 1, MaxStrLen(EDocument."Receiving Company Name"));
         EDocument."Receiving Company Address" := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cbc:StreetName'), 1, MaxStrLen(EDocument."Receiving Company Address"));
-        EDocument."Receiving Company GLN" := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID'), 1, MaxStrLen(EDocument."Receiving Company GLN"));
+        SchemaId := GetNodeAttributeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID/@schemeID');
+        CompanyIdentifierValue := GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID');
+
         EDocument."Receiving Company VAT Reg. No." := CopyStr(GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cac:PartyTaxScheme/cbc:CompanyID'), 1, MaxStrLen(EDocument."Receiving Company VAT Reg. No."));
+        if SchemaId = '0088' then
+            EDocument."Receiving Company GLN" := CopyStr(CompanyIdentifierValue, 1, MaxStrLen(EDocument."Receiving Company GLN"));
+
+        if (EDocument."Receiving Company VAT Reg. No." = '') and (SchemaId <> '0088') then
+            EDocument."Receiving Company VAT Reg. No." := CopyStr(CompanyIdentifierValue, 1, MaxStrLen(EDocument."Receiving Company VAT Reg. No."));
+
+        SchemaId := GetNodeAttributeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cac:PartyIdentification/cbc:ID/@schemeID');
+        CompanyIdentifierValue := GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cac:PartyIdentification/cbc:ID');
+
+        if (EDocument."Receiving Company GLN" = '') and (SchemaId = '0088') then
+            EDocument."Receiving Company GLN" := CopyStr(CompanyIdentifierValue, 1, MaxStrLen(EDocument."Receiving Company GLN"));
+
         ReceivingId := CopyStr(this.GetNodeAttributeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID/@schemeID'), 1, (MaxStrLen(EDocument."Receiving Company Id") - 1)) + ':';
         ReceivingId += CopyStr(this.GetNodeByPath(TempXMLBuffer, '/' + DocumentType + '/cac:AccountingCustomerParty/cac:Party/cbc:EndpointID'), 1, MaxStrLen(EDocument."Receiving Company Id") - StrLen(ReceivingId));
         EDocument."Receiving Company Id" := ReceivingId;
@@ -193,6 +220,7 @@ codeunit 6166 "EDoc Import PEPPOL BIS 3.0"
 
         // Insert last line
         PurchaseLine.Insert();
+        PurchaseHeader."Prices Including VAT" := false;
         PurchaseHeader.Modify();
 
         // Allowance charge
@@ -551,6 +579,11 @@ codeunit 6166 "EDoc Import PEPPOL BIS 3.0"
 
         if TempXMLBuffer.FindFirst() then
             exit(TempXMLBuffer.Value);
+    end;
+
+    local procedure GLNSchemeId(): Text
+    begin
+        exit('0088');
     end;
 
     local procedure GetDocumentType(var TempXMLBuffer: Record "XML Buffer" temporary): Text

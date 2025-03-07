@@ -19,7 +19,7 @@ pageextension 8065 "Posted Sales Cr. Memo Subform" extends "Posted Sales Cr. Mem
 
                 trigger OnAction()
                 begin
-                    ContractsGeneralMgt.ShowArchivedBillingLines(Rec."Contract No.", Rec."Contract Line No.", Enum::"Service Partner"::Customer, Enum::"Rec. Billing Document Type"::"Credit Memo", Rec."Document No.");
+                    ContractsGeneralMgt.ShowArchivedBillingLines(Rec."Subscription Contract No.", Rec."Subscription Contract Line No.", Enum::"Service Partner"::Customer, Enum::"Rec. Billing Document Type"::"Credit Memo", Rec."Document No.");
                 end;
             }
             action("Usage Data")
@@ -29,25 +29,28 @@ pageextension 8065 "Posted Sales Cr. Memo Subform" extends "Posted Sales Cr. Mem
                 Image = DataEntry;
                 Scope = Repeater;
                 ToolTip = 'Shows the related usage data.';
+                Enabled = UsageDataEnabled;
 
                 trigger OnAction()
                 var
                     UsageDataBilling: Record "Usage Data Billing";
                 begin
-                    UsageDataBilling.FilterOnDocumentTypeAndDocumentNo("Usage Based Billing Doc. Type"::"Posted Credit Memo", Rec."Document No.");
-                    UsageDataBilling.SetRange("Document Line No.", Rec."Line No.");
-                    Page.RunModal(Page::"Usage Data Billings", UsageDataBilling);
+                    UsageDataBilling.ShowForDocuments(Enum::"Service Partner"::Customer, "Usage Based Billing Doc. Type"::"Posted Credit Memo", Rec."Document No.", Rec."Line No.");
                 end;
             }
         }
     }
 
     trigger OnAfterGetCurrRecord()
+    var
+        UsageDataBilling: Record "Usage Data Billing";
     begin
-        IsConnectedToContractLine := ContractsGeneralMgt.HasConnectionToContractLine(Rec."Contract No.", Rec."Contract Line No.");
+        IsConnectedToContractLine := ContractsGeneralMgt.HasConnectionToContractLine(Rec."Subscription Contract No.", Rec."Subscription Contract Line No.");
+        UsageDataEnabled := UsageDataBilling.ExistForDocuments(Enum::"Service Partner"::Customer, "Usage Based Billing Doc. Type"::"Posted Credit Memo", Rec."Document No.", Rec."Line No.");
     end;
 
     var
-        ContractsGeneralMgt: Codeunit "Contracts General Mgt.";
+        ContractsGeneralMgt: Codeunit "Sub. Contracts General Mgt.";
         IsConnectedToContractLine: Boolean;
+        UsageDataEnabled: Boolean;
 }

@@ -10,7 +10,7 @@ codeunit 8071 "Sub. Billing Activities Cue"
     Permissions = tabledata "Subscription Billing Cue" = r;
 
     var
-        Results: Dictionary of [Text, Text];
+        ResultsGlobal: Dictionary of [Text, Text];
 
     trigger OnRun()
     var
@@ -18,9 +18,9 @@ codeunit 8071 "Sub. Billing Activities Cue"
     begin
         Parameters := Page.GetBackgroundParameters();
 
-        CalculateFieldValues(Parameters, Results);
+        CalculateFieldValues(Parameters, ResultsGlobal);
 
-        Page.SetBackgroundTaskResult(Results);
+        Page.SetBackgroundTaskResult(ResultsGlobal);
     end;
 
     procedure CalculateFieldValues(Parameters: Dictionary of [Text, Text]; var ReturnResults: Dictionary of [Text, Text])
@@ -40,7 +40,7 @@ codeunit 8071 "Sub. Billing Activities Cue"
 
     local procedure CalculateCueFieldValues(var SubscriptionBillingCue: Record "Subscription Billing Cue")
     var
-        TemporaryOverdueServiceCommitments: Record "Overdue Service Commitments" temporary;
+        TemporaryOverdueServiceCommitments: Record "Overdue Subscription Line" temporary;
     begin
         SubscriptionBillingCue."Revenue current Month" := RevenueCurrentMonth();
         SubscriptionBillingCue."Cost current Month" := CostCurrentMonth();
@@ -79,7 +79,7 @@ codeunit 8071 "Sub. Billing Activities Cue"
 
     internal procedure DrillDownOverdueServiceCommitments()
     var
-        TemporaryOverdueServiceCommitments: Record "Overdue Service Commitments" temporary;
+        TemporaryOverdueServiceCommitments: Record "Overdue Subscription Line" temporary;
     begin
         TemporaryOverdueServiceCommitments.FillOverdueServiceCommitments();
         Page.Run(Page::"Overdue Service Commitments", TemporaryOverdueServiceCommitments);
@@ -125,12 +125,12 @@ codeunit 8071 "Sub. Billing Activities Cue"
         DateFilterFrom: Text;
         DateFilterTo: Text;
     begin
-        GetDateFilters(CurrentMonth, DateFilterFrom, DateFilterTo);
-        SalesInvLine.SetFilter("Contract No.", '<>%1', '');
+        GetDateFilterFormulas(CurrentMonth, DateFilterFrom, DateFilterTo);
+        SalesInvLine.SetFilter("Subscription Contract No.", '<>%1', '');
         SalesInvLine.SetRange("Posting Date", CalcDate(DateFilterFrom, WorkDate()), CalcDate(DateFilterTo, WorkDate()));
         SalesInvLine.CalcSums(Amount);
 
-        SalesCrMemoLine.SetFilter("Contract No.", '<>%1', '');
+        SalesCrMemoLine.SetFilter("Subscription Contract No.", '<>%1', '');
         SalesCrMemoLine.SetRange("Posting Date", CalcDate(DateFilterFrom, WorkDate()), CalcDate(DateFilterTo, WorkDate()));
         SalesCrMemoLine.CalcSums(Amount);
 
@@ -144,26 +144,26 @@ codeunit 8071 "Sub. Billing Activities Cue"
         DateFilterFrom: Text;
         DateFilterTo: Text;
     begin
-        GetDateFilters(CurrentMonth, DateFilterFrom, DateFilterTo);
-        PurchInvLine.SetFilter("Contract No.", '<>%1', '');
+        GetDateFilterFormulas(CurrentMonth, DateFilterFrom, DateFilterTo);
+        PurchInvLine.SetFilter("Subscription Contract No.", '<>%1', '');
         PurchInvLine.SetRange("Posting Date", CalcDate(DateFilterFrom, WorkDate()), CalcDate(DateFilterTo, WorkDate()));
         PurchInvLine.CalcSums(Amount);
 
-        PurchCrMemoLine.SetFilter("Contract No.", '<>%1', '');
+        PurchCrMemoLine.SetFilter("Subscription Contract No.", '<>%1', '');
         PurchCrMemoLine.SetRange("Posting Date", CalcDate(DateFilterFrom, WorkDate()), CalcDate(DateFilterTo, WorkDate()));
         PurchCrMemoLine.CalcSums(Amount);
 
         exit(PurchInvLine.Amount - PurchCrMemoLine.Amount);
     end;
 
-    local procedure GetDateFilters(CurrentMonth: Boolean; var DateFilterFrom: Text; var DateFilterTo: Text)
+    procedure GetDateFilterFormulas(CurrentMonth: Boolean; var DateFilterFrom: Text; var DateFilterTo: Text)
     begin
         if CurrentMonth then begin
             DateFilterFrom := '<-CM>';
             DateFilterTo := '<CM>';
         end else begin
-            DateFilterFrom := '<-CM-1M>';
-            DateFilterTo := '<CM-1M>';
+            DateFilterFrom := '<-1M-CM>';
+            DateFilterTo := '<-1M+CM>';
         end;
     end;
 

@@ -25,7 +25,7 @@ codeunit 6257 "SustCostManagement"
         if not CalculateAverageCost(Item, AverageCost) then
             exit;
 
-        Item."CO2e per Unit" := Round(AverageCost, SustSetup."Emission Rounding Precision");
+        Item."CO2e per Unit" := AverageCost;
     end;
 
     procedure CalculateAverageCost(var Item: Record Item; var AverageCost: Decimal): Boolean
@@ -36,7 +36,7 @@ codeunit 6257 "SustCostManagement"
         AverageCost := 0;
 
         ExcludeOpenOutbndCosts(Item, AverageCost, AverageQty);
-        AverageQty := AverageQty + CalculateQuantity(Item);
+        AverageQty := AverageQty + CalculateQuantity(Item) - GetTransferQuantity(Item);
 
         if AverageQty <> 0 then begin
             CostAmt := AverageCost + CalculateCostAmt(Item, true) + CalculateCostAmt(Item, false);
@@ -108,6 +108,14 @@ codeunit 6257 "SustCostManagement"
         exit(SustValueEntry."CO2e Amount (Expected)");
     end;
 
+    local procedure GetTransferQuantity(var Item: Record Item) CalcQty: Decimal
     var
-        SustSetup: Record "Sustainability Setup";
+        SustValueEntry: Record "Sustainability Value Entry";
+    begin
+        SetFilters(SustValueEntry, Item);
+        SustValueEntry.SetRange("Item Ledger Entry Type", SustValueEntry."Item Ledger Entry Type"::Transfer);
+        SustValueEntry.CalcSums("Item Ledger Entry Quantity");
+        CalcQty := SustValueEntry."Item Ledger Entry Quantity";
+        exit(CalcQty);
+    end;
 }
