@@ -35,6 +35,27 @@ codeunit 6135 "E-Document WorkFlow Processing"
             until Workflow.Next() = 0;
     end;
 
+    internal procedure GetEDocumentServicesInWorkflow(WorkFlow: Record Workflow; var EDocumentService: Record "E-Document Service"): Boolean
+    var
+        WorkflowStepArgument: Record "Workflow Step Argument";
+        WorkflowStep: Record "Workflow Step";
+        Filter: Text;
+    begin
+        WorkflowStep.SetRange("Workflow Code", Workflow.Code);
+        WorkflowStep.SetRange(Type, WorkflowStep.Type::Response);
+        if WorkflowStep.FindSet() then
+            repeat
+                WorkflowStepArgument.Get(WorkflowStep.Argument);
+                AddFilter(Filter, WorkflowStepArgument."E-Document Service");
+            until WorkflowStep.Next() = 0;
+
+        if Filter = '' then
+            exit(false);
+
+        EDocumentService.SetFilter(Code, Filter);
+        exit(true);
+    end;
+
     internal procedure DoesFlowHasEDocService(var EDocServices: Record "E-Document Service"; WorkfLowCode: Code[20]): Boolean
     var
         WorkflowStepArgument: Record "Workflow Step Argument";
@@ -229,8 +250,11 @@ codeunit 6135 "E-Document WorkFlow Processing"
     var
         EDocErrorHelper: Codeunit "E-Document Error Helper";
     begin
-        WorkflowStepArgument.Get(WorkflowStepInstance.Argument);
+        // Check that step instance corresponds to workflow code set by document sending profile for the document
+        if WorkflowStepInstance."Workflow Code" <> EDocument."Workflow Code" then
+            Error(WrongWorkflowStepInstanceFoundErr, WorkflowStepInstance."Workflow Code");
 
+        WorkflowStepArgument.Get(WorkflowStepInstance.Argument);
         if WorkflowStepArgument."E-Document Service" = '' then begin
             EDocErrorHelper.LogErrorMessage(EDocument, WorkflowStepArgument, WorkflowStepArgument.FieldNo("E-Document Service"), 'E-Document Service must be specified in Workflow Argument');
             exit(false);
@@ -276,6 +300,7 @@ codeunit 6135 "E-Document WorkFlow Processing"
 
     var
         EDocumentProcessing: Codeunit "E-Document Processing";
+        WrongWorkflowStepInstanceFoundErr: Label 'Workflow %1 was executed but did not match the one set for E-Document. Ensure that the response argument condition in the workflow is the only true condition across all workflows.', Comment = '%1 - Workflow code';
         NotSupportedBatchModeErr: Label 'Batch Mode %1 is not supported in E-Document Framework.', Comment = '%1 - The batch mode enum value';
         EDocTelemetryProcessingStartScopeLbl: Label 'E-Document Processing: Start Scope', Locked = true;
         EDocTelemetryProcessingEndScopeLbl: Label 'E-Document Processing: End Scope', Locked = true;
