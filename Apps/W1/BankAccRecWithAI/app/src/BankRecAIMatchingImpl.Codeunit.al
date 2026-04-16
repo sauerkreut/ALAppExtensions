@@ -18,35 +18,9 @@ codeunit 7250 "Bank Rec. AI Matching Impl."
         CompletionTaskTxt: SecretText;
         CompletionTaskPartTxt: SecretText;
         CompletionTaskBuildingFromKeyVaultFailed: Boolean;
-        ConcatSubstrTok: Label '%1%2', Locked = true;
     begin
         if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching1') then
             CompletionTaskTxt := CompletionTaskPartTxt
-        else
-            CompletionTaskBuildingFromKeyVaultFailed := true;
-
-        if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching2') then
-            CompletionTaskTxt := SecretStrSubstNo(ConcatSubstrTok, CompletionTaskTxt, CompletionTaskPartTxt)
-        else
-            CompletionTaskBuildingFromKeyVaultFailed := true;
-
-        if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching3') then
-            CompletionTaskTxt := SecretStrSubstNo(ConcatSubstrTok, CompletionTaskTxt, CompletionTaskPartTxt)
-        else
-            CompletionTaskBuildingFromKeyVaultFailed := true;
-
-        if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching4') then
-            CompletionTaskTxt := SecretStrSubstNo(ConcatSubstrTok, CompletionTaskTxt, CompletionTaskPartTxt)
-        else
-            CompletionTaskBuildingFromKeyVaultFailed := true;
-
-        if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching5') then
-            CompletionTaskTxt := SecretStrSubstNo(ConcatSubstrTok, CompletionTaskTxt, CompletionTaskPartTxt)
-        else
-            CompletionTaskBuildingFromKeyVaultFailed := true;
-
-        if GetAzureKeyVaultSecret(CompletionTaskPartTxt, 'BankAccRecAIMatching6') then
-            CompletionTaskTxt := SecretStrSubstNo(ConcatSubstrTok, CompletionTaskTxt, CompletionTaskPartTxt)
         else
             CompletionTaskBuildingFromKeyVaultFailed := true;
 
@@ -252,13 +226,13 @@ codeunit 7250 "Bank Rec. AI Matching Impl."
     begin
         // this is because we are using GPT4 which has a 100K token limit
         // on top of that, we are setting aside a number of tokens for the response in MaxTokens())
-        exit(18000);
+        exit(48000);
     end;
 
     procedure LedgerEntryInputThreshold(): Integer
     begin
         // this is the max size of the part of the prompt that carries information about ledger entries
-        exit(10000);
+        exit(32000);
     end;
 
     procedure MaxTokens(): Integer
@@ -353,10 +327,12 @@ codeunit 7250 "Bank Rec. AI Matching Impl."
         AOAIDeployments: Codeunit "AOAI Deployments";
         AOAIOperationResponse: Codeunit "AOAI Operation Response";
         AOAIChatCompletionParams: Codeunit "AOAI Chat Completion Params";
+        AOAIPolicyParams: Codeunit "AOAI Policy Params";
         AOAIChatMessages: Codeunit "AOAI Chat Messages";
         CompletionAnswerTxt: Text;
         NumberOfFoundMatches: Integer;
         NewLineChar: Char;
+        UserMessageWithXPIADetectionTagsTxt: Text;
     begin
         NewLineChar := 10;
         NumberOfFoundMatches := 0;
@@ -367,11 +343,17 @@ codeunit 7250 "Bank Rec. AI Matching Impl."
         // Generate OpenAI Completion
         AzureOpenAI.SetAuthorization(Enum::"AOAI Model Type"::"Chat Completions", AOAIDeployments.GetGPT41Latest());
         AzureOpenAI.SetCopilotCapability(Enum::"Copilot Capability"::"Bank Account Reconciliation");
+        AOAIPolicyParams.SetXPIADetection(true);
+        AOAIPolicyParams.SetHarmsSeverity(Enum::"AOAI Policy Harms Severity"::Medium);
         AOAIChatCompletionParams.SetMaxTokens(MaxTokens());
         AOAIChatCompletionParams.SetTemperature(0);
+        AOAIChatCompletionParams.SetAOAIPolicyParams(AOAIPolicyParams);
         AOAIChatMessages.AddSystemMessage(CompletionTaskTxt.Unwrap().Replace('\n', NewLineChar));
-        if not UserMessageTxt.IsEmpty() then
-            AOAIChatMessages.AddUserMessage(UserMessageTxt.Unwrap().Replace('\n', NewLineChar));
+        if not UserMessageTxt.IsEmpty() then begin
+            UserMessageWithXPIADetectionTagsTxt := UserMessageTxt.Unwrap().Replace('\n', NewLineChar);
+            AOAIChatMessages.AddXPIADetectionTags(UserMessageWithXPIADetectionTagsTxt);
+            AOAIChatMessages.AddUserMessage(UserMessageWithXPIADetectionTagsTxt);
+        end;
         AzureOpenAI.GenerateChatCompletion(AOAIChatMessages, AOAIChatCompletionParams, AOAIOperationResponse);
         if AOAIOperationResponse.IsSuccess() then
             CompletionAnswerTxt := AOAIOperationResponse.GetResult()

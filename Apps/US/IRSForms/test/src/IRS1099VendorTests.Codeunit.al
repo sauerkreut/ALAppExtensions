@@ -6,8 +6,8 @@ namespace Microsoft.Finance.VAT.Reporting;
 
 using Microsoft.Finance.VAT.Setup;
 using Microsoft.Purchases.Document;
-using Microsoft.Purchases.Payables;
 using Microsoft.Purchases.History;
+using Microsoft.Purchases.Payables;
 using Microsoft.Purchases.Vendor;
 using System.TestLibraries.Utilities;
 
@@ -165,11 +165,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
     procedure ChangeIRSDataInVendorLedgerEntry()
     var
         VendorLedgerEntry: Record "Vendor Ledger Entry";
-#if not CLEAN25
-#pragma warning disable AL0432
-        IRSFormsEnableFeature: Codeunit "IRS Forms Enable Feature";
-#pragma warning restore AL0432
-#endif
         VendorLedgerEntriesPage: TestPage "Vendor Ledger Entries";
         NewPeriodNo, FormNo, NewFormNo, FormBoxNo, NewFormBoxNo : Code[20];
         IRSAmount: Decimal;
@@ -178,9 +173,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         // [SCENARIO 495389] Stan can change the IRS data in the posted vendor ledger entry
 
         Initialize();
-#if not CLEAN25
-        BindSubscription(IRSFormsEnableFeature);
-#endif
         LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
         FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
         FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
@@ -211,20 +203,12 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         VendorLedgerEntry.TestField("IRS 1099 Form Box No.", NewFormBoxNo);
         VendorLedgerEntry.TestField("IRS 1099 Reporting Amount", IRSAmount);
 
-#if not CLEAN25
-        UnbindSubscription(IRSFormsEnableFeature);
-#endif
     end;
 
     [Test]
     procedure SetIRSAmountMoreThanAmountInVendLedgEntry()
     var
         VendorLedgerEntry: Record "Vendor Ledger Entry";
-#if not CLEAN25
-#pragma warning disable AL0432
-        IRSFormsEnableFeature: Codeunit "IRS Forms Enable Feature";
-#pragma warning restore AL0432
-#endif
         VendorLedgerEntriesPage: TestPage "Vendor Ledger Entries";
         FormNo, FormBoxNo : Code[20];
         IRSAmount: Decimal;
@@ -232,9 +216,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         // [SCENARIO 495389] Stan cannot set the IRS Reporting Amount more than amount in Vendor Ledger Entry
 
         Initialize();
-#if not CLEAN25
-        BindSubscription(IRSFormsEnableFeature);
-#endif
         LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
         FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
         FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
@@ -251,20 +232,12 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         // [THEN] An error message "IRS Reporting Amount cannot be more than -300" is thrown
         Assert.ExpectedError(IRSReportingAmountCannotBeMoreThanAmountErr);
 
-#if not CLEAN25
-        UnbindSubscription(IRSFormsEnableFeature);
-#endif
     end;
 
     [Test]
     procedure SetPositiveIRSAmountInInvVendLedgEntry()
     var
         VendorLedgerEntry: Record "Vendor Ledger Entry";
-#if not CLEAN25
-#pragma warning disable AL0432
-        IRSFormsEnableFeature: Codeunit "IRS Forms Enable Feature";
-#pragma warning restore AL0432
-#endif
         VendorLedgerEntriesPage: TestPage "Vendor Ledger Entries";
         FormNo, FormBoxNo : Code[20];
         IRSAmount: Decimal;
@@ -272,9 +245,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         // [SCENARIO 495389] Stan cannot set the positive IRS Reporting Amount in the invoice Vendor Ledger Entry
 
         Initialize();
-#if not CLEAN25
-        BindSubscription(IRSFormsEnableFeature);
-#endif
         LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
         FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
         FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
@@ -290,20 +260,12 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         asserterror VendorLedgerEntriesPage."IRS 1099 Reporting Amount".SetValue(IRSAmount);
         // [THEN] An error message "IRS Reporting Amount must be negative" is thrown
         Assert.ExpectedError(IRSReportingAmountNegativeErr);
-#if not CLEAN25
-        UnbindSubscription(IRSFormsEnableFeature);
-#endif
     end;
 
     [Test]
     procedure SetNegativeIRSAmountInInvVendLedgEntry()
     var
         VendorLedgerEntry: Record "Vendor Ledger Entry";
-#if not CLEAN25
-#pragma warning disable AL0432
-        IRSFormsEnableFeature: Codeunit "IRS Forms Enable Feature";
-#pragma warning restore AL0432
-#endif
         VendorLedgerEntriesPage: TestPage "Vendor Ledger Entries";
         FormNo, FormBoxNo : Code[20];
         IRSAmount: Decimal;
@@ -311,9 +273,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         // [SCENARIO 495389] Stan cannot set the negative IRS Reporting Amount in the credit memo Vendor Ledger Entry
 
         Initialize();
-#if not CLEAN25
-        BindSubscription(IRSFormsEnableFeature);
-#endif
         LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
         FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
         FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
@@ -329,9 +288,6 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         asserterror VendorLedgerEntriesPage."IRS 1099 Reporting Amount".SetValue(IRSAmount);
         // [THEN] An error message "IRS Reporting Amount must be positive" is thrown
         Assert.ExpectedError(IRSReportingAmountPositiveErr);
-#if not CLEAN25
-        UnbindSubscription(IRSFormsEnableFeature);
-#endif
     end;
 
     [Test]
@@ -362,6 +318,247 @@ codeunit 148011 "IRS 1099 Vendor Tests"
 
         // [THEN] Vendor ledger entry has IRS 1099 fields filled on Vendor Ledger Entry of selected Vendors
         VerifyIRS1099FieldsOnVendorLedgerEntry(PeriodNo, FormNo, FormBoxNo, VendorNo[1] + '|' + VendorNo[3]);
+    end;
+
+    [Test]
+    procedure VendorCardShowsIRSFieldsWhenVendorHasFormBoxSetup()
+    var
+        VendorCard: TestPage "Vendor Card";
+        VendorNo, PeriodNo, FormNo, FormBoxNo : Code[20];
+    begin
+        // [SCENARIO 562547] Vendor Card displays IRS fields correctly when vendor has form box setup
+        Initialize();
+
+        // [GIVEN] Reporting period, form "F1" and form box "FB1" are created
+        PeriodNo := LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
+        FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
+        FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
+        // [GIVEN] Vendor "V" with form box setup for form "F1" and form box "FB1"
+        VendorNo := LibraryPurchase.CreateVendorNo();
+        LibraryIRS1099FormBox.AssignFormBoxForVendorInPeriod(VendorNo, WorkDate(), WorkDate(), FormNo, FormBoxNo);
+
+        // [WHEN] Vendor Card page is opened for vendor "V"
+        VendorCard.OpenView();
+        VendorCard.Filter.SetFilter("No.", VendorNo);
+
+        // [THEN] IRSReportingPeriodNoField shows the reporting period, IRS1099FormNoField shows "F1", IRS1099FormBoxNoField shows "FB1"
+        VendorCard.IRSReportingPeriodNoField.AssertEquals(PeriodNo);
+        VendorCard.IRS1099FormNoField.AssertEquals(FormNo);
+        VendorCard.IRS1099FormBoxNoField.AssertEquals(FormBoxNo);
+        VendorCard.Close();
+    end;
+
+    [Test]
+    procedure VendorCardShowsEmptyIRSFieldsWhenVendorHasNoFormBoxSetup()
+    var
+        VendorCard: TestPage "Vendor Card";
+        VendorNo: Code[20];
+    begin
+        // [SCENARIO 562547] Vendor Card displays empty IRS fields when vendor has no form box setup
+        Initialize();
+
+        // [GIVEN] Vendor "V" with no form box setup
+        VendorNo := LibraryPurchase.CreateVendorNo();
+
+        // [WHEN] Vendor Card page is opened for vendor "V"
+        VendorCard.OpenView();
+        VendorCard.Filter.SetFilter("No.", VendorNo);
+
+        // [THEN] IRSReportingPeriodNoField is empty, IRS1099FormNoField is empty, IRS1099FormBoxNoField is empty
+        VendorCard.IRSReportingPeriodNoField.AssertEquals('');
+        VendorCard.IRS1099FormNoField.AssertEquals('');
+        VendorCard.IRS1099FormBoxNoField.AssertEquals('');
+        VendorCard.Close();
+    end;
+
+    [Test]
+    procedure VendorCardIRSFormBoxNoDrillDownOpensFormBoxSetup()
+    var
+        IRS1099VendorFormBoxSetup: TestPage "IRS 1099 Vendor Form Box Setup";
+        VendorCard: TestPage "Vendor Card";
+        VendorNo, FormNo, FormBoxNo : Code[20];
+    begin
+        // [SCENARIO 562547] Drill down on IRS Form Box No. field opens vendor form box setup page
+        Initialize();
+
+        // [GIVEN] Reporting period, form "F1" and form box "FB1" are created
+        LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
+        FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
+        FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
+        // [GIVEN] Vendor "V" with form box setup for form "F1" and form box "FB1"
+        VendorNo := LibraryPurchase.CreateVendorNo();
+        LibraryIRS1099FormBox.AssignFormBoxForVendorInPeriod(VendorNo, WorkDate(), WorkDate(), FormNo, FormBoxNo);
+        // [GIVEN] Vendor Card page is opened for vendor "V"
+        VendorCard.OpenView();
+        VendorCard.Filter.SetFilter("No.", VendorNo);
+
+        // [WHEN] User drills down on IRS1099FormBoxNoField
+        IRS1099VendorFormBoxSetup.Trap();
+        VendorCard.IRS1099FormBoxNoField.DrillDown();
+
+        // [THEN] IRS 1099 Vendor Form Box Setup page opens filtered by vendor "V"
+        IRS1099VendorFormBoxSetup."Vendor No.".AssertEquals(VendorNo);
+        IRS1099VendorFormBoxSetup.Close();
+        VendorCard.Close();
+    end;
+
+    [Test]
+    procedure VendorListShowsFormBoxOnlyForVendorWithSetup()
+    var
+        VendorList: TestPage "Vendor List";
+        VendorNoWithSetup, VendorNoWithoutSetup, PeriodNo, FormNo, FormBoxNo : Code[20];
+    begin
+        // [FEATURE] [AI test]
+        // [SCENARIO 562547] Vendor List displays IRS fields only for vendors that have form box setup, not for all vendors
+
+        Initialize();
+
+        // [GIVEN] Reporting period, form "F" and form box "FB" are created
+        PeriodNo := LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
+        FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
+        FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
+        // [GIVEN] Vendor "V1" with form box setup for form "F" and form box "FB"
+        VendorNoWithSetup := LibraryPurchase.CreateVendorNo();
+        LibraryIRS1099FormBox.AssignFormBoxForVendorInPeriod(VendorNoWithSetup, WorkDate(), WorkDate(), FormNo, FormBoxNo);
+        // [GIVEN] Vendor "V2" without any form box setup
+        VendorNoWithoutSetup := LibraryPurchase.CreateVendorNo();
+
+        // [WHEN] Open Vendor List page and navigate to vendor "V1" first, then to vendor "V2"
+        VendorList.OpenView();
+        VendorList.Filter.SetFilter("No.", VendorNoWithSetup);
+        VendorList.First();
+
+        // [THEN] IRS fields show correct values for vendor "V1"
+        VendorList.IRSReportingPeriodNoField.AssertEquals(PeriodNo);
+        VendorList.IRS1099FormNoField.AssertEquals(FormNo);
+        VendorList.IRS1099FormBoxNoField.AssertEquals(FormBoxNo);
+
+        // [WHEN] Navigate to vendor "V2" without form box setup
+        VendorList.Filter.SetFilter("No.", VendorNoWithoutSetup);
+        VendorList.First();
+
+        // [THEN] IRS fields are empty for vendor "V2" (not showing values from vendor "V1")
+        VendorList.IRSReportingPeriodNoField.AssertEquals('');
+        VendorList.IRS1099FormNoField.AssertEquals('');
+        VendorList.IRS1099FormBoxNoField.AssertEquals('');
+        VendorList.Close();
+    end;
+
+    [Test]
+    [HandlerFunctions('NoDataFoundMessageHandler')]
+    procedure IRS1099VendorOverviewRefreshesDataWithPeriodNo()
+    var
+        VendorLedgerEntry: Record "Vendor Ledger Entry";
+        IRS1099VendorOverviewPage: TestPage "IRS 1099 Vendor Overview";
+        PeriodNo, FormNo, FormBoxNo, VendNo : Code[20];
+        IRSAmount: Decimal;
+    begin
+        // [SCENARIO 615776] The IRS 1099 Vendor Overview page correctly sets the period number before calling GetVendorFormBoxAmount
+
+        Initialize();
+        // [GIVEN] IRS Reporting Period with forms and form boxes
+        PeriodNo := LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(WorkDate());
+        FormNo := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(WorkDate());
+        FormBoxNo := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(WorkDate(), FormNo);
+        // [GIVEN] Vendor with Form Box setup and vendor ledger entry with IRS data
+        VendNo := LibraryIRS1099FormBox.CreateVendorNoWithFormBox(WorkDate(), FormNo, FormBoxNo);
+        IRSAmount := -LibraryRandom.RandDec(100, 2);
+        LibraryIRS1099Document.MockInvVendLedgEntryWithIRSData(VendorLedgerEntry, WorkDate(), WorkDate(), FormNo, FormBoxNo, IRSAmount);
+        VendorLedgerEntry."Vendor No." := VendNo;
+        VendorLedgerEntry.Modify();
+
+        // [WHEN] Open IRS 1099 Vendor Overview page and set the Reporting Period
+        IRS1099VendorOverviewPage.OpenView();
+        IRS1099VendorOverviewPage.IRSReportingPeriodNoField.SetValue(PeriodNo);
+
+        // [THEN] The page shows data for the selected period (no error occurs)
+        // The fix ensures IRS1099CalcParameters."Period No." is set before calling GetVendorFormBoxAmount
+        IRS1099VendorOverviewPage.Close();
+    end;
+
+    [Test]
+    [HandlerFunctions('NoDataFoundMessageHandler')]
+    procedure VendorOverviewShowsDataForSelectedPeriodOnly()
+    var
+        PurchaseHeader: Record "Purchase Header";
+        PurchaseLine: Record "Purchase Line";
+        VendorLedgerEntry: Record "Vendor Ledger Entry";
+        IRS1099VendorOverviewPage: TestPage "IRS 1099 Vendor Overview";
+        PeriodNo1, PeriodNo2, FormNo1, FormNo2, FormBoxNo1, FormBoxNo2, VendorNo1, VendorNo2 : Code[20];
+        PostingDate1, PostingDate2 : Date;
+        ExpectedAmount1, ExpectedAmount2 : Decimal;
+    begin
+        // [FEATURE] [AI test]
+        // [SCENARIO 619930] When switching between reporting periods in IRS 1099 Vendor Overview, only data from the selected period is displayed
+        Initialize();
+
+        // [GIVEN] Two IRS Reporting Periods "P1" and "P2" for different years
+        PostingDate1 := LibraryIRSReportingPeriod.GetPostingDate();
+        PostingDate2 := CalcDate('<1Y>', PostingDate1);
+        PeriodNo1 := LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(PostingDate1);
+        PeriodNo2 := LibraryIRSReportingPeriod.CreateOneDayReportingPeriod(PostingDate2);
+
+        // [GIVEN] Form "F1", form box "FB1" and vendor "V1" setup for the first period
+        FormNo1 := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(PostingDate1);
+        FormBoxNo1 := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(PostingDate1, FormNo1);
+        VendorNo1 := LibraryIRS1099FormBox.CreateVendorNoWithFormBox(PostingDate1, FormNo1, FormBoxNo1);
+
+        // [GIVEN] Invoice posted and paid for vendor "V1" in the first period
+        LibraryPurchase.CreatePurchHeader(PurchaseHeader, PurchaseHeader."Document Type"::Invoice, VendorNo1);
+        PurchaseHeader.Validate("Posting Date", PostingDate1);
+        LibraryPurchase.CreatePurchaseLineWithUnitCost(
+            PurchaseLine, PurchaseHeader, LibraryInventory.CreateItemNo(),
+            LibraryRandom.RandInt(10), LibraryRandom.RandDecInRange(100, 200, 2));
+        LibraryERM.FindVendorLedgerEntry(
+            VendorLedgerEntry, VendorLedgerEntry."Document Type"::Invoice,
+            LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, true));
+        VendorLedgerEntry.CalcFields(Amount);
+        ExpectedAmount1 := -VendorLedgerEntry.Amount;
+        LibraryIRS1099Document.PostPaymentAppliedToInvoice(PostingDate1, VendorNo1, VendorLedgerEntry."Document No.", -VendorLedgerEntry.Amount);
+
+        // [GIVEN] Form "F2", form box "FB2" and vendor "V2" setup for the second period
+        FormNo2 := LibraryIRS1099FormBox.CreateSingleFormInReportingPeriod(PostingDate2);
+        FormBoxNo2 := LibraryIRS1099FormBox.CreateSingleFormBoxInReportingPeriod(PostingDate2, FormNo2);
+        VendorNo2 := LibraryIRS1099FormBox.CreateVendorNoWithFormBox(PostingDate2, FormNo2, FormBoxNo2);
+
+        // [GIVEN] Invoice posted and paid for vendor "V2" in the second period
+        LibraryPurchase.CreatePurchHeader(PurchaseHeader, PurchaseHeader."Document Type"::Invoice, VendorNo2);
+        PurchaseHeader.Validate("Posting Date", PostingDate2);
+        LibraryPurchase.CreatePurchaseLineWithUnitCost(
+            PurchaseLine, PurchaseHeader, LibraryInventory.CreateItemNo(),
+            LibraryRandom.RandInt(10), LibraryRandom.RandDecInRange(300, 400, 2));
+        LibraryERM.FindVendorLedgerEntry(
+            VendorLedgerEntry, VendorLedgerEntry."Document Type"::Invoice,
+            LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, true));
+        VendorLedgerEntry.CalcFields(Amount);
+        ExpectedAmount2 := -VendorLedgerEntry.Amount;
+        LibraryIRS1099Document.PostPaymentAppliedToInvoice(PostingDate2, VendorNo2, VendorLedgerEntry."Document No.", -VendorLedgerEntry.Amount);
+
+        // [GIVEN] User opens IRS 1099 Vendor Overview page and sets the reporting period to "P1"
+        IRS1099VendorOverviewPage.OpenView();
+        IRS1099VendorOverviewPage.IRSReportingPeriodNoField.SetValue(PeriodNo1);
+
+        // [THEN] The page shows data from the first period for vendor "V1"
+        Assert.IsTrue(IRS1099VendorOverviewPage.First(), 'Expected data for the first period');
+        IRS1099VendorOverviewPage."Vendor No.".AssertEquals(VendorNo1);
+        IRS1099VendorOverviewPage."Form No.".AssertEquals(FormNo1);
+        IRS1099VendorOverviewPage."Form Box No.".AssertEquals(FormBoxNo1);
+        IRS1099VendorOverviewPage.Amount.AssertEquals(ExpectedAmount1);
+
+        // [WHEN] User changes the IRS Reporting Period No. to the second period "P2"
+        IRS1099VendorOverviewPage.IRSReportingPeriodNoField.SetValue(PeriodNo2);
+
+        // [THEN] The page shows only data from the second period for vendor "V2"
+        Assert.IsTrue(IRS1099VendorOverviewPage.First(), 'Expected data for the second period');
+        IRS1099VendorOverviewPage."Vendor No.".AssertEquals(VendorNo2);
+        IRS1099VendorOverviewPage."Form No.".AssertEquals(FormNo2);
+        IRS1099VendorOverviewPage."Form Box No.".AssertEquals(FormBoxNo2);
+        IRS1099VendorOverviewPage.Amount.AssertEquals(ExpectedAmount2);
+
+        // [THEN] There is only one record (no data from the first period)
+        Assert.IsFalse(IRS1099VendorOverviewPage.Next(), 'Expected only one record from the second period');
+
+        IRS1099VendorOverviewPage.Close();
     end;
 
     local procedure Initialize()
@@ -429,5 +626,10 @@ codeunit 148011 "IRS 1099 Vendor Tests"
         IRS1099PropagateVendSetup.PurchaseDocumentsControl.SetValue(true);
         IRS1099PropagateVendSetup.VendorLedgerEntriesControl.SetValue(true);
         IRS1099PropagateVendSetup.OK().Invoke();
+    end;
+
+    [MessageHandler]
+    procedure NoDataFoundMessageHandler(Message: Text[1024])
+    begin
     end;
 }

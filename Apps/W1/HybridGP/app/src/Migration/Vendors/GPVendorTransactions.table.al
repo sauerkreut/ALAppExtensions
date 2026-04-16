@@ -38,6 +38,7 @@ table 4097 "GP Vendor Transactions"
         }
         field(6; CURTRXAM; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'Transaction Amount';
             DataClassification = CustomerContent;
         }
@@ -60,6 +61,11 @@ table 4097 "GP Vendor Transactions"
         field(11; PYMTRMID; Text[21])
         {
             Caption = 'Payment Terms ID';
+            DataClassification = CustomerContent;
+        }
+        field(12; VCHRNMBR; Text[22])
+        {
+            Caption = 'Voucher Number';
             DataClassification = CustomerContent;
         }
     }

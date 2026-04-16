@@ -5,10 +5,10 @@
 
 namespace Microsoft.DemoData.CRM;
 
+using Microsoft.CRM.Interaction;
+using Microsoft.DemoData.Foundation;
 using Microsoft.DemoTool;
 using Microsoft.DemoTool.Helpers;
-using Microsoft.DemoData.Foundation;
-using Microsoft.CRM.Interaction;
 
 codeunit 5648 "Create Marketing Setup"
 {
@@ -27,6 +27,6 @@ codeunit 5648 "Create Marketing Setup"
     begin
         ContosoCoffeeDemoDataSetup.Get();
 
-        ContosoCRM.InsertMarketingSetup(ContosoCoffeeDemoDataSetup."Country/Region Code", CreateNoSeries.Contact(), CreateNoSeries.Campaign(), CreateNoSeries.Segment(), CreateNoSeries.Task(), CreateNoSeries.Opportunity(), CreateBusinessRelation.CustBusinessRelation(), CreateBusinessRelation.VendBusinessRelation(), CreateBusinessRelation.BankBusinessRelation(), CreateBusinessRelation.EmpBusinessRelation(), true, true, true, true, true, true, ContosoLanguage.GetLanguageCode(''), CreateSalesCycle.NewSalesCycle(), Enum::"Setup Attachment Storage Type"::Embedded, true, 60, true, 1033, CreateSalutations.Company(), CreateSalutations.Unisex(), Enum::"Correspondence Type"::Email, true);
+        ContosoCRM.InsertMarketingSetup(ContosoCoffeeDemoDataSetup."Country/Region Code", CreateNoSeries.Contact(), CreateNoSeries.Campaign(), CreateNoSeries.Segment(), CreateNoSeries.Task(), CreateNoSeries.Opportunity(), CreateBusinessRelation.CustBusinessRelation(), CreateBusinessRelation.VendBusinessRelation(), CreateBusinessRelation.BankBusinessRelation(), CreateBusinessRelation.EmpBusinessRelation(), true, true, true, true, true, true, ContosoLanguage.GetLanguageCode(ContosoCoffeeDemoDataSetup."Country/Region Code"), CreateSalesCycle.NewSalesCycle(), Enum::"Setup Attachment Storage Type"::Embedded, true, 60, true, 1033, CreateSalutations.Company(), CreateSalutations.Unisex(), Enum::"Correspondence Type"::Email, true);
     end;
 }

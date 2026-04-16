@@ -310,20 +310,6 @@ codeunit 31002 "SalesAdvLetterManagement CZZ"
         InsertedEntryNo := SalesAdvLetterPostCZZ.PostAdvancePayment(
             CustLedgerEntry, PostedGenJournalLine, GenJnlPostLine, AdvancePostingParametersCZZ);
     end;
-#if not CLEAN25
-    [Obsolete('Replaced by GetAdvanceGLAccountNoCZZ function in GenJournalLine.', '25.0')]
-    procedure GetAdvanceGLAccount(var GenJournalLine: Record "Gen. Journal Line"): Code[20]
-    var
-        SalesAdvLetterHeaderCZZ: Record "Sales Adv. Letter Header CZZ";
-        AdvanceLetterTemplateCZZ: Record "Advance Letter Template CZZ";
-    begin
-        SalesAdvLetterHeaderCZZ.Get(GenJournalLine."Adv. Letter No. (Entry) CZZ");
-        SalesAdvLetterHeaderCZZ.TestField("Advance Letter Code");
-        AdvanceLetterTemplateCZZ.Get(SalesAdvLetterHeaderCZZ."Advance Letter Code");
-        AdvanceLetterTemplateCZZ.TestField("Advance Letter G/L Account");
-        exit(AdvanceLetterTemplateCZZ."Advance Letter G/L Account");
-    end;
-#endif
 
     procedure PostAdvancePaymentVAT(var SalesAdvLetterEntryCZZ: Record "Sales Adv. Letter Entry CZZ"; PostingDate: Date)
     begin
@@ -969,9 +955,15 @@ codeunit 31002 "SalesAdvLetterManagement CZZ"
         PostingDate: Date;
         CurrencyFactor: Decimal;
         AddCurrencyFactor: Decimal;
+        IsHandled: Boolean;
     begin
         SalesAdvLetterEntryCZZ.TestField("Entry Type", SalesAdvLetterEntryCZZ."Entry Type"::"VAT Payment");
         SalesAdvLetterEntryCZZ.TestField(Cancelled, false);
+
+        IsHandled := false;
+        OnBeforePostAdvanceCreditMemoVAT(SalesAdvLetterEntryCZZ, IsHandled);
+        if IsHandled then
+            exit;
 
         AdvPaymentCloseDialog.SetValues(SalesAdvLetterEntryCZZ."Posting Date", SalesAdvLetterEntryCZZ."VAT Date", SalesAdvLetterEntryCZZ."Currency Code", SalesAdvLetterEntryCZZ."Currency Factor", '', false);
         if AdvPaymentCloseDialog.RunModal() = Action::OK then begin
@@ -1340,6 +1332,11 @@ codeunit 31002 "SalesAdvLetterManagement CZZ"
 
     [IntegrationEvent(false, false)]
     local procedure OnBeforePostPaymentVAT(var SalesAdvLetterEntryCZZ: Record "Sales Adv. Letter Entry CZZ"; PostingDate: Date; var IsHandled: Boolean)
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforePostAdvanceCreditMemoVAT(var SalesAdvLetterEntryCZZ: Record "Sales Adv. Letter Entry CZZ"; var IsHandled: Boolean)
     begin
     end;
 

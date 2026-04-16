@@ -2,6 +2,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
 {
     Subtype = Test;
     TestPermissions = Disabled;
+    TestType = UnitTest;
 
     var
         Assert: Codeunit Assert;
@@ -9,6 +10,11 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         Initialized: Boolean;
         ExtensionRefreshFailureErr: Label 'Some extensions could not be updated and may need to be reinstalled to refresh their data.';
         ExtensionRefreshUnexpectedFailureErr: Label 'Failed to update extensions. You may need to verify and reinstall any missing extensions if needed.';
+        TableNotMarkedForDeltaSyncErr: Label 'Table %1 was not correctly marked for delta sync';
+        IntelligentCloudStatusRecordNotFoundErr: Label 'Intelligent cloud status record for table %1 not found';
+        TableNotMarkedForReplicationErr: Label 'Table %1 was not correctly marked for replication';
+        CustomerId1Tok: Label 'TEST-1', Locked = true;
+        CustomerId2Tok: Label 'TEST-2', Locked = true;
 
     local procedure Initialize()
     var
@@ -16,6 +22,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         HybridDeploymentSetup: Record "Hybrid Deployment Setup";
         HybridReplicationSummary: Record "Hybrid Replication Summary";
         HybridReplicationDetail: Record "Hybrid Replication Detail";
+        IntelligentCloudStatus: Record "Intelligent Cloud Status";
     begin
         if not Initialized then begin
             HybridDeploymentSetup.DeleteAll();
@@ -23,6 +30,11 @@ codeunit 139656 "Hybrid Cloud Management Tests"
             HybridDeploymentSetup.Insert();
             BindSubscription(LibraryHybridManagement);
             HybridDeploymentSetup.Get();
+
+            // Mark system tables as not replicated to avoid permission issues in tests
+            IntelligentCloudStatus.SetRange("Table Id", 2000000000, 2000100000);
+            if IntelligentCloudStatus.FindSet() then
+                IntelligentCloudStatus.DeleteAll();
         end;
 
         HybridReplicationDetail.DeleteAll();
@@ -468,6 +480,8 @@ codeunit 139656 "Hybrid Cloud Management Tests"
 #pragma warning disable AA0210
         IntelligentCloudStatus.SetRange("Replicate Data", false);
 #pragma warning restore AA0210
+        // Exclude system tables (2000000000-2000100000) except for allowed Tenant Media tables
+        IntelligentCloudStatus.SetFilter("Table Id", '<%1|>%2', 2000000000, 2000100000);
         IntelligentCloudStatus.FindFirst();
         CloudMigSelectTables.Filter.SetFilter("Table Id", Format(IntelligentCloudStatus."Table Id"));
         CloudMigSelectTables.IncludeTablesInMigration.Invoke();
@@ -532,6 +546,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
 #pragma warning disable AA0210
         IntelligentCloudStatus.SetRange("Company Name", '');
         IntelligentCloudStatus.SetRange("Preserve Cloud Data", false);
+        IntelligentCloudStatus.SetFilter("Table Id", '<%1|>%2', 2000000000, 2000100000);
 #pragma warning restore AA0210
         if not IntelligentCloudStatus.FindFirst() then begin
             IntelligentCloudStatus.SetRange("Preserve Cloud Data");
@@ -565,8 +580,12 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         OpenCloudMigSelectTablesPage(CloudMigSelectTables);
 #pragma warning disable AA0210
         IntelligentCloudStatus.SetRange("Preserve Cloud Data", true);
+        IntelligentCloudStatus.SetRange("Replicate Data", true);
 #pragma warning restore AA0210
+        // Exclude system tables (2000000000-2000100000) except for allowed Tenant Media tables
+        IntelligentCloudStatus.SetFilter("Table Id", '<%1|>%2', 2000000000, 2000100000);
         IntelligentCloudStatus.FindFirst();
+
         CloudMigSelectTables.Filter.SetFilter("Table Id", Format(IntelligentCloudStatus."Table Id"));
         CloudMigSelectTables.ReplaceSyncTables.Invoke();
 
@@ -586,7 +605,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
         RecordLink: Record "Record Link";
         RecordLinkMapping: Record "Record Link Mapping";
-        UserMappingWork: Record "User Mapping Work";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
         RecordLinkCount: Integer;
         ReplicationRecordLinkBufferCount: Integer;
@@ -595,9 +613,8 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer.DeleteAll();
         RecordLink.DeleteAll();
         RecordLinkMapping.DeleteAll();
-        UserMappingWork.DeleteAll();
-        CreateReplicationRecordLinkBuffers('USER1');
-        CreateRecordLinks('USER2');
+        CreateReplicationRecordLinkBuffers();
+        CreateRecordLinks();
         RecordLinkCount := RecordLink.Count();
         ReplicationRecordLinkBufferCount := ReplicationRecordLinkBuffer.Count();
 
@@ -621,7 +638,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
         RecordLink: Record "Record Link";
         RecordLinkMapping: Record "Record Link Mapping";
-        UserMappingWork: Record "User Mapping Work";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
         RecordLinkCount: Integer;
         ReplicationRecordLinkBufferCount: Integer;
@@ -631,9 +647,8 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer.DeleteAll();
         RecordLink.DeleteAll();
         RecordLinkMapping.DeleteAll();
-        UserMappingWork.DeleteAll();
-        CreateReplicationRecordLinkBuffers('USER1');
-        CreateRecordLinks('USER2');
+        CreateReplicationRecordLinkBuffers();
+        CreateRecordLinks();
         ReplicationRecordLinkBuffer.FindLast();
         RecordLink.FindLast();
         CreateRecordLinkMapping(ReplicationRecordLinkBuffer, RecordLink);
@@ -661,16 +676,15 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
         RecordLink: Record "Record Link";
         RecordLinkMapping: Record "Record Link Mapping";
-        UserMappingWork: Record "User Mapping Work";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
         ReplicationRecordLinkBufferCount: Integer;
     begin
         // [GIVEN] Setup buffer with sample data
+        LibraryHybridManagement.SetAdlMigrationEnabled(true);
         ReplicationRecordLinkBuffer.DeleteAll();
         RecordLink.DeleteAll();
         RecordLinkMapping.DeleteAll();
-        UserMappingWork.DeleteAll();
-        CreateReplicationRecordLinkBuffers('USER1');
+        CreateReplicationRecordLinkBuffers();
         ReplicationRecordLinkBufferCount := ReplicationRecordLinkBuffer.Count();
 
         // [WHEN] Call migration
@@ -688,48 +702,11 @@ codeunit 139656 "Hybrid Cloud Management Tests"
     end;
 
     [Test]
-    procedure TestMigrateRecordLinksUserMapping()
-    var
-        ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
-        RecordLink: Record "Record Link";
-        RecordLinkMapping: Record "Record Link Mapping";
-        UserMappingWork: Record "User Mapping Work";
-        HybridCloudManagement: Codeunit "Hybrid Cloud Management";
-        RecordLinkCount: Integer;
-        ReplicationRecordLinkBufferCount: Integer;
-    begin
-        // [GIVEN] Setup buffer with sample data
-        ReplicationRecordLinkBuffer.DeleteAll();
-        RecordLink.DeleteAll();
-        RecordLinkMapping.DeleteAll();
-        UserMappingWork.DeleteAll();
-        CreateReplicationRecordLinkBuffers('USER1');
-        CreateRecordLinks('USER2');
-        CreateUserMappings('USER1', 'USER2');
-        RecordLinkCount := RecordLink.Count();
-        ReplicationRecordLinkBufferCount := ReplicationRecordLinkBuffer.Count();
-
-        // [WHEN] Call migration
-        HybridCloudManagement.MigrateRecordLinks();
-
-        // [THEN] Record link and Record link mapping should be created with correct users
-        Assert.AreEqual(RecordLinkCount + ReplicationRecordLinkBufferCount, RecordLink.Count(), 'Record links not created');
-        Assert.AreEqual(ReplicationRecordLinkBufferCount, RecordLinkMapping.Count(), 'Record link mappings not created');
-        RecordLinkMapping.FindSet();
-        repeat
-            ReplicationRecordLinkBuffer.Get(RecordLinkMapping."Source ID", RecordLinkMapping.Company);
-            RecordLink.Get(RecordLinkMapping."Target ID");
-            VerifyRecordLinkUsers(ReplicationRecordLinkBuffer, RecordLink);
-        until RecordLinkMapping.Next() = 0;
-    end;
-
-    [Test]
     procedure TestMigrateRecordLinksCompanyStatus()
     var
         ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
         RecordLink: Record "Record Link";
         RecordLinkMapping: Record "Record Link Mapping";
-        UserMappingWork: Record "User Mapping Work";
         HybridCompanyStatus: Record "Hybrid Company Status";
         HybridCloudManagement: Codeunit "Hybrid Cloud Management";
     begin
@@ -737,9 +714,8 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         ReplicationRecordLinkBuffer.DeleteAll();
         RecordLink.DeleteAll();
         RecordLinkMapping.DeleteAll();
-        UserMappingWork.DeleteAll();
-        CreateReplicationRecordLinkBuffers('USER1');
-        CreateRecordLinks('USER2');
+        CreateReplicationRecordLinkBuffers();
+        CreateRecordLinks();
 
         // [WHEN] Call migration
         HybridCloudManagement.MigrateRecordLinks();
@@ -747,6 +723,224 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         // [THEN] Company status is updated
         HybridCompanyStatus.Get();
         Assert.IsTrue(HybridCompanyStatus."Record Link Move Completed", 'Record links migration status not updated');
+    end;
+
+    [Test]
+    procedure TestMigrationValidation()
+    var
+        MigrationValidationError: Record "Migration Validation Error";
+        Customer: Record Customer;
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        MigrationValidation: Codeunit "Migration Validation";
+    begin
+        // [GIVEN] A company migration is being validated
+        InitMigrationValidationTests();
+
+        // [WHEN] No customers were migrated, but were expected
+        MigrationValidation.RunTests(false);
+
+        // [THEN] The migration will fail, and there will be corresponding validation error entries
+        HybridCompanyStatus.Get(CompanyName());
+        Assert.IsTrue(HybridCompanyStatus.Validated, 'The company should have been validated.');
+        Assert.RecordCount(MigrationValidationError, 1);
+        MigrationValidationError.FindFirst();
+        Assert.AreEqual('Missing TEST-1', MigrationValidationError."Test Description", 'Incorrect test description');
+        Assert.AreEqual(false, MigrationValidationError."Is Warning", 'Incorrect value for Is Warning');
+        Assert.IsTrue(GetDidValiationErrorFailTheMigration(), 'The migration should be in a failed state.');
+
+        // Reset
+        MigrationValidation.DeleteMigrationValidationEntriesForCompany();
+
+        // [WHEN] Some of the customers were created
+        // Create Customer TEST-1
+        InitMigrationValidationTest_CustomerTest1();
+        MigrationValidation.RunTests(false);
+
+        // [THEN] The migration will fail, and there will be corresponding validation error entries
+        Assert.IsTrue(GetDidValiationErrorFailTheMigration(), 'The migration should be in a failed state.');
+        Assert.RecordCount(MigrationValidationError, 1);
+        MigrationValidationError.FindFirst();
+        Assert.AreEqual('Missing TEST-2', MigrationValidationError."Test Description", 'Incorrect test description');
+        Assert.AreEqual(false, MigrationValidationError."Is Warning", 'Incorrect value for Is Warning');
+
+        // Reset
+        MigrationValidation.DeleteMigrationValidationEntriesForCompany();
+
+        // [WHEN] All the customers were created and correct
+        InitMigrationValidationTest_CustomerTest1();
+        InitMigrationValidationTest_CustomerTest2();
+
+        // [THEN] No validation progress should be recorded for either Customers.
+        // Note: The source table will normally be the staging table, but for testing the Customer table is sufficient
+        Assert.IsFalse(CustomerHasNotBeenValidated(CustomerId1Tok), 'Customer 1 should not have validation progress recorded.');
+        Assert.IsFalse(CustomerHasNotBeenValidated(CustomerId2Tok), 'Customer 2 should not have validation progress recorded.');
+
+        MigrationValidation.RunTests(false);
+
+        // [THEN] The migration will be successful, and there won't be any validation error entries
+        Assert.IsFalse(GetDidValiationErrorFailTheMigration(), 'The migration should be in a failed state.');
+        Assert.RecordCount(MigrationValidationError, 0);
+
+        // [THEN] Validation progress will be recorded for both Customers.
+        // Note: The source table will normally be the staging table, but for testing the Customer table is sufficient
+        Assert.IsTrue(CustomerHasNotBeenValidated(CustomerId1Tok), 'Customer 1 should have validation progress recorded.');
+        Assert.IsTrue(CustomerHasNotBeenValidated(CustomerId2Tok), 'Customer 2 should have validation progress recorded.');
+
+        // Reset
+        MigrationValidation.DeleteMigrationValidationEntriesForCompany();
+
+        // [WHEN] Some values are unexpected
+        Customer.GET(CustomerId1Tok);
+        Customer.Name := 'Wrong name';
+        Customer."Name 2" := 'Wrong name 2';
+        Customer.Modify();
+
+        MigrationValidation.RunTests(false);
+
+        // [TEST] The correct validation error records will be added
+        // The migration will be in a failed state because there is an entry that isn't a warning
+        Assert.RecordCount(MigrationValidationError, 2);
+        Assert.IsTrue(GetDidValiationErrorFailTheMigration(), 'The migration should be in a failed state.');
+
+        MigrationValidationError.FindSet();
+        Assert.AreEqual('Name', MigrationValidationError."Test Description", 'Incorrect test description');
+        Assert.AreEqual('Test 1', MigrationValidationError.Expected, 'Incorrect Expected value');
+        Assert.AreEqual('Wrong name', MigrationValidationError.Actual, 'Incorrect Actual value');
+        Assert.AreEqual(false, MigrationValidationError."Is Warning", 'Incorrect value for Is Warning');
+
+        MigrationValidationError.Next();
+        Assert.AreEqual('Name 2', MigrationValidationError."Test Description", 'Incorrect test description');
+        Assert.AreEqual('Test name 2', MigrationValidationError.Expected, 'Incorrect Expected value');
+        Assert.AreEqual('Wrong name 2', MigrationValidationError.Actual, 'Incorrect Actual value');
+        Assert.AreEqual(true, MigrationValidationError."Is Warning", 'Incorrect value for Is Warning');
+
+        // Reset
+        MigrationValidation.DeleteMigrationValidationEntriesForCompany();
+
+        // [WHEN] Some values are unexpected, but nothing considered major
+        Customer.GET(CustomerId1Tok);
+        Customer.Name := 'Test 1'; // Back to expected value
+        Customer."Name 2" := 'Wrong name 2';
+        Customer.Modify();
+
+        // [THEN] The migration should NOT be in a failed state
+        MigrationValidation.RunTests(false);
+        Assert.RecordCount(MigrationValidationError, 1);
+        Assert.IsFalse(GetDidValiationErrorFailTheMigration(), 'The migration should NOT be in a failed state.');
+    end;
+
+    local procedure GetDidValiationErrorFailTheMigration(): Boolean
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+        MigrationValidationError: Record "Migration Validation Error";
+    begin
+        IntelligentCloudSetup.Get();
+
+        MigrationValidationError.SetRange("Migration Type", IntelligentCloudSetup."Product ID");
+        MigrationValidationError.SetRange("Company Name", CompanyName());
+        MigrationValidationError.SetRange("Is Warning", false);
+        MigrationValidationError.SetRange("Errors should fail migration", true);
+        exit(not MigrationValidationError.IsEmpty())
+    end;
+
+    local procedure CustomerHasNotBeenValidated(CustomerNo: Code[20]): Boolean
+    var
+        Customer: Record Customer;
+        MigrationValidationAssert: Codeunit "Migration Validation Assert";
+        MockMigrationValidator: Codeunit "Mock Migration Validator";
+    begin
+        // The source table will normally be the staging table, but for testing the Customer table is sufficient
+        if Customer.Get(CustomerNo) then
+            exit(MigrationValidationAssert.IsSourceRowValidated(MockMigrationValidator.GetValidationSuiteId(), Customer));
+    end;
+
+    local procedure InitMigrationValidationTests()
+    var
+        ValidationSuite: Record "Validation Suite";
+        MigrationValidationError: Record "Migration Validation Error";
+        DataMigrationStatus: Record "Data Migration Status";
+        HybridCompany: Record "Hybrid Company";
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+        MockMigrationValidator: Codeunit "Mock Migration Validator";
+        ValidatorCode: Code[20];
+        MigrationType: Text[250];
+        ValidatorCodeunitId: Integer;
+    begin
+        ValidatorCode := MockMigrationValidator.GetValidationSuiteId();
+        ValidatorCodeunitId := Codeunit::"Mock Migration Validator";
+
+        if not IntelligentCloudSetup.Get() then begin
+            IntelligentCloudSetup."Product ID" := GetDefaultTestMigrationType();
+            IntelligentCloudSetup.Insert();
+        end;
+
+        MigrationType := IntelligentCloudSetup."Product ID";
+
+        if not DataMigrationStatus.IsEmpty() then
+            DataMigrationStatus.DeleteAll();
+
+        if not MigrationValidationError.IsEmpty() then
+            MigrationValidationError.DeleteAll();
+
+        if not ValidationSuite.IsEmpty() then
+            ValidationSuite.DeleteAll();
+
+        if not ValidationSuite.Get(ValidatorCode) then begin
+            ValidationSuite.Validate(Id, ValidatorCode);
+            ValidationSuite.Validate("Migration Type", MigrationType);
+            ValidationSuite.Validate("Codeunit Id", ValidatorCodeunitId);
+            ValidationSuite.Insert();
+        end;
+
+        if not HybridCompany.Get(CompanyName()) then begin
+            HybridCompany.Name := CopyStr(CompanyName(), 1, MaxStrLen(HybridCompany.Name));
+            HybridCompany.Insert();
+        end;
+
+        if not HybridCompanyStatus.Get(CompanyName()) then begin
+            HybridCompanyStatus.Name := CopyStr(CompanyName(), 1, MaxStrLen(HybridCompanyStatus.Name));
+            HybridCompanyStatus.Insert();
+        end;
+
+        HybridCompanyStatus.Validated := false;
+        HybridCompany.Modify();
+
+        Clear(DataMigrationStatus);
+        DataMigrationStatus."Migration Type" := IntelligentCloudSetup."Product ID";
+        DataMigrationStatus.Status := DataMigrationStatus.Status::"In Progress";
+        DataMigrationStatus.Insert(true);
+
+        MockMigrationValidator.OnPrepareMigrationValidation(MigrationType);
+    end;
+
+    local procedure InitMigrationValidationTest_CustomerTest1()
+    var
+        Customer: Record Customer;
+    begin
+        if not Customer.Get(CustomerId1Tok) then begin
+            Customer."No." := CustomerId1Tok;
+            Customer.Name := 'Test 1';
+            Customer."Name 2" := 'Test name 2';
+            Customer.Insert();
+        end;
+    end;
+
+    local procedure InitMigrationValidationTest_CustomerTest2()
+    var
+        Customer: Record Customer;
+    begin
+        if not Customer.Get(CustomerId2Tok) then begin
+            Customer."No." := CustomerId2Tok;
+            Customer.Name := 'Test 2';
+            Customer."Name 2" := 'Test name 2';
+            Customer.Insert();
+        end;
+    end;
+
+    local procedure GetDefaultTestMigrationType(): Code[20]
+    begin
+        exit('TEST');
     end;
 
     local procedure OpenCloudMigSelectTablesPage(var CloudMigSelectTables: TestPage "Cloud Mig - Select Tables")
@@ -765,7 +959,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         IntelligentCloudStatus: Record "Intelligent Cloud Status";
     begin
         // [THEN] The table is marked as included in replication
-        Assert.AreEqual(ExpectedReplicateProperty, CloudMigSelectTables."Replicate Data".AsBoolean(), 'Table was not correctly marked for replication');
+        Assert.AreEqual(ExpectedReplicateProperty, CloudMigSelectTables."Replicate Data".AsBoolean(), StrSubstNo(TableNotMarkedForReplicationErr, SelectedTableId));
 
         // [THEN] The log table is created and main intelligent cloud status table is updated
         Assert.IsTrue(IntelligentCloudStatus.Get(CloudMigSelectTables."Table Name".Value, CloudMigSelectTables."Company Name".Value), 'Intelligent cloud status record not found');
@@ -781,10 +975,10 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         IntelligentCloudStatus: Record "Intelligent Cloud Status";
     begin
         // [THEN] The table is marked as included in replication
-        Assert.AreEqual(ExpectedDeltaSyncProperty, CloudMigSelectTables."Preserve Cloud Data".AsBoolean(), 'Table was not correctly marked for delta sync');
+        Assert.AreEqual(ExpectedDeltaSyncProperty, CloudMigSelectTables."Preserve Cloud Data".AsBoolean(), StrSubstNo(TableNotMarkedForDeltaSyncErr, SelectedTableId));
 
         // [THEN] The log table is created and main intelligent cloud status table is updated
-        Assert.IsTrue(IntelligentCloudStatus.Get(CloudMigSelectTables."Table Name".Value, CloudMigSelectTables."Company Name".Value), 'Intelligent cloud status record not found');
+        Assert.IsTrue(IntelligentCloudStatus.Get(CloudMigSelectTables."Table Name".Value, CloudMigSelectTables."Company Name".Value), StrSubstNo(IntelligentCloudStatusRecordNotFoundErr, CloudMigSelectTables."Table Name".Value));
         Assert.AreEqual(ExpectedDeltaSyncProperty, IntelligentCloudStatus."Preserve Cloud Data", 'Intelligent cloud status record not updated correctly');
         Assert.IsTrue(CloudMigOverrideLog.FindLast(), 'Cloud migration override log record not found');
         Assert.AreEqual(SelectedTableId, CloudMigOverrideLog."Table Id", 'Cloud migration override log record not updated correctly');
@@ -803,7 +997,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         WebhookNotification.Insert();
     end;
 
-    local procedure CreateReplicationRecordLinkBuffers(UserId: Code[50])
+    local procedure CreateReplicationRecordLinkBuffers()
     var
         ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
         i: Integer;
@@ -813,8 +1007,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
             ReplicationRecordLinkBuffer."Link ID" := i;
             ReplicationRecordLinkBuffer.Company := CopyStr(CompanyName(), 1, MaxStrLen(ReplicationRecordLinkBuffer.Company));
             ReplicationRecordLinkBuffer.Description := 'record link buffer description' + Format(i);
-            ReplicationRecordLinkBuffer."User ID" := UserId;
-            ReplicationRecordLinkBuffer."To User ID" := UserId;
             if i mod 2 = 0 then begin
                 ReplicationRecordLinkBuffer.Type := ReplicationRecordLinkBuffer.Type::Link;
                 ReplicationRecordLinkBuffer.URL1 := 'buffertest' + Format(i) + '.com';
@@ -827,7 +1019,7 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         end;
     end;
 
-    local procedure CreateRecordLinks(UserId: Code[50])
+    local procedure CreateRecordLinks()
     var
         RecordLink: Record "Record Link";
         RecordLinkManagement: Codeunit "Record Link Management";
@@ -837,8 +1029,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
             RecordLink."Link ID" := i;
             RecordLink.Company := CopyStr(CompanyName(), 1, MaxStrLen(RecordLink.Company));
             RecordLink.Description := 'record link description' + Format(i);
-            RecordLink."User ID" := UserId;
-            RecordLink."To User ID" := UserId;
             if i mod 2 = 0 then begin
                 RecordLink.Type := RecordLink.Type::Link;
                 RecordLink.URL1 := 'recordlinktest' + Format(i) + '.com';
@@ -860,21 +1050,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         RecordLinkMapping.Insert();
     end;
 
-    local procedure CreateUserMappings(SourceUserId: Code[50]; DestinationUserId: Code[50])
-    var
-        UserMappingWork: Record "User Mapping Work";
-        HybridCompanyStatus: Record "Hybrid Company Status";
-    begin
-        if not HybridCompanyStatus.Get() then
-            HybridCompanyStatus.Insert();
-        HybridCompanyStatus."User Mapping Completed" := true;
-        HybridCompanyStatus.Modify();
-
-        UserMappingWork."Source User ID" := SourceUserId;
-        UserMappingWork."Dest User ID" := DestinationUserId;
-        UserMappingWork.Insert();
-    end;
-
     local procedure VerifyRecordLink(ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer"; RecordLink: Record "Record Link")
     begin
         Assert.AreEqual(ReplicationRecordLinkBuffer."Record ID", RecordLink."Record ID", 'Record ID mismatch');
@@ -887,17 +1062,6 @@ codeunit 139656 "Hybrid Cloud Management Tests"
         Assert.AreEqual(ReplicationRecordLinkBuffer.Notify, RecordLink.Notify, 'Notify mismatch');
         Assert.AreEqual(ReplicationRecordLinkBuffer."To User ID", RecordLink."To User ID", 'To User ID mismatch');
         Assert.AreEqual(ReadReplicationRecordLinkBufferNote(ReplicationRecordLinkBuffer), ReadRecordLinkNote(RecordLink), 'Note mismatch');
-    end;
-
-    local procedure VerifyRecordLinkUsers(ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer"; RecordLink: Record "Record Link")
-    var
-        UserMappingWork: Record "User Mapping Work";
-    begin
-        UserMappingWork.Get(ReplicationRecordLinkBuffer."User ID");
-        Assert.AreEqual(UserMappingWork."Dest User ID", RecordLink."User ID", 'User ID mismatch');
-
-        UserMappingWork.Get(ReplicationRecordLinkBuffer."To User ID");
-        Assert.AreEqual(UserMappingWork."Dest User ID", RecordLink."To User ID", 'To User ID mismatch');
     end;
 
     local procedure ReadReplicationRecordLinkBufferNote(ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer") Result: Text

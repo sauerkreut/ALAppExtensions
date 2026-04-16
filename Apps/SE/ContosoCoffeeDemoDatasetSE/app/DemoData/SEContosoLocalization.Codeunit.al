@@ -5,14 +5,14 @@
 
 namespace Microsoft.DemoData.Localization;
 
-using Microsoft.DemoData.Foundation;
-using Microsoft.DemoData.Inventory;
 using Microsoft.DemoData.Bank;
-using Microsoft.DemoData.Purchases;
 using Microsoft.DemoData.Finance;
 using Microsoft.DemoData.FixedAsset;
-using Microsoft.DemoData.Sales;
+using Microsoft.DemoData.Foundation;
 using Microsoft.DemoData.HumanResources;
+using Microsoft.DemoData.Inventory;
+using Microsoft.DemoData.Purchases;
+using Microsoft.DemoData.Sales;
 using Microsoft.DemoTool;
 
 codeunit 11214 "SE Contoso Localization"
@@ -36,7 +36,7 @@ codeunit 11214 "SE Contoso Localization"
         if Module = Enum::"Contoso Demo Data Module"::Inventory then
             InventoryModule(ContosoDemoDataLevel);
 
-        UnBindSubscriptionDemoData(Module);
+        UnBindSubscriptionDemoData(ContosoDemoDataLevel, Module);
     end;
 
     local procedure FoundationModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
@@ -106,18 +106,9 @@ codeunit 11214 "SE Contoso Localization"
     end;
 
     local procedure InventoryModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
-    var
-        CreateInvPostingSetupSE: Codeunit "Create Inv. Posting Setup SE";
     begin
-        case ContosoDemoDataLevel of
-            Enum::"Contoso Demo Data Level"::"Setup Data":
-                Codeunit.Run(Codeunit::"Create Inv. Posting Setup SE");
-            Enum::"Contoso Demo Data Level"::"Master Data":
-                begin
-                    CreateInvPostingSetupSE.UpdateInventoryPosting();
-                    Codeunit.Run(Codeunit::"Create Location SE");
-                end;
-        end;
+        if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+            Codeunit.Run(Codeunit::"Create Location SE");
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Contoso Demo Tool", 'OnBeforeGeneratingDemoData', '', false, false)]
@@ -151,7 +142,8 @@ codeunit 11214 "SE Contoso Localization"
                 end;
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
-                    BindSubscription(CreateItemSE);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        BindSubscription(CreateItemSE);
                     BindSubscription(CreateLocationSE);
                 end;
             Enum::"Contoso Demo Data Module"::Sales:
@@ -186,7 +178,7 @@ codeunit 11214 "SE Contoso Localization"
         end;
     end;
 
-    local procedure UnBindSubscriptionDemoData(Module: Enum "Contoso Demo Data Module")
+    local procedure UnBindSubscriptionDemoData(ContosoDemoDataLevel: Enum "Contoso Demo Data Level"; Module: Enum "Contoso Demo Data Module")
     var
         CreateLocationSE: Codeunit "Create Location SE";
         CreateItemSE: Codeunit "Create Item SE";
@@ -215,7 +207,8 @@ codeunit 11214 "SE Contoso Localization"
                 end;
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
-                    UnBindSubscription(CreateItemSE);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        UnBindSubscription(CreateItemSE);
                     UnBindSubscription(CreateLocationSE);
                 end;
             Enum::"Contoso Demo Data Module"::Sales:

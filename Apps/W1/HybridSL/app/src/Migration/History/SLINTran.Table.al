@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -10,6 +11,14 @@ table 47028 "SL INTran"
     Access = Internal;
     DataClassification = CustomerContent;
     ReplicateData = false;
+    ObsoleteReason = 'Replaced by table SL INTran Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -48,10 +57,12 @@ table 47028 "SL INTran"
         field(9; BMIEstimatedCost; Decimal)
         {
             Caption = 'BMIEstimatedCost';
+            AutoFormatType = 0;
         }
         field(10; BMIExtCost; Decimal)
         {
             Caption = 'BMIExtCost';
+            AutoFormatType = 0;
         }
         field(11; BMIMultDiv; Text[1])
         {
@@ -60,6 +71,7 @@ table 47028 "SL INTran"
         field(12; BMIRate; Decimal)
         {
             Caption = 'BMIRate';
+            AutoFormatType = 0;
         }
         field(13; BMIRtTp; Text[6])
         {
@@ -68,18 +80,22 @@ table 47028 "SL INTran"
         field(14; BMITranAmt; Decimal)
         {
             Caption = 'BMITranAmt';
+            AutoFormatType = 0;
         }
         field(15; BMIUnitPrice; Decimal)
         {
             Caption = 'BMIUnitPrice';
+            AutoFormatType = 0;
         }
         field(16; CmmnPct; Decimal)
         {
             Caption = 'CmmnPct';
+            AutoFormatType = 0;
         }
         field(17; CnvFact; Decimal)
         {
             Caption = 'CnvFact';
+            AutoFormatType = 0;
         }
         field(18; COGSAcct; Text[10])
         {
@@ -116,6 +132,7 @@ table 47028 "SL INTran"
         field(26; EstimatedCost; Decimal)
         {
             Caption = 'EstimatedCost';
+            AutoFormatType = 0;
         }
         field(27; Excpt; Integer)
         {
@@ -124,6 +141,7 @@ table 47028 "SL INTran"
         field(28; ExtCost; Decimal)
         {
             Caption = 'ExtCost';
+            AutoFormatType = 0;
         }
         field(29; ExtRefNbr; Text[15])
         {
@@ -176,6 +194,7 @@ table 47028 "SL INTran"
         field(42; KitStdQty; Decimal)
         {
             Caption = 'KitStdQty';
+            AutoFormatType = 0;
         }
         field(43; LayerType; Text[1])
         {
@@ -232,6 +251,7 @@ table 47028 "SL INTran"
         field(56; OvrhdAmt; Decimal)
         {
             Caption = 'OvrhdAmt';
+            AutoFormatType = 0;
         }
         field(57; OvrhdFlag; Integer)
         {
@@ -272,10 +292,12 @@ table 47028 "SL INTran"
         field(66; Qty; Decimal)
         {
             Caption = 'Qty';
+            AutoFormatType = 0;
         }
         field(67; QtyUnCosted; Decimal)
         {
             Caption = 'QtyUnCosted';
+            AutoFormatType = 0;
         }
         field(68; RcptDate; DateTime)
         {
@@ -316,18 +338,22 @@ table 47028 "SL INTran"
         field(77; S4Future03; Decimal)
         {
             Caption = 'S4Future03';
+            AutoFormatType = 0;
         }
         field(78; S4Future04; Decimal)
         {
             Caption = 'S4Future04';
+            AutoFormatType = 0;
         }
         field(79; S4Future05; Decimal)
         {
             Caption = 'S4Future05';
+            AutoFormatType = 0;
         }
         field(80; S4Future06; Decimal)
         {
             Caption = 'S4Future06';
+            AutoFormatType = 0;
         }
         field(81; S4Future07; DateTime)
         {
@@ -372,6 +398,7 @@ table 47028 "SL INTran"
         field(91; ShortQty; Decimal)
         {
             Caption = 'ShortQty';
+            AutoFormatType = 0;
         }
         field(92; SiteID; Text[10])
         {
@@ -404,6 +431,7 @@ table 47028 "SL INTran"
         field(99; StdTotalQty; Decimal)
         {
             Caption = 'StdTotalQty';
+            AutoFormatType = 0;
         }
         field(100; Sub; Text[24])
         {
@@ -432,6 +460,7 @@ table 47028 "SL INTran"
         field(106; TranAmt; Decimal)
         {
             Caption = 'TranAmt';
+            AutoFormatType = 0;
         }
         field(107; TranDate; DateTime)
         {
@@ -448,6 +477,7 @@ table 47028 "SL INTran"
         field(110; UnitCost; Decimal)
         {
             Caption = 'UnitCost';
+            AutoFormatType = 0;
         }
         field(111; UnitDesc; Text[6])
         {
@@ -460,6 +490,7 @@ table 47028 "SL INTran"
         field(113; UnitPrice; Decimal)
         {
             Caption = 'UnitPrice';
+            AutoFormatType = 0;
         }
         field(114; User1; Text[30])
         {
@@ -472,10 +503,12 @@ table 47028 "SL INTran"
         field(116; User3; Decimal)
         {
             Caption = 'User3';
+            AutoFormatType = 0;
         }
         field(117; User4; Decimal)
         {
             Caption = 'User4';
+            AutoFormatType = 0;
         }
         field(118; User5; Text[10])
         {
@@ -511,3 +544,4 @@ table 47028 "SL INTran"
         }
     }
 }
+#endif

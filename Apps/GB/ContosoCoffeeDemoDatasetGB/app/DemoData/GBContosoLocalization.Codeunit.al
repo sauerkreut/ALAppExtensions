@@ -5,15 +5,15 @@
 
 namespace Microsoft.DemoData.Localization;
 
-using Microsoft.DemoTool;
 using Microsoft.DemoData.eServices;
-using Microsoft.DemoData.Foundation;
-using Microsoft.DemoData.Purchases;
-using Microsoft.DemoData.Sales;
 using Microsoft.DemoData.Finance;
+using Microsoft.DemoData.FixedAsset;
+using Microsoft.DemoData.Foundation;
 using Microsoft.DemoData.HumanResources;
 using Microsoft.DemoData.Inventory;
-using Microsoft.DemoData.FixedAsset;
+using Microsoft.DemoData.Purchases;
+using Microsoft.DemoData.Sales;
+using Microsoft.DemoTool;
 
 codeunit 11487 "GB Contoso Localization"
 {
@@ -102,7 +102,6 @@ codeunit 11487 "GB Contoso Localization"
             Enum::"Contoso Demo Data Level"::"Master Data":
                 begin
                     Codeunit.Run(Codeunit::"Create GB Column Layout");
-                    Codeunit.Run(Codeunit::"Create Allocation Account GB");
                     CreateGBGeneralLedgerSetup.UpdateMaxVATDifferenceAllowedOnGeneralLedgerSetup();
                 end;
         end;
@@ -166,6 +165,8 @@ codeunit 11487 "GB Contoso Localization"
                 end;
             Enum::"Contoso Demo Data Module"::Finance:
                 begin
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        Codeunit.Run(Codeunit::"Create Allocation Account GB");
                     BindSubscription(CreateGBResource);
 #if not CLEAN27
                     BindSubscription(CreateGBVATReportSetup);

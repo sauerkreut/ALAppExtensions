@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -9,6 +10,14 @@ table 42802 "SL Hist. APTran"
 {
     DataClassification = CustomerContent;
     ReplicateData = false;
+    ObsoleteReason = 'Replaced by table SL Hist. APTran Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -78,58 +87,72 @@ table 42802 "SL Hist. APTran"
         }
         field(17; CuryPOExtPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryPOExtPrice';
         }
         field(18; CuryPOUnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryPOUnitPrice';
         }
         field(19; CuryPPV; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryPPV';
         }
         field(20; CuryRate; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryRate';
         }
         field(21; CuryTaxAmt00; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTaxAmt00';
         }
         field(22; CuryTaxAmt01; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTaxAmt01';
         }
         field(23; CuryTaxAmt02; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTaxAmt02';
         }
         field(24; CuryTaxAmt03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTaxAmt03';
         }
         field(25; CuryTranAmt; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTranAmt';
         }
         field(26; CuryTxblAmt00; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTxblAmt00';
         }
         field(27; CuryTxblAmt01; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTxblAmt01';
         }
         field(28; CuryTxblAmt02; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTxblAmt02';
         }
         field(29; CuryTxblAmt03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryTxblAmt03';
         }
         field(30; CuryUnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CuryUnitPrice';
         }
         field(31; DrCr; Text[1])
@@ -170,6 +193,7 @@ table 42802 "SL Hist. APTran"
         }
         field(40; JobRate; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'JobRate';
         }
         field(41; JrnlType; Text[3])
@@ -246,6 +270,7 @@ table 42802 "SL Hist. APTran"
         }
         field(59; POExtPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'POExtPrice';
         }
         field(60; POLineRef; Text[5])
@@ -258,14 +283,17 @@ table 42802 "SL Hist. APTran"
         }
         field(62; POQty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'POQty';
         }
         field(63; POUnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'POUnitPrice';
         }
         field(64; PPV; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'PPV';
         }
         field(65; ProjectID; Text[16])
@@ -274,10 +302,12 @@ table 42802 "SL Hist. APTran"
         }
         field(66; Qty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'Qty';
         }
         field(67; QtyVar; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'QtyVar';
         }
         field(68; RcptLineRef; Text[5])
@@ -290,6 +320,7 @@ table 42802 "SL Hist. APTran"
         }
         field(70; RcptQty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'RcptQty';
         }
         field(71; RecordID; Integer)
@@ -314,18 +345,22 @@ table 42802 "SL Hist. APTran"
         }
         field(76; S4Future03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future03';
         }
         field(77; S4Future04; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future04';
         }
         field(78; S4Future05; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future05';
         }
         field(79; S4Future06; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future06';
         }
         field(80; S4Future07; DateTime)
@@ -382,18 +417,22 @@ table 42802 "SL Hist. APTran"
         }
         field(93; TaxAmt00; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TaxAmt00';
         }
         field(94; TaxAmt01; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TaxAmt01';
         }
         field(95; TaxAmt02; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TaxAmt02';
         }
         field(96; TaxAmt03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TaxAmt03';
         }
         field(97; TaxCalced; Text[1])
@@ -426,6 +465,7 @@ table 42802 "SL Hist. APTran"
         }
         field(104; TranAmt; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TranAmt';
         }
         field(105; TranClass; Text[1])
@@ -446,18 +486,22 @@ table 42802 "SL Hist. APTran"
         }
         field(109; TxblAmt00; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TxblAmt00';
         }
         field(110; TxblAmt01; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TxblAmt01';
         }
         field(111; TxblAmt02; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TxblAmt02';
         }
         field(112; TxblAmt03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TxblAmt03';
         }
         field(113; UnitDesc; Text[10])
@@ -466,6 +510,7 @@ table 42802 "SL Hist. APTran"
         }
         field(114; UnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'UnitPrice';
         }
         field(115; User1; Text[30])
@@ -478,10 +523,12 @@ table 42802 "SL Hist. APTran"
         }
         field(117; User3; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'User3';
         }
         field(118; User4; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'User4';
         }
         field(119; User5; Text[10])
@@ -521,3 +568,4 @@ table 42802 "SL Hist. APTran"
         }
     }
 }
+#endif

@@ -5,6 +5,7 @@
 
 namespace Microsoft.DemoTool;
 
+using Microsoft.DemoData.Analytics;
 using Microsoft.DemoData.Bank;
 using Microsoft.DemoData.Common;
 using Microsoft.DemoData.CRM;
@@ -99,5 +100,10 @@ enum 5160 "Contoso Demo Data Module" implements "Contoso Demo Data Module"
     {
         Implementation = "Contoso Demo Data Module" = "EService Module";
         Caption = 'EService';
+    }
+    value(18; Analytics)
+    {
+        Implementation = "Contoso Demo Data Module" = "Analytics Module";
+        Caption = 'Analytics';
     }
 }

@@ -1,8 +1,15 @@
+namespace Microsoft.Finance.FinancialReports;
+
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using Microsoft.Sales.Document;
+using System.TestLibraries.Utilities;
+
 codeunit 144014 "UT REP Doclay"
 {
     Subtype = Test;
     TestPermissions = Disabled;
-
+    TestType = IntegrationTest;
     trigger OnRun()
     begin
     end;

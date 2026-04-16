@@ -6,6 +6,7 @@
 namespace Microsoft.DataMigration.SL;
 
 using Microsoft.DataMigration;
+using Microsoft.Utilities;
 using System.Environment;
 
 codeunit 47012 "SL Hybrid Wizard"
@@ -63,13 +64,12 @@ codeunit 47012 "SL Hybrid Wizard"
     end;
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Create Companies IC", OnBeforeCreateCompany, '', false, false)]
-    local procedure HandleOnBeforeCreateCompany(ProductId: Text; var CompanyDataType: Option "Evaluation Data","Standard Data",None,"Extended Data","Full No Data")
+    local procedure HandleOnBeforeCreateCompany(ProductId: Text; var CompanyDataType: Enum "Company Demo Data Type")
     begin
-
         if not CanHandle(ProductId) then
             exit;
 
-        CompanyDataType := CompanyDataType::"Standard Data";
+        CompanyDataType := CompanyDataType::"Production - Setup Data Only";
     end;
 
     internal procedure CanHandle(productId: Text): Boolean
@@ -230,13 +230,13 @@ codeunit 47012 "SL Hybrid Wizard"
         UpdateOrInsertRecord(Database::"SL AcctHist", 'AcctHist');
         UpdateOrInsertRecord(Database::"SL Batch", 'Batch');
         UpdateOrInsertRecord(Database::"SL GLSetup", 'GLSetup');
-        UpdateOrInsertRecord(Database::"SL GLTran", 'GLTran');
+        UpdateOrInsertRecord(Database::"SL GLTran Buffer", 'GLTran');
         // Payables
         UpdateOrInsertRecord(Database::"SL AP_Balances", 'AP_Balances');
         UpdateOrInsertRecord(Database::"SL APAdjust", 'APAdjust');
-        UpdateOrInsertRecord(Database::"SL APDoc", 'APDoc');
+        UpdateOrInsertRecord(Database::"SL APDoc Buffer", 'APDoc');
         UpdateOrInsertRecord(Database::"SL APSetup", 'APSetup');
-        UpdateOrInsertRecord(Database::"SL APTran", 'APTran');
+        UpdateOrInsertRecord(Database::"SL APTran Buffer", 'APTran');
         UpdateOrInsertRecord(Database::"SL POAddress", 'POAddress');
         UpdateOrInsertRecord(Database::"SL POReceipt", 'POReceipt');
         UpdateOrInsertRecord(Database::"SL POSetup", 'POSetup');
@@ -248,9 +248,9 @@ codeunit 47012 "SL Hybrid Wizard"
         // Receivables
         UpdateOrInsertRecord(Database::"SL AR_Balances", 'AR_Balances');
         UpdateOrInsertRecord(Database::"SL ARAdjust", 'ARAdjust');
-        UpdateOrInsertRecord(Database::"SL ARDoc", 'ARDoc');
+        UpdateOrInsertRecord(Database::"SL ARDoc Buffer", 'ARDoc');
         UpdateOrInsertRecord(Database::"SL ARSetup", 'ARSetup');
-        UpdateOrInsertRecord(Database::"SL ARTran", 'ARTran');
+        UpdateOrInsertRecord(Database::"SL ARTran Buffer", 'ARTran');
         UpdateOrInsertRecord(Database::"SL CustClass", 'CustClass');
         UpdateOrInsertRecord(Database::"SL Customer", 'Customer');
         UpdateOrInsertRecord(Database::"SL SOAddress", 'SOAddress');
@@ -263,13 +263,13 @@ codeunit 47012 "SL Hybrid Wizard"
         UpdateOrInsertRecord(Database::"SL SOType", 'SOType');
         // Items
         UpdateOrInsertRecord(Database::"SL INSetup", 'INSetup');
-        UpdateOrInsertRecord(Database::"SL INTran", 'INTran');
-        UpdateOrInsertRecord(Database::"SL Inventory", 'Inventory');
+        UpdateOrInsertRecord(Database::"SL INTran Buffer", 'INTran');
+        UpdateOrInsertRecord(Database::"SL Inventory Buffer", 'Inventory');
         UpdateOrInsertRecord(Database::"SL InventoryADG", 'InventoryADG');
-        UpdateOrInsertRecord(Database::"SL ItemCost", 'ItemCost');
-        UpdateOrInsertRecord(Database::"SL ItemSite", 'ItemSite');
-        UpdateOrInsertRecord(Database::"SL LotSerMst", 'LotSerMst');
-        UpdateOrInsertRecord(Database::"SL LotSerT", 'LotSerT');
+        UpdateOrInsertRecord(Database::"SL ItemCost Buffer", 'ItemCost');
+        UpdateOrInsertRecord(Database::"SL ItemSite Buffer", 'ItemSite');
+        UpdateOrInsertRecord(Database::"SL LotSerMst Buffer", 'LotSerMst');
+        UpdateOrInsertRecord(Database::"SL LotSerT Buffer", 'LotSerT');
         UpdateOrInsertRecord(Database::"SL ProductClass", 'ProductClass');
         UpdateOrInsertRecord(Database::"SL Site", 'Site');
         // Misc
@@ -280,12 +280,12 @@ codeunit 47012 "SL Hybrid Wizard"
         // Projects
         UpdateOrInsertRecord(Database::"SL PJAddr", 'PJAddr');
         UpdateOrInsertRecord(Database::"SL PJCode", 'PJCode');
-        UpdateOrInsertRecord(Database::"SL PJEmploy", 'PJEmploy');
-        UpdateOrInsertRecord(Database::"SL PJEmpPjt", 'PJEmpPjt');
-        UpdateOrInsertRecord(Database::"SL PJEquip", 'PJEquip');
-        UpdateOrInsertRecord(Database::"SL PJEQRate", 'PJEQRate');
-        UpdateOrInsertRecord(Database::"SL PJPent", 'PJPent');
-        UpdateOrInsertRecord(Database::"SL PJProj", 'PJProj');
+        UpdateOrInsertRecord(Database::"SL PJEmploy Buffer", 'PJEmploy');
+        UpdateOrInsertRecord(Database::"SL PJEmpPjt Buffer", 'PJEmpPjt');
+        UpdateOrInsertRecord(Database::"SL PJEquip Buffer", 'PJEquip');
+        UpdateOrInsertRecord(Database::"SL PJEQRate Buffer", 'PJEQRate');
+        UpdateOrInsertRecord(Database::"SL PJPent Buffer", 'PJPent');
+        UpdateOrInsertRecord(Database::"SL PJProj Buffer", 'PJProj');
     end;
 
     internal procedure UpdateOrInsertRecord(TableID: Integer; SourceTableName: Text[128])

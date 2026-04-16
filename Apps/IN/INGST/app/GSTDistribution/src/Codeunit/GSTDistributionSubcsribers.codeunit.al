@@ -94,11 +94,21 @@ codeunit 18201 "GST Distribution Subcsribers"
     begin
         if GSTDistributionHeader."No." = '' then begin
             GeneralLedgerSetup.Get();
-            if GeneralLedgerSetup."GST Distribution Nos." <> '' then begin
-                GeneralLedgerSetup.TestField("GST Distribution Nos.");
-                NoSeries.Get(GeneralLedgerSetup."GST Distribution Nos.");
-                GSTDistributionHeader."No." := NoSeriesCodeunit.GetNextNo(NoSeries.Code);
-                GSTDistributionHeader."No. Series" := GeneralLedgerSetup."GST Distribution Nos.";
+            case GSTDistributionHeader.Reversal of
+                false:
+                    if GeneralLedgerSetup."GST Distribution Nos." <> '' then begin
+                        GeneralLedgerSetup.TestField("GST Distribution Nos.");
+                        NoSeries.Get(GeneralLedgerSetup."GST Distribution Nos.");
+                        GSTDistributionHeader."No." := NoSeriesCodeunit.GetNextNo(NoSeries.Code);
+                        GSTDistributionHeader."No. Series" := GeneralLedgerSetup."GST Distribution Nos.";
+                    end;
+                true:
+                    if GeneralLedgerSetup."GST Reversal Distribution Nos." <> '' then begin
+                        GeneralLedgerSetup.TestField("GST Reversal Distribution Nos.");
+                        NoSeries.Get(GeneralLedgerSetup."GST Reversal Distribution Nos.");
+                        GSTDistributionHeader."No." := NoSeriesCodeunit.GetNextNo(NoSeries.Code);
+                        GSTDistributionHeader."No. Series" := GeneralLedgerSetup."GST Reversal Distribution Nos.";
+                    end;
             end;
         end;
 
@@ -310,6 +320,14 @@ codeunit 18201 "GST Distribution Subcsribers"
             repeat
                 GSTDistributionLine.Init();
                 GSTDistributionLine.TransferFields(PostedGSTDistributionLine);
+
+                if GSTDistributionHeader."ISD Document Type" = GSTDistributionHeader."ISD Document Type"::"Credit Memo" then begin
+                    GSTDistributionLine."From Location Code" := GSTDistributionLine."To Location Code";
+                    GSTDistributionLine."From GSTIN No." := GSTDistributionLine."To GSTIN No.";
+                    GSTDistributionLine."To Location Code" := GSTDistributionHeader."From Location Code";
+                    GSTDistributionLine."To GSTIN No." := GSTDistributionHeader."From GSTIN No.";
+                end;
+
                 GSTDistributionLine."Distribution No." := GSTDistributionHeader."No.";
                 GSTDistributionLine."Posting Date" := GSTDistributionHeader2."Posting Date";
                 GSTDistributionLine."Distribution Amount" := 0;

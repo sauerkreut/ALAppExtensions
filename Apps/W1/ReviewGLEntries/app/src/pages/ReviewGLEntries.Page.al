@@ -1,9 +1,9 @@
 namespace Microsoft.Finance.GeneralLedger.Review;
 
+using Microsoft.Finance.GeneralLedger.Account;
 using Microsoft.Finance.GeneralLedger.Ledger;
 using System.Telemetry;
 using System.Utilities;
-using Microsoft.Finance.GeneralLedger.Account;
 
 page 22207 "Review G/L Entries"
 {
@@ -67,13 +67,20 @@ page 22207 "Review G/L Entries"
                     Editable = false;
                     ToolTip = 'Specifies the account no. that will be applied.';
                 }
+                field("Rec Review Policy"; Rec."Review Policy")
+                {
+                    ApplicationArea = Basic, Suite;
+                    Editable = false;
+                    Visible = false;
+                    ToolTip = 'Specifies the review policy for the G/L Account.';
+                }
                 field(Reviewer; Rec."Reviewed By")
                 {
                     ApplicationArea = Basic, Suite;
                     Editable = false;
                     ToolTip = 'Specifies a code for the ID when you set entries as reviewed.';
                     AboutTitle = 'About Reviewer?';
-                    AboutText = 'When an entry has been marked as reviewed, you can see the name of that person';
+                    AboutText = 'When an entry has been marked as reviewed, you can see the name of that person.';
                 }
                 field("Reviewed Date"; Rec."Reviewed Date")
                 {
@@ -81,11 +88,16 @@ page 22207 "Review G/L Entries"
                     Editable = false;
                     ToolTip = 'Specifies the time when the ledger entries were reviewed.';
                     AboutTitle = 'About Reviewed Date?';
-                    AboutText = 'When an entry has been marked as reviewed, you can see the date on which it was done';
+                    AboutText = 'When an entry has been marked as reviewed, you can see the date on which it was done.';
                 }
                 field("Amount to Review"; Rec."Amount to Review")
                 {
                     ApplicationArea = Basic, Suite;
+                    Caption = 'Amount to Review';
+                    BlankZero = true;
+                    ToolTip = 'Specifies the amount that you want to review for the entry. Leaving this field blank or setting it to zero indicates that the entire amount is to be reviewed.';
+                    AboutTitle = 'About Amount to Review?';
+                    AboutText = 'When only a part of an entry amount is to be reviewed, set that custom amount in this field.';
 
                     trigger OnValidate()
                     begin
@@ -98,10 +110,12 @@ page 22207 "Review G/L Entries"
                 }
                 field(RemainingAmount; RemainingAmount)
                 {
+                    AutoFormatType = 1;
+                    AutoFormatExpression = '';
                     ApplicationArea = Basic, Suite;
                     Caption = 'Remaining Amount';
                     Editable = false;
-                    ToolTip = 'Specifies the remaining amount that can be applied to the entry.';
+                    ToolTip = 'Specifies the remaining amount that can be reviewed.';
                 }
                 field("Review Id"; Rec."Reviewed Identifier")
                 {
@@ -143,6 +157,7 @@ page 22207 "Review G/L Entries"
                 {
                     ApplicationArea = Basic, Suite;
                     AutoFormatType = 1;
+                    AutoFormatExpression = '';
                     Caption = 'Debit (LCY)';
                     Editable = false;
                     ToolTip = 'Specifies the accumulated debit amount of all the lines applied to this line.';
@@ -151,6 +166,7 @@ page 22207 "Review G/L Entries"
                 {
                     ApplicationArea = Basic, Suite;
                     AutoFormatType = 1;
+                    AutoFormatExpression = '';
                     Caption = 'Credit (LCY)';
                     Editable = false;
                     ToolTip = 'Specifies the accumulated credit amount of all the lines applied to this line.';
@@ -159,6 +175,7 @@ page 22207 "Review G/L Entries"
                 {
                     ApplicationArea = Basic, Suite;
                     AutoFormatType = 1;
+                    AutoFormatExpression = '';
                     Caption = 'Balance';
                     Editable = false;
                     ToolTip = 'Specifies the accumulated balance of all the lines applied to this line.';
@@ -328,7 +345,7 @@ page 22207 "Review G/L Entries"
         InitialRecordsLoaded := Rec.GetView();
         FeatureTelemetry.LogUptake('0000J2Y', 'Review G/L Entries', "Feature Uptake Status"::Discovered);
 
-        CalcBalance();
+        CalcBalance(Rec);
     end;
 
     trigger OnAfterGetRecord()
@@ -344,7 +361,14 @@ page 22207 "Review G/L Entries"
 
     trigger OnModifyRecord(): Boolean
     begin
-        Balance := Balance + Rec."Amount to Review" - xRec."Amount to Review";
+        if (Rec."Amount to Review" <> xRec."Amount to Review") then
+            if xRec."Amount to Review" = 0 then
+                Balance := Balance - Rec.Amount + Rec."Amount to Review"
+            else
+                if Rec."Amount to Review" = 0 then
+                    Balance := Balance + Rec.Amount - xRec."Amount to Review"
+                else
+                    Balance := Balance + Rec."Amount to Review" - xRec."Amount to Review";
     end;
 
     local procedure SetSelectedRecordsAsReviewed()
@@ -368,9 +392,11 @@ page 22207 "Review G/L Entries"
         GLEntry: Record "G/L Entry";
     begin
         SelectedGLEntries(GLEntry);
+        GLEntry.SetLoadFields("Debit Amount", "Credit Amount");
         GLEntry.CalcSums("Debit Amount", "Credit Amount");
         Debit := GLEntry."Debit Amount";
         Credit := GLEntry."Credit Amount";
+        CalcBalance(GLEntry);
         CurrPage.Update(false);
     end;
 
@@ -383,6 +409,7 @@ page 22207 "Review G/L Entries"
     var
         GLAccount: record "G/L Account";
     begin
+        GLAccount.SetLoadFields("No.", Name, "Review Policy");
         if not GLAccount.Get(Rec."G/L Account No.") then
             if Rec.GetFilter(Rec."G/L Account No.") <> '' then
                 GLAccount.Get(Rec.GetRangeMin(Rec."G/L Account No."));
@@ -390,16 +417,19 @@ page 22207 "Review G/L Entries"
         exit(StrSubstNo(CaptionLbl, GLAccount."No.", GLAccount.Name));
     end;
 
-    local procedure CalcBalance()
+    local procedure CalcBalance(var GLEntryRec: Record "G/L Entry")
     var
         GLEntry: Record "G/L Entry";
     begin
         Balance := 0;
-        GLEntry.Copy(Rec);
-        if GLEntry.FindSet() then
-            repeat
-                Balance += GLEntry."Amount to Review";
-            until GLEntry.Next() = 0;
+        GLEntry.Copy(GLEntryRec);
+        GLEntry.SetLoadFields("Amount to Review", Amount);
+        GLEntry.SetFilter("Amount to Review", '<>0');
+        GLEntry.CalcSums("Amount to Review");
+        Balance += GLEntry."Amount to Review";
+        GLEntry.SetRange("Amount to Review", 0);
+        GLEntry.CalcSums(Amount);
+        Balance += GLEntry.Amount;
     end;
 
     local procedure AreOppositeSign(Amount1: Decimal; Amount2: Decimal): Boolean

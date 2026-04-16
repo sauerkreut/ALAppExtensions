@@ -6,12 +6,12 @@
 namespace Microsoft.DataMigration.SL;
 
 using Microsoft.DataMigration;
+using Microsoft.Finance.GeneralLedger.Account;
+using Microsoft.Inventory.Item;
+using Microsoft.Purchases.Vendor;
+using Microsoft.Sales.Customer;
 using Microsoft.Utilities;
 using System.Integration;
-using Microsoft.Finance.GeneralLedger.Account;
-using Microsoft.Sales.Customer;
-using Microsoft.Purchases.Vendor;
-using Microsoft.Inventory.Item;
 
 codeunit 47001 "SL Cloud Migration"
 {
@@ -122,6 +122,7 @@ codeunit 47001 "SL Cloud Migration"
 
         SelectLatestVersion();
         SLHelperFunctions.SetProcessesRunning(true);
+        SLHelperFunctions.RunPreMigrationCleanup();
 
         SLPopulateFiscalPeriods.CreateSLFiscalPeriodsFromGLSetup();
         SLFiscalPeriods.MoveStagingData();
@@ -234,7 +235,7 @@ codeunit 47001 "SL Cloud Migration"
             CreateDataMigrationStatusRecords(Database::Vendor, VendorsToMigrateCount, Database::"SL Vendor", Codeunit::"SL Vendor Migrator");
 
         if SLCompanyAdditionalSettings.GetInventoryModuleEnabled() then
-            CreateDataMigrationStatusRecords(Database::Item, ItemsToMigrateCount, Database::"SL Inventory", Codeunit::"SL Item Migrator");
+            CreateDataMigrationStatusRecords(Database::Item, ItemsToMigrateCount, Database::"SL Inventory Buffer", Codeunit::"SL Item Migrator");
     end;
 
     [IntegrationEvent(false, false, true)]

@@ -9,13 +9,14 @@ namespace Microsoft.Agent.SalesOrderAgent;
 
 using Microsoft.Assembly.Document;
 using Microsoft.Finance.Dimension;
+using Microsoft.Foundation.Attachment;
 using Microsoft.Integration.Entity;
-using Microsoft.Inventory.Requisition;
 using Microsoft.Inventory.Availability;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Item.Attribute;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Planning;
+using Microsoft.Inventory.Requisition;
 using Microsoft.Purchases.Vendor;
 using Microsoft.Sales.Comment;
 using Microsoft.Sales.Customer;
@@ -43,6 +44,9 @@ permissionset 4405 "SOA - Edit"
                              "SOA - Read";
 
     Permissions = tabledata "Agent Task Message" = r,
+                  tabledata "Agent Task Message Attachment" = RM,
+                  tabledata "Agent Task File" = R,
+                  tabledata "Document Attachment" = IMD,
                   tabledata "Assemble-to-Order Link" = IMD,
                   tabledata "Assembly Header" = IMD,
                   tabledata "Assembly Line" = IMD,

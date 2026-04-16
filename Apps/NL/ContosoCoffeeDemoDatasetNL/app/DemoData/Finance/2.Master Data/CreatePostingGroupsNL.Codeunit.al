@@ -5,8 +5,8 @@
 
 namespace Microsoft.DemoData.Finance;
 
-using Microsoft.DemoTool.Helpers;
 using Microsoft.DemoData.Localization;
+using Microsoft.DemoTool.Helpers;
 
 codeunit 11538 "Create Posting Groups NL"
 {
@@ -54,6 +54,7 @@ codeunit 11538 "Create Posting Groups NL"
         ContosoGenPostingSetup.InsertGeneralPostingSetup(CreatePostingGroups.DomesticPostingGroup(), CreatePostingGroups.ZeroPostingGroup(), CreateNLGLAccounts.ResaleofGoods(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.CostofMaterials(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.GoodsforResale(), '', CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.CostofMaterials(), '', '');
 
         ContosoGenPostingSetup.InsertGeneralPostingSetup(CreatePostingGroups.EUPostingGroup(), CreatePostingGroups.RetailPostingGroup(), CreateNLGLAccounts.ResaleofGoods(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.CostofMaterials(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.GoodsforResale(), '', CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.CostofMaterials(), '', '');
+        ContosoGenPostingSetup.InsertGeneralPostingSetup(CreatePostingGroups.EUPostingGroup(), CreatePostingGroups.ZeroPostingGroup(), CreateNLGLAccounts.ResaleofGoods(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.CostofMaterials(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.GoodsforResale(), '', CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.CostofMaterials(), '', '');
 
         ContosoGenPostingSetup.InsertGeneralPostingSetup(CreatePostingGroups.ExportPostingGroup(), CreatePostingGroups.RetailPostingGroup(), CreateNLGLAccounts.ResaleofGoods(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.CostofMaterials(), CreateNLGLAccounts.GoodsforResale(), CreateNLGLAccounts.GoodsforResale(), '', CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.CostofMaterials(), '', '');
         ContosoGenPostingSetup.InsertGeneralPostingSetup(CreatePostingGroups.ExportPostingGroup(), CreatePostingGroups.ServicesPostingGroup(), CreateNLGLAccounts.SalesofServiceWork(), CreateNLGLAccounts.OtherExternalServices(), CreateNLGLAccounts.CostofLabor(), CreateNLGLAccounts.OtherExternalServices(), CreateNLGLAccounts.OtherExternalServices(), '', CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.SalesDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.PurchaseDiscounts(), CreateNLGLAccounts.CostofLabor(), '', '');

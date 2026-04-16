@@ -5,14 +5,14 @@
 
 namespace Microsoft.DemoData.Localization;
 
-using Microsoft.DemoData.Finance;
-using Microsoft.DemoData.Purchases;
 using Microsoft.DemoData.Bank;
+using Microsoft.DemoData.Finance;
 using Microsoft.DemoData.FixedAsset;
-using Microsoft.DemoData.Inventory;
-using Microsoft.DemoData.Sales;
 using Microsoft.DemoData.Foundation;
 using Microsoft.DemoData.HumanResources;
+using Microsoft.DemoData.Inventory;
+using Microsoft.DemoData.Purchases;
+using Microsoft.DemoData.Sales;
 using Microsoft.DemoTool;
 
 codeunit 11113 "DE Contoso Localization"
@@ -137,6 +137,8 @@ codeunit 11113 "DE Contoso Localization"
                         FinanceModuleSetup.InitRecord();
                         CreateDEVatPostingGroup.InsertVATProductPostingGroup();
                     end;
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        Codeunit.Run(Codeunit::"Create Allocation Account DE");
                     BindSubscription(CreateDEAccScheduleLine);
                     BindSubscription(CreateDEAnalysisView);
                     BindSubscription(CreateDECurrencyExRate);

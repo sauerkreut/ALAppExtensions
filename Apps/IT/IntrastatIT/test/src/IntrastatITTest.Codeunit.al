@@ -82,6 +82,7 @@ codeunit 139511 "Intrastat IT Test"
         DataExchangeXMLCSQP2Txt: Label '<TransformationRules><Code>GETAMOUNTSIGN</Code><Description>Get Amount Sign</Description><TransformationType>6</TransformationType><FindValue>^\d</FindValue><ReplaceValue>+</ReplaceValue><StartPosition>0</StartPosition><Length>0</Length><DataFormat /><DataFormattingCulture /><NextTransformationRule>FIRSTCHAR</NextTransformationRule><TableID>0</TableID><SourceFieldID>0</SourceFieldID><TargetFieldID>0</TargetFieldID><FieldLookupRule>0</FieldLookupRule><Precision>0.00</Precision><Direction /><ExportFromDateType>0</ExportFromDateType></TransformationRules></DataExchFieldMapping><DataExchFieldMapping ColumnNo="12" FieldID="13" Optional="true" TransformationRule="ROUNDTOINT"><TransformationRules><Code>ALPHANUMERIC_ONLY</Code><Description>Alphanumeric Text Only</Description><TransformationType>7</TransformationType><FindValue /><ReplaceValue /><StartPosition>0</StartPosition><Length>0</Length><DataFormat /><DataFormattingCulture /><NextTransformationRule /><TableID>0</TableID><SourceFieldID>0</SourceFieldID><TargetFieldID>0</TargetFieldID><FieldLookupRule>0</FieldLookupRule><Precision>0.00</Precision><Direction /><ExportFromDateType>0</ExportFromDateType></TransformationRules><TransformationRules><Code>ROUNDTOINT</Code><Description>Round to Integer</Description><TransformationType>14</TransformationType><FindValue>&amp;#032;</FindValue><ReplaceValue /><StartPosition>0</StartPosition><Length>0</Length><DataFormat /><DataFormattingCulture /><NextTransformationRule>ALPHANUMERIC_ONLY</NextTransformationRule><TableID>0</TableID><SourceFieldID>0</SourceFieldID><TargetFieldID>0</TargetFieldID><FieldLookupRule>0</FieldLookupRule><Precision>1.00</Precision><Direction>=</Direction><ExportFromDateType>0</ExportFromDateType></TransformationRules></DataExchFieldMapping><DataExchFieldMapping ColumnNo="13" FieldID="8" Optional="true" TransformationRule="FIRSTCHAR"><TransformationRules><Code>FIRSTCHAR</Code><Description>First Character</Description><TransformationType>4</TransformationType><FindValue>&amp;#032;</FindValue><ReplaceValue /><StartPosition>1</StartPosition><Length>1</Length><DataFormat /><DataFormattingCulture /><NextTransformationRule /><TableID>0</TableID><SourceFieldID>0</SourceFieldID><TargetFieldID>0</TargetFieldID><FieldLookupRule>0</FieldLookupRule><Precision>0.00</Precision><Direction /><ExportFromDateType>0</ExportFromDateType></TransformationRules></DataExchFieldMapping><DataExchFieldMapping ColumnNo="14" FieldID="5" Optional="true" TransformationRule="TRIMALL"><TransformationRules><Code>TRIMALL</Code><Description>Removes all spaces</Description><TransformationType>5</TransformationType><FindValue>&amp;#032;</FindValue><ReplaceValue /><StartPosition>0</StartPosition><Length>0</Length><DataFormat /><DataFormattingCulture /><NextTransformationRule /><TableID>0</TableID><SourceFieldID>0</SourceFieldID><TargetFieldID>0</TargetFieldID><FieldLookupRule>0</FieldLookupRule><Precision>0.00</Precision><Direction /><ExportFromDateType>0</ExportFromDateType></TransformationRules></DataExchFieldMapping></DataExchMapping></DataExchLineDef></DataExchDef></root>',
                             Locked = true;
         AmountErr: Label 'Amount must be %1 in %2.', Comment = '%1= Amount Value, %2= Table Caption.';
+        SourceEntryNoErr: Label 'Source Entry No. should match FA Ledger Entry No.';
 
     [Test]
     [Scope('OnPrem')]
@@ -780,6 +781,7 @@ codeunit 139511 "Intrastat IT Test"
         PurchaseHeader: Record "Purchase Header";
         PurchaseLine: Record "Purchase Line";
         IntrastatReportNo: Code[20];
+        CleanupIntrastatReportNo: Code[20];
         DocumentNo: Code[20];
     begin
         // [FEATURE] [Purchase] [Item Charge]
@@ -790,7 +792,7 @@ codeunit 139511 "Intrastat IT Test"
         LibraryPurchase.CreatePurchHeader(
           PurchaseHeader, PurchaseHeader."Document Type"::Order, LibraryIntrastat.CreateVendor(LibraryIntrastat.GetCountryRegionCode()));
         with PurchaseHeader do begin
-            Validate("Posting Date", CalcDate('<+1Y-CM>', WorkDate()));
+            Validate("Posting Date", CalcDate('<+5Y-CM>', WorkDate()));
             Validate("Buy-from Country/Region Code", '');
             Modify(true);
         end;
@@ -799,10 +801,13 @@ codeunit 139511 "Intrastat IT Test"
         // [GIVEN] Item Charge Purchase Line
         LibraryPurchase.AssignPurchChargeToPurchaseLine(PurchaseHeader, PurchaseLine, 1, LibraryRandom.RandDecInRange(100, 200, 2));
 
-        // [GIVEN] Purchase Order is Received and Invoiced on 01.Jan
-        DocumentNo := LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, false);
+        // [GIVEN] Pre-existing entries for the period are absorbed by a cleanup report
+        CreateIntrastatReportAndSuggestLines(PurchaseHeader."Posting Date", CleanupIntrastatReportNo, Periodicity::Month, Type::Purchase, false, IncStr(FileNo), false);
 
-        // [WHEN] Run Get Entries on Intrastat Report
+        // [GIVEN] Purchase Order is Received and Invoiced on 01.Jan
+        DocumentNo := LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, true);
+
+        // [WHEN] Run Get Entries on a second Intrastat Report for the same period
         // [THEN] No Intrastat Report Lines should be created for Item "X"
         CreateIntrastatReportAndSuggestLines(PurchaseHeader."Posting Date", IntrastatReportNo, Periodicity::Month, Type::Purchase, false, IncStr(FileNo), false);
         VerifyIntrastatLineForItemExist(DocumentNo, IntrastatReportNo);
@@ -2264,6 +2269,73 @@ codeunit 139511 "Intrastat IT Test"
     end;
 
     [Test]
+    [HandlerFunctions('IntrastatReportGetLinesPageHandler')]
+    procedure E2EIntrastatReportITCorrPurchHeaderNoExtraZeros()
+    var
+        PurchaseLine: Record "Purchase Line";
+        DataExch: Record "Data Exch.";
+        FileMgt: Codeunit "File Management";
+        LibraryTextFileValidation: Codeunit "Library - Text File Validation";
+        TempBlob: Codeunit "Temp Blob";
+        IntrastatReportPage: TestPage "Intrastat Report";
+        InvoiceDate: Date;
+        IntrastatReportNo: Code[20];
+        FileName: Text;
+        Header: Text;
+        HeaderTotalsSection: Text;
+        ExpectedTotalsLength: Integer;
+        TotalsStartPos: Integer;
+    begin
+        BindSubscription(LibraryIntrastat);
+        // [FEATURE] [AI test 0.3]
+        // [SCENARIO 624090] Corrective Purchase export header must not contain extra trailing zeros
+        // [GIVEN] Posted Purchase Order and corrective Credit Memo for intrastat
+        Initialize();
+        InvoiceDate := CalcDate('<7Y>');
+        WorkDate(InvoiceDate);
+        CreateAndPostCorrectivePurchCrMemo(LibraryIntrastat.CreateAndPostPurchaseOrderWithInvoice(PurchaseLine, InvoiceDate), CalcDate('<+1M>', InvoiceDate));
+        WorkDate(Today);
+        CreateIntrastatReportAndSuggestLines(CalcDate('<+1M>', InvoiceDate), IntrastatReportNo, Periodicity::Month, Type::Purchase, true, '999', false);
+        Commit();
+
+        // [GIVEN] A Intrastat Report with validated fields
+        EnsureLookupRecordsExist();
+        IntrastatReportPage.OpenEdit();
+        IntrastatReportPage.Filter.SetFilter("No.", IntrastatReportNo);
+        ValidateMissingFields(IntrastatReportPage);
+        IntrastatReportPage.ChecklistReport.Invoke();
+        IntrastatReportPage.ErrorMessagesPart."Field Name".AssertEquals('');
+
+        // [WHEN] Running Create File for corrective purchase
+        IntrastatReportPage.CreateFile.Invoke();
+
+        // [THEN] Verify header totals section has correct length (72 chars: 18+5+13+36) without extra 5 trailing zeros
+        DataExch.FindLast();
+        Assert.IsTrue(DataExch."File Content".HasValue(), DataExchFileContentMissingErr);
+        DataExch.CalcFields("File Content");
+        TempBlob.FromRecord(DataExch, DataExch.FieldNo("File Content"));
+        FileName := FileMgt.ServerTempFileName('txt');
+        FileMgt.BLOBExportToServerFile(TempBlob, FileName);
+        Header := LibraryTextFileValidation.ReadLine(FileName, 1);
+
+        // Header structure before totals: EUROX(5) + VAT(11) + FileDiskNo(6) + 000000(6) + Type(1) + Period(2) + Periodicity(1) + Month(2) + CompanyVAT(11) + 00(2) + TaxRepVAT(11) = 58 chars
+        TotalsStartPos := 59;
+        // Corrective purchase totals: 18 zeros + LineCount(5) + Amount(13) + 36 zeros = 72 chars. No trailing 5 zeros.
+        ExpectedTotalsLength := 72;
+        HeaderTotalsSection := LibraryTextFileValidation.ReadValue(Header, TotalsStartPos, ExpectedTotalsLength);
+        Assert.AreEqual(ExpectedTotalsLength, StrLen(HeaderTotalsSection), 'Corrective purchase header totals section has incorrect length.');
+
+        // Verify the trailing part is exactly 36 zeros (not 41)
+        Assert.AreEqual(Format('').PadLeft(36, '0'), LibraryTextFileValidation.ReadValue(Header, TotalsStartPos + 36, 36), 'Corrective purchase header should have exactly 36 trailing zeros, not 41.');
+
+        // Verify total header length: 58 (common header) + 72 (corrective purchase totals) = 130
+        Assert.AreEqual(130, StrLen(Header), 'Corrective purchase header total length is incorrect - extra trailing zeros detected.');
+
+        IntrastatReportPage.Close();
+        UnbindSubscription(LibraryIntrastat);
+    end;
+
+    [Test]
     [Scope('OnPrem')]
     [HandlerFunctions('IntrastatReportGetLinesPageHandler')]
     procedure IntrastatReportTotalWeight()
@@ -2942,6 +3014,70 @@ codeunit 139511 "Intrastat IT Test"
         //[THEN] An error occurs
         Assert.ExpectedErrorCode('TestField');
         Assert.ExpectedError(PurchaseHeader.FieldName("Transport Method"));
+    end;
+
+    [Test]
+    [HandlerFunctions('IntrastatReportGetLinesPageHandler')]
+    procedure IntrastatReportForPurchaseHaveSourceEntryNoForFixedAsset()
+    var
+        FALedgerEntry: Record "FA Ledger Entry";
+        IntrastatReportLine: Record "Intrastat Report Line";
+        PurchaseLine: Record "Purchase Line";
+        DocumentNo, IntrastatReportNo : Code[20];
+        FAPostingType: Enum "FA Ledger Entry FA Posting Type";
+    begin
+        // [SCENARIO 603678] Verify that Source Entry No. is populated for Fixed Asset entries in Intrastat Report
+        Initialize();
+
+        // [GIVEN] Posted Fixed Asset Purchase Order.
+        DocumentNo := LibraryIntrastat.CreateAndPostFixedAssetPurchaseOrder(PurchaseLine, WorkDate());
+
+        // [WHEN] Get Intrastat Report Lines for Fixed Asset Purchase Order.
+        CreateIntrastatReportAndSuggestLines(WorkDate(), IntrastatReportNo, Periodicity::Month, Type::Purchase, false, IncStr(FileNo), false);
+
+        // [THEN] Verify that Source Entry No. is populated with FA Ledger Entry No.
+        LibraryIntrastat.GetIntrastatReportLine(DocumentNo, IntrastatReportNo, IntrastatReportLine);
+
+        // [GIVEN] Find the corresponding FA Ledger Entry
+        FindFALedgerEntry(FALedgerEntry, DocumentNo, PurchaseLine."No.", FAPostingType::"Acquisition Cost");
+
+        // [THEN] Verify Source Entry No. is set and matches the FA Ledger Entry
+        Assert.AreEqual(FALedgerEntry."Entry No.", IntrastatReportLine."Source Entry No.", SourceEntryNoErr);
+    end;
+
+    [Test]
+    [HandlerFunctions('IntrastatReportGetLinesPageHandler')]
+    procedure IntrastatReportForSalesHaveSourceEntryNoForFixedAsset()
+    var
+        FALedgerEntry: Record "FA Ledger Entry";
+        IntrastatReportLine: Record "Intrastat Report Line";
+        PurchaseLine: Record "Purchase Line";
+        SalesLine: Record "Sales Line";
+        DocumentNo, IntrastatReportNo : Code[20];
+        FAPostingType: Enum "FA Ledger Entry FA Posting Type";
+    begin
+        // [SCENARIO 603678] Verify that Source Entry No. is populated for Fixed Asset entries in Intrastat Report
+        Initialize();
+
+        // [GIVEN] Create and post Aquisition Purchase Order
+        LibraryIntrastat.CreateAndPostFixedAssetPurchaseOrder(PurchaseLine, WorkDate());
+
+        // [GIVEN] Create and Post Disposal Sales Order.
+        DocumentNo := LibraryIntrastat.CreateAndPostSalesDocumentMultiLine(
+            SalesLine, SalesLine."Document Type"::Order, WorkDate(), SalesLine.Type::"Fixed Asset",
+            PurchaseLine."No.", 1);
+
+        // [WHEN] Get Intrastat Report Lines for Fixed Asset Sales Order.
+        CreateIntrastatReportAndSuggestLines(WorkDate(), IntrastatReportNo, Periodicity::Month, Type::Sales, false, IncStr(FileNo), false);
+
+        // [THEN] Verify that Source Entry No. is populated with FA Ledger Entry No.
+        LibraryIntrastat.GetIntrastatReportLine(DocumentNo, IntrastatReportNo, IntrastatReportLine);
+
+        // [GIVEN] Find the corresponding FA Ledger Entry.
+        FindFALedgerEntry(FALedgerEntry, DocumentNo, SalesLine."No.", FAPostingType::"Proceeds on Disposal");
+
+        // [THEN] Verify Source Entry No. is set and matches the FA Ledger Entry.
+        Assert.AreEqual(FALedgerEntry."Entry No.", IntrastatReportLine."Source Entry No.", SourceEntryNoErr);
     end;
 
     local procedure Initialize()
@@ -3720,6 +3856,9 @@ codeunit 139511 "Intrastat IT Test"
         Assert.AreEqual(Format(Round(DecVar, 1)).PadLeft(13, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 13), IntrastatFileOutputErr);
         ReadFromPosition += 13;
         Assert.AreEqual(Format('').PadLeft(54, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 54), IntrastatFileOutputErr);
+        ReadFromPosition += 54;
+        if FileType = 'C' then
+            Assert.AreEqual(Format('').PadLeft(5, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 5), IntrastatFileOutputErr);
 
         // Verify Line
         Line1 := LibraryTextFileValidation.ReadLine(FileName, 2);
@@ -3837,7 +3976,10 @@ codeunit 139511 "Intrastat IT Test"
         Evaluate(DecVar, IntrastatReportPage.IntrastatLines.Amount.Value);
         Assert.AreEqual(ConvertLastDigit(Format(Round(Abs(DecVar), 1)).PadLeft(13, '0')), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 13), IntrastatFileOutputErr);
         ReadFromPosition += 13;
-        Assert.AreEqual(Format('').PadLeft(41, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 41), IntrastatFileOutputErr);
+        Assert.AreEqual(Format('').PadLeft(36, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 36), IntrastatFileOutputErr);
+        ReadFromPosition += 36;
+        if FileType = 'C' then
+            Assert.AreEqual(Format('').PadLeft(5, '0'), LibraryTextFileValidation.ReadValue(Header, ReadFromPosition, 5), IntrastatFileOutputErr);
 
         // Verify Line
         Line1 := LibraryTextFileValidation.ReadLine(FileName, 2);
@@ -3901,6 +4043,56 @@ codeunit 139511 "Intrastat IT Test"
         Choice := 2;
     end;
 
+    local procedure EnsureLookupRecordsExist()
+    var
+        "Area": Record "Area";
+        CountryRegion: Record "Country/Region";
+        EntryExitPoint: Record "Entry/Exit Point";
+        ShipmentMethod: Record "Shipment Method";
+        TransactionType: Record "Transaction Type";
+        TransactionSpecification: Record "Transaction Specification";
+        TransportMethod: Record "Transport Method";
+    begin
+        if TransactionType.IsEmpty() then begin
+            TransactionType.Init();
+            TransactionType.Code := CopyStr(LibraryRandom.RandText(MaxStrLen(TransactionType.Code)), 1, MaxStrLen(TransactionType.Code));
+            TransactionType.Insert();
+        end;
+        if "Area".IsEmpty() then begin
+            "Area".Init();
+            "Area".Code := CopyStr(LibraryRandom.RandText(MaxStrLen("Area".Code)), 1, MaxStrLen("Area".Code));
+            "Area".Insert();
+        end;
+        if TransactionSpecification.IsEmpty() then begin
+            TransactionSpecification.Init();
+            TransactionSpecification.Code := CopyStr(LibraryRandom.RandText(MaxStrLen(TransactionSpecification.Code)), 1, MaxStrLen(TransactionSpecification.Code));
+            TransactionSpecification.Insert();
+        end;
+        TransactionSpecification.FindFirst();
+        CountryRegion.SetRange("EU Country/Region Code", TransactionSpecification.Code);
+        if CountryRegion.IsEmpty() then begin
+            CountryRegion.Init();
+            CountryRegion.Code := CopyStr(LibraryUtility.GenerateRandomCode(CountryRegion.FieldNo(Code), Database::"Country/Region"), 1, MaxStrLen(CountryRegion.Code));
+            CountryRegion."EU Country/Region Code" := TransactionSpecification.Code;
+            CountryRegion.Insert(true);
+        end;
+        if TransportMethod.IsEmpty() then begin
+            TransportMethod.Init();
+            TransportMethod.Code := CopyStr(LibraryRandom.RandText(MaxStrLen(TransportMethod.Code)), 1, MaxStrLen(TransportMethod.Code));
+            TransportMethod.Insert();
+        end;
+        if EntryExitPoint.IsEmpty() then begin
+            EntryExitPoint.Init();
+            EntryExitPoint.Code := CopyStr(LibraryRandom.RandText(MaxStrLen(EntryExitPoint.Code)), 1, MaxStrLen(EntryExitPoint.Code));
+            EntryExitPoint.Insert();
+        end;
+        if ShipmentMethod.IsEmpty() then begin
+            ShipmentMethod.Init();
+            ShipmentMethod.Code := CopyStr(LibraryRandom.RandText(MaxStrLen(ShipmentMethod.Code)), 1, MaxStrLen(ShipmentMethod.Code));
+            ShipmentMethod.Insert();
+        end;
+    end;
+
     local procedure CreateAndPostCorrectiveSalesCrMemo(PostedSalesInvoiceCode: Code[20]; PostingDate: Date): Code[20]
     var
         SalesHeader: Record "Sales Header";
@@ -3960,5 +4152,13 @@ codeunit 139511 "Intrastat IT Test"
                 OutText += 'y';
         end;
         exit(OutText);
+    end;
+
+    local procedure FindFALedgerEntry(var FALedgerEntry: Record "FA Ledger Entry"; DocumentNo: Code[20]; FANo: Code[20]; FAPostingType: Enum "FA Ledger Entry FA Posting Type")
+    begin
+        FALedgerEntry.SetRange("Document No.", DocumentNo);
+        FALedgerEntry.SetRange("FA No.", FANo);
+        FALedgerEntry.SetRange("FA Posting Type", FAPostingType);
+        FALedgerEntry.FindFirst();
     end;
 }

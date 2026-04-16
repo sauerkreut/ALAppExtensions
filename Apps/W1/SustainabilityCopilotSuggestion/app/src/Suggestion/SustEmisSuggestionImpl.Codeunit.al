@@ -4,11 +4,11 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.Sustainability.Copilot;
 
-using System.AI;
 using Microsoft.Sustainability.Journal;
+using System.AI;
+using System.Azure.KeyVault;
 using System.Environment;
 using System.Telemetry;
-using System.Azure.KeyVault;
 
 codeunit 6290 "Sust. Emis. Suggestion Impl."
 {
@@ -34,13 +34,13 @@ codeunit 6290 "Sust. Emis. Suggestion Impl."
 
     procedure CalculateEmissionByCopilot(var SustainabilityJnlLine: Record "Sustainability Jnl. Line")
     var
-        SustainEmissionSuggestion: Record "Sustain. Emission Suggestion";
+        TempSustainEmissionSuggestion: Record "Sustain. Emission Suggestion";
         SustainEmissionSuggestionPage: Page "Sustain. Emission Suggestion";
     begin
         if SustainabilityJnlLine.IsEmpty() then
             exit;
 
-        SustainEmissionSuggestionPage.SetData(SustainabilityJnlLine, SustainEmissionSuggestion);
+        SustainEmissionSuggestionPage.SetData(SustainabilityJnlLine, TempSustainEmissionSuggestion);
         SustainEmissionSuggestionPage.SetPromptMode(PromptMode::Generate);
         SustainEmissionSuggestionPage.LookupMode(true);
         SustainEmissionSuggestionPage.RunModal();

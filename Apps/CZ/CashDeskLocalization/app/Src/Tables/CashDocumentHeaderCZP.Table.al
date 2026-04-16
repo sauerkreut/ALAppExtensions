@@ -100,6 +100,8 @@ table 11732 "Cash Document Header CZP"
         }
         field(7; Amount; Decimal)
         {
+            AutoFormatType = 1;
+            AutoFormatExpression = Rec."Currency Code";
             Caption = 'Amount';
             CalcFormula = Sum("Cash Document Line CZP".Amount where("Cash Desk No." = field("Cash Desk No."), "Cash Document No." = field("No.")));
             Editable = false;
@@ -107,6 +109,8 @@ table 11732 "Cash Document Header CZP"
         }
         field(8; "Amount (LCY)"; Decimal)
         {
+            AutoFormatType = 1;
+            AutoFormatExpression = '';
             Caption = 'Amount (LCY)';
             CalcFormula = Sum("Cash Document Line CZP"."Amount (LCY)" where("Cash Desk No." = field("Cash Desk No."), "Cash Document No." = field("No.")));
             Editable = false;
@@ -181,7 +185,8 @@ table 11732 "Cash Document Header CZP"
         {
             CaptionClass = '1,2,1';
             Caption = 'Shortcut Dimension 1 Code';
-            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(1));
+            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(1),
+                                                          Blocked = const(false));
             DataClassification = CustomerContent;
 
             trigger OnValidate()
@@ -193,7 +198,8 @@ table 11732 "Cash Document Header CZP"
         {
             CaptionClass = '1,2,2';
             Caption = 'Shortcut Dimension 2 Code';
-            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(2));
+            TableRelation = "Dimension Value".Code where("Global Dimension No." = const(2),
+                                                          Blocked = const(false));
             DataClassification = CustomerContent;
 
             trigger OnValidate()
@@ -203,6 +209,7 @@ table 11732 "Cash Document Header CZP"
         }
         field(25; "Currency Factor"; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'Currency Factor';
             DataClassification = CustomerContent;
 
@@ -261,6 +268,8 @@ table 11732 "Cash Document Header CZP"
         }
         field(50; "Released Amount"; Decimal)
         {
+            AutoFormatExpression = "Currency Code";
+            AutoFormatType = 1;
             Caption = 'Released Amount';
             Editable = false;
             DataClassification = CustomerContent;
@@ -285,6 +294,8 @@ table 11732 "Cash Document Header CZP"
         }
         field(55; "VAT Base Amount (LCY)"; Decimal)
         {
+            AutoFormatType = 1;
+            AutoFormatExpression = '';
             CalcFormula = Sum("Cash Document Line CZP"."VAT Base Amount (LCY)" where("Cash Desk No." = field("Cash Desk No."), "Cash Document No." = field("No.")));
             Caption = 'VAT Base Amount (LCY)';
             Editable = false;
@@ -292,6 +303,8 @@ table 11732 "Cash Document Header CZP"
         }
         field(56; "Amount Including VAT (LCY)"; Decimal)
         {
+            AutoFormatType = 1;
+            AutoFormatExpression = '';
             CalcFormula = Sum("Cash Document Line CZP"."Amount Including VAT (LCY)" where("Cash Desk No." = field("Cash Desk No."), "Cash Document No." = field("No.")));
             Caption = 'Amount Including VAT (LCY)';
             Editable = false;
@@ -654,18 +667,18 @@ table 11732 "Cash Document Header CZP"
                 "Document Type"::Receipt:
                     begin
                         CashDeskCZP.TestField("Cash Document Receipt Nos.");
-                            "No. Series" := CashDeskCZP."Cash Document Receipt Nos.";
-                            if NoSeries.AreRelated("No. Series", xRec."No. Series") then
-                                "No. Series" := xRec."No. Series";
-                            "No." := NoSeries.GetNextNo("No. Series");
+                        "No. Series" := CashDeskCZP."Cash Document Receipt Nos.";
+                        if NoSeries.AreRelated("No. Series", xRec."No. Series") then
+                            "No. Series" := xRec."No. Series";
+                        "No." := NoSeries.GetNextNo("No. Series");
                     end;
                 "Document Type"::Withdrawal:
                     begin
                         CashDeskCZP.TestField("Cash Document Withdrawal Nos.");
-                            "No. Series" := CashDeskCZP."Cash Document Withdrawal Nos.";
-                            if NoSeries.AreRelated("No. Series", xRec."No. Series") then
-                                "No. Series" := xRec."No. Series";
-                            "No." := NoSeries.GetNextNo("No. Series");
+                        "No. Series" := CashDeskCZP."Cash Document Withdrawal Nos.";
+                        if NoSeries.AreRelated("No. Series", xRec."No. Series") then
+                            "No. Series" := xRec."No. Series";
+                        "No." := NoSeries.GetNextNo("No. Series");
                     end;
             end;
 
@@ -724,8 +737,10 @@ table 11732 "Cash Document Header CZP"
         DeleteQst: Label 'Deleting this document will cause a gap in the number series for posted cash documents. An empty posted cash document %1 will be created to fill this gap in the number series.\\Do you want to continue?', Comment = '%1 = Document No.';
         PostedDocsToPrintCreatedMsg: Label 'One or more related posted documents have been generated during deletion to fill gaps in the number series. You can view or print the documents from the respective document archive.';
         CurrencyDate: Date;
-        SkipLineNo: Integer;
         HideValidationDialog: Boolean;
+
+    protected var
+        SkipLineNo: Integer;
 
     procedure AssistEdit(OldCashDocumentHeaderCZP: Record "Cash Document Header CZP"): Boolean
     var
@@ -1164,9 +1179,7 @@ table 11732 "Cash Document Header CZP"
 
     procedure SignAmount(): Integer
     begin
-        if "Document Type" = "Document Type"::Receipt then
-            exit(-1);
-        exit(1);
+        exit("Document Type" = "Document Type"::Receipt ? -1 : 1);
     end;
 
     procedure SetHideValidationDialog(NewHideValidationDialog: Boolean)

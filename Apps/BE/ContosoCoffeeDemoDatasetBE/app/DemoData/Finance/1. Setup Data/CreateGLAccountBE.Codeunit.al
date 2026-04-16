@@ -5,9 +5,9 @@
 
 namespace Microsoft.DemoData.Finance;
 
+using Microsoft.DemoTool.Helpers;
 using Microsoft.Finance.GeneralLedger.Account;
 using Microsoft.Foundation.Enums;
-using Microsoft.DemoTool.Helpers;
 
 codeunit 11357 "Create GL Account BE"
 {
@@ -412,6 +412,8 @@ codeunit 11357 "Create GL Account BE"
         UpdateGLAccountVatSetup(PostAccount(), '', '', false, 0);
         UpdateGLAccountVatSetup(CreateGLAccount.Cash(), '', '', false, 0);
         GLAccountIndent.Indent();
+
+        Codeunit.Run(Codeunit::"Create Deferral Template BE");
     end;
 
     local procedure UpdateGLAccountVatSetup(GLAccountNo: Code[20]; VATBusPostingGroup: Code[20]; VATProdPostingGroup: Code[20]; PrintDetails: Boolean; NonDeductibleVAT: Decimal)

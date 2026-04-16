@@ -10,11 +10,16 @@ using System.Agents;
 
 codeunit 4309 "SOA Agent Task Execution" implements IAgentTaskExecution
 {
+    InherentEntitlements = X;
+    InherentPermissions = X;
     Access = Internal;
 
     procedure AnalyzeAgentTaskMessage(AgentTaskMessage: Record "Agent Task Message"; var Annotations: Record "Agent Annotation")
     begin
-        SOAAnnotation.GetAgentTaskMessageAnnotations(AgentTaskMessage, Annotations);
+        if AgentTaskMessage.Type = AgentTaskMessage.Type::Input then
+            SOAAnnotation.GetAgentTaskMessageAnnotations(AgentTaskMessage, Annotations)
+        else
+            SOAOutputMessageSetup.PrepareOutputMessage(AgentTaskMessage);
     end;
 
     procedure GetAgentTaskUserInterventionSuggestions(AgentTaskUserInterventionRequestDetails: Record "Agent User Int Request Details"; var AgentTaskUserInterventionSuggestion: Record "Agent Task User Int Suggestion")
@@ -29,5 +34,6 @@ codeunit 4309 "SOA Agent Task Execution" implements IAgentTaskExecution
 
     var
         SOAAnnotation: Codeunit "SOA Annotation";
+        SOAOutputMessageSetup: Codeunit "SOA Output Message Setup";
         SOASetupCU: Codeunit "SOA Setup";
 }

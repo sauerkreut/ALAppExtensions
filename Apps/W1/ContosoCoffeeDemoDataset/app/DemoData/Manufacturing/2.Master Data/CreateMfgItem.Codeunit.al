@@ -5,12 +5,12 @@
 
 namespace Microsoft.DemoData.Manufacturing;
 
-using Microsoft.Inventory.Item;
-using Microsoft.DemoTool.Helpers;
 using Microsoft.DemoData.Common;
-using Microsoft.Manufacturing.StandardCost;
+using Microsoft.DemoTool.Helpers;
 using Microsoft.Inventory.Costing;
+using Microsoft.Inventory.Item;
 using Microsoft.Manufacturing.Setup;
+using Microsoft.Manufacturing.StandardCost;
 
 codeunit 4770 "Create Mfg Item"
 {
@@ -58,6 +58,10 @@ codeunit 4770 "Create Mfg Item"
         ContosoPostingSetup.InsertInventoryPostingSetup(ManufacturingModuleSetup."Manufacturing Location", CreateCommonPostingGroup.RawMaterial(), CommonGLAccount.RawMaterials(), '', CreateMfgGLAccount.WIPAccountFinishedGoods(), '', '', '', '', '');
 
         ContosoPostingSetup.InsertInventoryPostingSetup(ManufacturingModuleSetup."Manufacturing Location", CreateCommonPostingGroup.Resale(), CommonGLAccount.Resale(), CommonGLAccount.ResaleInterim());
+
+        ContosoPostingSetup.InsertInventoryPostingSetup(ManufacturingModuleSetup."Subcontracting Location", CreateMfgPostingGroup.Finished(), CreateMfgGLAccount.FinishedGoods(), '', CreateMfgGLAccount.WIPAccountFinishedGoods(), CreateMfgGLAccount.MaterialVariance(), CreateMfgGLAccount.CapacityVariance(), CreateMfgGLAccount.SubcontractedVariance(), CreateMfgGLAccount.CapOverheadVariance(), CreateMfgGLAccount.MfgOverheadVariance(), CreateMfgGLAccount.MaterialNonInvVariance());
+        ContosoPostingSetup.InsertInventoryPostingSetup(ManufacturingModuleSetup."Subcontracting Location", CreateCommonPostingGroup.RawMaterial(), CommonGLAccount.RawMaterials(), '', CreateMfgGLAccount.WIPAccountFinishedGoods(), '', '', '', '', '');
+        ContosoPostingSetup.InsertInventoryPostingSetup(ManufacturingModuleSetup."Subcontracting Location", CreateCommonPostingGroup.Resale(), CommonGLAccount.Resale(), CommonGLAccount.ResaleInterim());
     end;
 
     local procedure CreateBOMAndRoutingItems()
@@ -245,9 +249,9 @@ codeunit 4770 "Create Mfg Item"
 
     local procedure InsertItemVariants()
     begin
-        ContosoItem.InsertItemVariant(SPSCM1006(), BlackTok, AutoDripLiteBlackTok);
-        ContosoItem.InsertItemVariant(SPSCM1006(), WhiteTok, AutoDripLiteWhiteTok);
-        ContosoItem.InsertItemVariant(SPSCM1006(), RedTok, AutoDripLiteRedTok);
+        ContosoItem.InsertItemVariant(SPSCM1006(), BlackTok, AutoDripLiteBlackTok, ManufacturingMedia.GetAutoDripLiteBlackPicture());
+        ContosoItem.InsertItemVariant(SPSCM1006(), WhiteTok, AutoDripLiteWhiteTok, ManufacturingMedia.GetAutoDripLiteWhitePicture());
+        ContosoItem.InsertItemVariant(SPSCM1006(), RedTok, AutoDripLiteRedTok, ManufacturingMedia.GetAutoDripLiteRedPicture());
     end;
 
     local procedure CalcStandardCost()

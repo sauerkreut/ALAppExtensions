@@ -30,6 +30,8 @@ pageextension 31144 "Posted Purch. Inv. Update CZL" extends "Posted Purch. Invoi
                 {
                     ApplicationArea = Basic, Suite;
                     ToolTip = 'Specifies the vendor''s own invoice number.';
+                    Editable = IsExtDocNoEditable;
+                    Visible = IsExtDocNoEditable;
                 }
                 field("Variable Symbol CZL"; Rec."Variable Symbol CZL")
                 {
@@ -55,4 +57,13 @@ pageextension 31144 "Posted Purch. Inv. Update CZL" extends "Posted Purch. Invoi
             }
         }
     }
+
+    trigger OnOpenPage()
+    begin
+        IsExtDocNoEditable := ExtDocNoChangingCZL.IsAllowed();
+    end;
+
+    var
+        ExtDocNoChangingCZL: Codeunit "Ext. Doc. No. Changing CZL";
+        IsExtDocNoEditable: Boolean;
 }

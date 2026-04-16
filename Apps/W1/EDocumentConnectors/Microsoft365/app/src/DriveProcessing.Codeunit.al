@@ -5,12 +5,12 @@
 namespace Microsoft.EServices.EDocumentConnector.Microsoft365;
 
 using Microsoft.EServices.EDocument;
+using Microsoft.eServices.EDocument.Integration;
+using Microsoft.eServices.EDocument.Integration.Receive;
+using System.Integration;
+using System.Telemetry;
 using System.Text;
 using System.Utilities;
-using System.Integration;
-using Microsoft.eServices.EDocument.Integration.Receive;
-using System.Telemetry;
-using Microsoft.eServices.EDocument.Integration;
 
 codeunit 6381 "Drive Processing"
 {
@@ -184,8 +184,8 @@ codeunit 6381 "Drive Processing"
 
     internal procedure SizeThreshold(): Integer
     begin
-        // 5 MB
-        exit(5242880)
+        // 20 MB
+        exit(20971520)
     end;
 
     procedure DownloadDocument(var EDocument: Record "E-Document"; var EDocumentService: Record "E-Document Service"; DocumentMetadataBlob: Codeunit "Temp Blob"; ReceiveContext: Codeunit ReceiveContext)

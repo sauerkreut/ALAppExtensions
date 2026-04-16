@@ -1,8 +1,15 @@
+namespace Microsoft.Finance.FinancialReports;
+
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.History;
+using System.Environment.Configuration;
+using System.TestLibraries.Utilities;
+
 codeunit 144015 "UT REP Purchase & Sales"
 {
     Subtype = Test;
     TestPermissions = Disabled;
-
+    TestType = IntegrationTest;
     trigger OnRun()
     begin
     end;

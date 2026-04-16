@@ -5,9 +5,9 @@
 
 namespace Microsoft.DemoData.Warehousing;
 
-using Microsoft.Inventory.Setup;
-using Microsoft.DemoTool.Helpers;
 using Microsoft.DemoData.Common;
+using Microsoft.DemoTool.Helpers;
+using Microsoft.Inventory.Setup;
 
 codeunit 5148 "Create Whse Inventory Setup"
 {
@@ -53,7 +53,7 @@ codeunit 5148 "Create Whse Inventory Setup"
         InventorySetup.Modify(true);
     end;
 
-    local procedure CreateInventoryPostingSetup()
+    internal procedure CreateInventoryPostingSetup()
     var
         WhseDemoDataSetup: Record "Warehouse Module Setup";
         ContosoPostingSetup: Codeunit "Contoso Posting Setup";

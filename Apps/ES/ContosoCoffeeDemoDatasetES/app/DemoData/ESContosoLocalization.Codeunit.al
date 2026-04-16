@@ -6,13 +6,13 @@
 namespace Microsoft.DemoData.Localization;
 
 using Microsoft.DemoData.Bank;
-using Microsoft.DemoData.Purchases;
 using Microsoft.DemoData.CRM;
+using Microsoft.DemoData.Finance;
 using Microsoft.DemoData.FixedAsset;
 using Microsoft.DemoData.Foundation;
-using Microsoft.DemoData.Inventory;
 using Microsoft.DemoData.HumanResources;
-using Microsoft.DemoData.Finance;
+using Microsoft.DemoData.Inventory;
+using Microsoft.DemoData.Purchases;
 using Microsoft.DemoData.Sales;
 using Microsoft.DemoTool;
 
@@ -185,6 +185,8 @@ codeunit 10824 "ES Contoso Localization"
                         FinanceModuleSetup.InitRecord();
                         Codeunit.Run(Codeunit::"Create ES VAT Posting Groups");
                     end;
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        Codeunit.Run(Codeunit::"Create Allocation Account ES");
                     BindSubscription(CreateESResource);
                     BindSubscription(CreateESAnalysisView);
                     BindSubscription(CreateESAccScheduleLine);
@@ -196,7 +198,8 @@ codeunit 10824 "ES Contoso Localization"
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
                     BindSubscription(CreateESLocation);
-                    BindSubscription(CreateESItem);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        BindSubscription(CreateESItem);
                 end;
             Enum::"Contoso Demo Data Module"::Bank:
                 begin
@@ -262,7 +265,8 @@ codeunit 10824 "ES Contoso Localization"
                 end;
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
-                    UnbindSubscription(CreateESItem);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        UnbindSubscription(CreateESItem);
                     UnbindSubscription(CreateESLocation);
                 end;
             Enum::"Contoso Demo Data Module"::Purchase:

@@ -18,8 +18,8 @@ using Microsoft.Foundation.Shipping;
 using Microsoft.Inventory.Location;
 using Microsoft.Purchases.Vendor;
 using System.Globalization;
-using System.Utilities;
 using System.Telemetry;
+using System.Utilities;
 
 report 10581 "Purchase Invoice"
 {
@@ -929,4 +929,3 @@ report 10581 "Purchase Invoice"
         FeatureNameTok: Label 'Purchase Invoice GB', Locked = true;
         EventNameTok: Label 'Purchase Invoice GB report has been used', Locked = true;
 }
-

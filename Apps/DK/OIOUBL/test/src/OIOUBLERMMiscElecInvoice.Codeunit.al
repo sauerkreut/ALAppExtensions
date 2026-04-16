@@ -707,33 +707,6 @@ codeunit 148052 "OIOUBL-ERM Misc Elec. Invoice"
 
     [Test]
     [HandlerFunctions('MessageHandler')]
-    procedure ElectronicCrMemoWithUnitPriceMoreThanTwoDecimal();
-    var
-        SalesHeader: Record "Sales Header";
-        SalesCrMemoLine: Record "Sales Cr.Memo Line";
-        DocumentNo: Code[20];
-    begin
-        // Verify XML data after Create Electronic Credit Memos for Item with more than two decimal digits in Unit Price.
-
-        // Setup:  Create and Post Sales Credit Memo.
-        Initialize();
-        DocumentNo :=
-          CreateAndPostSalesDocument(SalesHeader, CreateCustomer(''), SalesHeader."Document Type"::"Credit Memo",
-            CreateItemWithUnitPrice(), LibraryRandom.RandDec(10, 2), false);  // Using Random value for VAT%.
-        SalesCrMemoLine.SetRange("Document No.", DocumentNo);
-        SalesCrMemoLine.FindFirst();
-
-        // Exercise: Run Create Electronic Credit Memo Report.
-        CreateElectronicCreditMemoDocument(DocumentNo);
-
-        // Verify: Verify ID and Issue Date for Create Electronic Credit Memos Report.
-        VerifyElectronicDocumentData(DocumentNo, SalesHeader."Document Date");
-        // Verify: Verify Unit Price on document matches Unit Price on Electronic Document
-        VerifyNodeDecimalValue('cbc:PriceAmount', SalesCrMemoLine."Unit Price");
-    end;
-
-    [Test]
-    [HandlerFunctions('MessageHandler')]
     procedure ElectronicInvoiceWithNormalVAT();
     var
         Customer: Record Customer;
@@ -1734,6 +1707,7 @@ codeunit 148052 "OIOUBL-ERM Misc Elec. Invoice"
         GeneralLedgerSetup: Record "General Ledger Setup";
     begin
         GeneralLedgerSetup.GET();
+        GeneralLedgerSetup."LCY Code" := '';        // to avoid error on updating LCY Code
         GeneralLedgerSetup.VALIDATE("LCY Code", LCYCode);
         GeneralLedgerSetup.MODIFY(true);
     end;

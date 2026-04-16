@@ -4,8 +4,8 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.Finance.VAT.Reporting;
 
-using System.Utilities;
 using System.Telemetry;
+using System.Utilities;
 
 codeunit 10047 "Process Response IRIS"
 {
@@ -19,8 +19,11 @@ codeunit 10047 "Process Response IRIS"
         AckNamespaceUriTxt: Label 'urn:us:gov:treasury:irs:ir', Locked = true;
         AckNamespacePrefixTxt: Label 'n1', Locked = true;
         ParseSubmitTransmResponseEventTxt: Label 'ParseSubmitTransmissionResponse', Locked = true;
+        PreReceiptValidationEventTxt: Label 'PreReceiptValidation', Locked = true;
         ReceiptIDNotFoundErr: Label 'Receipt ID was not found in the response.';
         ReceiptIDEmptyErr: Label 'Empty Receipt ID was found in the response.';
+        PreReceiptValidationFailedTxt: Label 'Pre-receipt validation failed', Locked = true;
+        XmlSchemaValidationErrorTok: Label 'XML Schema Validation Error', Locked = true;
 
     procedure GetReceiptID(ResponseContentBlob: Codeunit "Temp Blob"; var ReceiptID: Text[100]): Boolean
     var
@@ -51,6 +54,33 @@ codeunit 10047 "Process Response IRIS"
         end;
 
         exit(true);
+    end;
+
+    procedure GetReceiptIDFromAcknowledgXmlResponse(AcknowledgContentBlob: Codeunit "Temp Blob") ReceiptID: Text[100]
+    var
+        XmlDoc: XmlDocument;
+        NamespaceManager: XmlNamespaceManager;
+        CurrXmlNode: XmlNode;
+        AckText: Text;
+        XPath: Text;
+    begin
+        ReceiptID := '';
+
+        AckText := Helper.WriteTempBlobToText(AcknowledgContentBlob);
+        if AckText = '' then
+            exit('');
+
+        XmlDocument.ReadFrom(AckText, XmlDoc);
+
+        NamespaceManager.NameTable(XmlDoc.NameTable());
+        NamespaceManager.AddNamespace(AckNamespacePrefixTxt, AckNamespaceUriTxt);
+
+        // Receipt ID may or may not be present in the Acknowledgement response
+        XPath := Helper.AddPrefixToXPath('//ResultGrp/TransmissionResultGrp/ReceiptId', AckNamespacePrefixTxt);
+        if XmlDoc.SelectSingleNode(XPath, NamespaceManager, CurrXmlNode) then
+            ReceiptID := CopyStr(CurrXmlNode.AsXmlElement().InnerText(), 1, MaxStrLen(ReceiptID));
+
+        exit(ReceiptID);
     end;
 
     procedure ParseGetStatusXmlResponse(AcknowledgContentBlob: Codeunit "Temp Blob"; var UniqueTransmissionId: Text[100]; var TransmissionStatus: Text): Boolean
@@ -211,9 +241,12 @@ codeunit 10047 "Process Response IRIS"
         // Record Errors
         XPath := Helper.AddPrefixToXPath('ErrorInformationGrp', AckNamespacePrefixTxt);
         if RecordResultGrpNode.SelectNodes(XPath, NamespaceManager, CurrNodeList) then
-            foreach CurrXmlNode in CurrNodeList do
-                if ParseErrorInfoGroup(CurrXmlNode, NamespaceManager, ErrorCode, ErrorMessage, ErrorValue, XmlElementPath) then
-                    CreateErrorInfoTempRec(TempErrorInfo, Enum::"Entity Type IRIS"::RecordType, SubmissionId, RecordIdValue, ErrorCode, ErrorMessage, ErrorValue, XmlElementPath);
+            if CurrNodeList.Count() = 0 then
+                CreateErrorInfoTempRec(TempErrorInfo, Enum::"Entity Type IRIS"::RecordType, SubmissionId, RecordIdValue, '', '', '', '')    // record was processed by IRS without errors
+            else
+                foreach CurrXmlNode in CurrNodeList do
+                    if ParseErrorInfoGroup(CurrXmlNode, NamespaceManager, ErrorCode, ErrorMessage, ErrorValue, XmlElementPath) then
+                        CreateErrorInfoTempRec(TempErrorInfo, Enum::"Entity Type IRIS"::RecordType, SubmissionId, RecordIdValue, ErrorCode, ErrorMessage, ErrorValue, XmlElementPath);
     end;
 
     local procedure ParseErrorInfoGroup(ErrorInfoGrpNode: XmlNode; NamespaceManager: XmlNamespaceManager; var ErrorCode: Text; var ErrorMessage: Text; var ErrorValue: Text; var XmlElementPath: Text): Boolean
@@ -263,5 +296,19 @@ codeunit 10047 "Process Response IRIS"
         TempErrorInfo."Error Value" := CopyStr(ErrorValue, 1, MaxStrLen(TempErrorInfo."Error Value"));
         TempErrorInfo."Xml Element Path" := CopyStr(XmlElementPath, 1, MaxStrLen(TempErrorInfo."Xml Element Path"));
         TempErrorInfo.Insert(true);
+    end;
+
+    procedure PreReceiptValidationFailed(var TempErrorInfo: Record "Error Information IRIS" temporary): Boolean
+    begin
+        // Pre-receipt validation errors indicate that the transmission was rejected before processing.
+        // In this case, even if a Receipt ID is returned, the transmission status should not be updated.
+        TempErrorInfo.Reset();
+        TempErrorInfo.SetRange("Error Code", XmlSchemaValidationErrorTok);
+        if not TempErrorInfo.IsEmpty() then begin
+            FeatureTelemetry.LogError('0000RH0', Helper.GetIRISFeatureName(), PreReceiptValidationEventTxt, PreReceiptValidationFailedTxt);
+            exit(true);
+        end;
+
+        exit(false);
     end;
 }

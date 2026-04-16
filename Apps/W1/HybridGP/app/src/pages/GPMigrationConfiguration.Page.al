@@ -242,7 +242,7 @@ page 4050 "GP Migration Configuration"
                     end;
                 }
             }
-
+#pragma warning disable AA0219
             group(SkipPosting)
             {
                 Caption = 'Disable Auto Posting';
@@ -324,16 +324,8 @@ page 4050 "GP Migration Configuration"
                     end;
                 }
             }
+#pragma warning restore AA0219
 
-#if not CLEAN25
-            group(Inactives)
-            {
-                Visible = false;
-                ObsoleteState = Pending;
-                ObsoleteTag = '25.0';
-                ObsoleteReason = 'Group replaced by IncludeTheseRecords';
-            }
-#endif
 
             group(IncludeTheseRecords)
             {
@@ -446,6 +438,58 @@ page 4050 "GP Migration Configuration"
                         if PrepSettingsForFieldUpdate() then
                             repeat
                                 GPCompanyAdditionalSettings.Validate("Migrate Kit Items", Rec."Migrate Kit Items");
+                                GPCompanyAdditionalSettings.Modify();
+                            until GPCompanyAdditionalSettings.Next() = 0;
+                    end;
+                }
+                field("Item Desc 2 Source"; Rec."Item Desc. 2 Source")
+                {
+                    Caption = 'Item Desc. 2 Source';
+                    ToolTip = 'Specifies whether Short Description or Generic Description populates Item Description 2 field.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    begin
+                        if PrepSettingsForFieldUpdate() then
+                            repeat
+                                GPCompanyAdditionalSettings.Validate("Item Desc. 2 Source", Rec."Item Desc. 2 Source");
+                                GPCompanyAdditionalSettings.Modify();
+                            until GPCompanyAdditionalSettings.Next() = 0;
+                    end;
+                }
+            }
+
+            group(RecurringLines)
+            {
+                Caption = 'Recurring Lines';
+                InstructionalText = 'Select these options to generate recurring sales or purchasing lines using the default sales or purchasing accounts defined on the Vendor, Customer, Class or Posting Setup in GP.';
+
+                field("Recurring Purchasing Lines"; Rec."Recurring Purchasing Lines")
+                {
+                    Caption = 'Purchasing Lines';
+                    ToolTip = 'Specifies whether to migrate recurring purchasing lines.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    begin
+                        if PrepSettingsForFieldUpdate() then
+                            repeat
+                                GPCompanyAdditionalSettings.Validate("Recurring Purchasing Lines", Rec."Recurring Purchasing Lines");
+                                GPCompanyAdditionalSettings.Modify();
+                            until GPCompanyAdditionalSettings.Next() = 0;
+                    end;
+                }
+                field("Recurring Sales Lines"; Rec."Recurring Sales Lines")
+                {
+                    Caption = 'Sales Lines';
+                    ToolTip = 'Specifies whether to migrate recurring sales lines.';
+                    ApplicationArea = All;
+
+                    trigger OnValidate()
+                    begin
+                        if PrepSettingsForFieldUpdate() then
+                            repeat
+                                GPCompanyAdditionalSettings.Validate("Recurring Sales Lines", Rec."Recurring Sales Lines");
                                 GPCompanyAdditionalSettings.Modify();
                             until GPCompanyAdditionalSettings.Next() = 0;
                     end;
@@ -718,6 +762,10 @@ page 4050 "GP Migration Configuration"
     end;
 
     trigger OnOpenPage()
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+        HybridGPWizard: Codeunit "Hybrid GP Wizard";
+        MigrationValidation: Codeunit "Migration Validation";
     begin
         if not Rec.Get() then
             Rec.Insert(true);
@@ -730,6 +778,10 @@ page 4050 "GP Migration Configuration"
                                                         Rec."Migrate Hist. AP Trx." and
                                                         Rec."Migrate Hist. Inv. Trx." and
                                                         Rec."Migrate Hist. Purch. Trx.";
+
+        if IntelligentCloudSetup.Get() then
+            if IntelligentCloudSetup."Product ID" = HybridGPWizard.ProductId() then
+                MigrationValidation.PrepareValidation();
     end;
 
     local procedure EnsureSettingsForAllCompanies()
@@ -748,9 +800,12 @@ page 4050 "GP Migration Configuration"
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Inactive Checkbooks", Rec."Migrate Inactive Checkbooks");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Inactive Items", Rec."Migrate Inactive Items");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Kit Items", Rec."Migrate Kit Items");
+                    GPCompanyAdditionalSettingsEachCompany.Validate("Item Desc. 2 Source", Rec."Item Desc. 2 Source");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Vendor Classes", Rec."Migrate Vendor Classes");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Customer Classes", Rec."Migrate Customer Classes");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Item Classes", Rec."Migrate Item Classes");
+                    GPCompanyAdditionalSettingsEachCompany.Validate("Recurring Purchasing Lines", Rec."Recurring Purchasing Lines");
+                    GPCompanyAdditionalSettingsEachCompany.Validate("Recurring Sales Lines", Rec."Recurring Sales Lines");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate GL Module", Rec."Migrate GL Module");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Bank Module", Rec."Migrate Bank Module");
                     GPCompanyAdditionalSettingsEachCompany.Validate("Migrate Payables Module", Rec."Migrate Payables Module");
@@ -816,9 +871,12 @@ page 4050 "GP Migration Configuration"
         Rec.Validate("Migrate Inactive Checkbooks", GPCompanyAdditionalSettingsInit."Migrate Inactive Checkbooks");
         Rec.Validate("Migrate Inactive Items", GPCompanyAdditionalSettingsInit."Migrate Inactive Items");
         Rec.Validate("Migrate Kit Items", GPCompanyAdditionalSettingsInit."Migrate Kit Items");
+        Rec.Validate("Item Desc. 2 Source", GPCompanyAdditionalSettingsInit."Item Desc. 2 Source");
         Rec.Validate("Migrate Vendor Classes", GPCompanyAdditionalSettingsInit."Migrate Vendor Classes");
         Rec.Validate("Migrate Customer Classes", GPCompanyAdditionalSettingsInit."Migrate Customer Classes");
         Rec.Validate("Migrate Item Classes", GPCompanyAdditionalSettingsInit."Migrate Item Classes");
+        Rec.Validate("Recurring Purchasing Lines", GPCompanyAdditionalSettingsInit."Recurring Purchasing Lines");
+        Rec.Validate("Recurring Sales Lines", GPCompanyAdditionalSettingsInit."Recurring Sales Lines");
         Rec.Validate("Migrate GL Module", GPCompanyAdditionalSettingsInit."Migrate GL Module");
         Rec.Validate("Migrate Bank Module", GPCompanyAdditionalSettingsInit."Migrate Bank Module");
         Rec.Validate("Migrate Payables Module", GPCompanyAdditionalSettingsInit."Migrate Payables Module");

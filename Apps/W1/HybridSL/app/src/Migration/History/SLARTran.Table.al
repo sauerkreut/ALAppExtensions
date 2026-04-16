@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -10,6 +11,14 @@ table 47025 "SL ARTran"
     Access = Internal;
     DataClassification = CustomerContent;
     ReplicateData = false;
+    ObsoleteReason = 'Replaced by table SL ARTran Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -28,10 +37,12 @@ table 47025 "SL ARTran"
         field(4; CmmnPct; Decimal)
         {
             Caption = 'CmmnPct';
+            AutoFormatType = 0;
         }
         field(5; CnvFact; Decimal)
         {
             Caption = 'CnvFact';
+            AutoFormatType = 0;
         }
         field(6; ContractID; Text[10])
         {
@@ -60,6 +71,7 @@ table 47025 "SL ARTran"
         field(12; CuryExtCost; Decimal)
         {
             Caption = 'CuryExtCost';
+            AutoFormatType = 0;
         }
         field(13; CuryId; Text[4])
         {
@@ -72,46 +84,57 @@ table 47025 "SL ARTran"
         field(15; CuryRate; Decimal)
         {
             Caption = 'CuryRate';
+            AutoFormatType = 0;
         }
         field(16; CuryTaxAmt00; Decimal)
         {
             Caption = 'CuryTaxAmt00';
+            AutoFormatType = 0;
         }
         field(17; CuryTaxAmt01; Decimal)
         {
             Caption = 'CuryTaxAmt01';
+            AutoFormatType = 0;
         }
         field(18; CuryTaxAmt02; Decimal)
         {
             Caption = 'CuryTaxAmt02';
+            AutoFormatType = 0;
         }
         field(19; CuryTaxAmt03; Decimal)
         {
             Caption = 'CuryTaxAmt03';
+            AutoFormatType = 0;
         }
         field(20; CuryTranAmt; Decimal)
         {
             Caption = 'CuryTranAmt';
+            AutoFormatType = 0;
         }
         field(21; CuryTxblAmt00; Decimal)
         {
             Caption = 'CuryTxblAmt00';
+            AutoFormatType = 0;
         }
         field(22; CuryTxblAmt01; Decimal)
         {
             Caption = 'CuryTxblAmt01';
+            AutoFormatType = 0;
         }
         field(23; CuryTxblAmt02; Decimal)
         {
             Caption = 'CuryTxblAmt02';
+            AutoFormatType = 0;
         }
         field(24; CuryTxblAmt03; Decimal)
         {
             Caption = 'CuryTxblAmt03';
+            AutoFormatType = 0;
         }
         field(25; CuryUnitPrice; Decimal)
         {
             Caption = 'CuryUnitPrice';
+            AutoFormatType = 0;
         }
         field(26; CustId; Text[15])
         {
@@ -128,6 +151,7 @@ table 47025 "SL ARTran"
         field(29; ExtCost; Decimal)
         {
             Caption = 'ExtCost';
+            AutoFormatType = 0;
         }
         field(30; ExtRefNbr; Text[15])
         {
@@ -152,6 +176,7 @@ table 47025 "SL ARTran"
         field(35; JobRate; Decimal)
         {
             Caption = 'JobRate';
+            AutoFormatType = 0;
         }
         field(36; JrnlType; Text[3])
         {
@@ -220,6 +245,7 @@ table 47025 "SL ARTran"
         field(52; Qty; Decimal)
         {
             Caption = 'Qty';
+            AutoFormatType = 0;
         }
         field(53; "RecordID"; Integer)
         {
@@ -244,18 +270,22 @@ table 47025 "SL ARTran"
         field(58; S4Future03; Decimal)
         {
             Caption = 'S4Future03';
+            AutoFormatType = 0;
         }
         field(59; S4Future04; Decimal)
         {
             Caption = 'S4Future04';
+            AutoFormatType = 0;
         }
         field(60; S4Future05; Decimal)
         {
             Caption = 'S4Future05';
+            AutoFormatType = 0;
         }
         field(61; S4Future06; Decimal)
         {
             Caption = 'S4Future06';
+            AutoFormatType = 0;
         }
         field(62; S4Future07; DateTime)
         {
@@ -328,18 +358,22 @@ table 47025 "SL ARTran"
         field(79; TaxAmt00; Decimal)
         {
             Caption = 'TaxAmt00';
+            AutoFormatType = 0;
         }
         field(80; TaxAmt01; Decimal)
         {
             Caption = 'TaxAmt01';
+            AutoFormatType = 0;
         }
         field(81; TaxAmt02; Decimal)
         {
             Caption = 'TaxAmt02';
+            AutoFormatType = 0;
         }
         field(82; TaxAmt03; Decimal)
         {
             Caption = 'TaxAmt03';
+            AutoFormatType = 0;
         }
         field(83; TaxCalced; Text[1])
         {
@@ -372,6 +406,7 @@ table 47025 "SL ARTran"
         field(90; TranAmt; Decimal)
         {
             Caption = 'TranAmt';
+            AutoFormatType = 0;
         }
         field(91; TranClass; Text[1])
         {
@@ -392,18 +427,22 @@ table 47025 "SL ARTran"
         field(95; TxblAmt00; Decimal)
         {
             Caption = 'TxblAmt00';
+            AutoFormatType = 0;
         }
         field(96; TxblAmt01; Decimal)
         {
             Caption = 'TxblAmt01';
+            AutoFormatType = 0;
         }
         field(97; TxblAmt02; Decimal)
         {
             Caption = 'TxblAmt02';
+            AutoFormatType = 0;
         }
         field(98; TxblAmt03; Decimal)
         {
             Caption = 'TxblAmt03';
+            AutoFormatType = 0;
         }
         field(99; UnitDesc; Text[6])
         {
@@ -412,6 +451,7 @@ table 47025 "SL ARTran"
         field(100; UnitPrice; Decimal)
         {
             Caption = 'UnitPrice';
+            AutoFormatType = 0;
         }
         field(101; User1; Text[30])
         {
@@ -424,10 +464,12 @@ table 47025 "SL ARTran"
         field(103; User3; Decimal)
         {
             Caption = 'User3';
+            AutoFormatType = 0;
         }
         field(104; User4; Decimal)
         {
             Caption = 'User4';
+            AutoFormatType = 0;
         }
         field(105; User5; Text[10])
         {
@@ -459,3 +501,4 @@ table 47025 "SL ARTran"
         }
     }
 }
+#endif

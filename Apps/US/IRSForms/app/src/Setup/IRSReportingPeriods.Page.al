@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
@@ -8,7 +8,7 @@ page 10031 "IRS Reporting Periods"
 {
     PageType = List;
     SourceTable = "IRS Reporting Period";
-    ApplicationArea = BasicUS;
+    ApplicationArea = BasicCA, BasicUS;
     UsageCategory = Administration;
     AboutTitle = 'About reporting periods';
     AboutText = 'Here you can set up the different periods and form boxes, vendor mapping, and statement for reporting per period.';
@@ -111,14 +111,14 @@ page 10031 "IRS Reporting Periods"
             }
             action(CopyFrom)
             {
-                Caption = 'Copy Setup From...';
+                Caption = 'Copy Setup';
                 Image = Copy;
-                ToolTip = 'Copy the setup from another period. That includes forms with boxes, vendor setup, adjustments and form statement.';
+                ToolTip = 'Copy the setup from the current period. That includes forms with boxes, vendor setup, adjustments and form statement.';
                 trigger OnAction()
                 var
                     IRSReportingPeriod: Codeunit "IRS Reporting Period";
                 begin
-                    IRSReportingPeriod.CopyReportingPeriodSetup(Rec."No.");
+                    IRSReportingPeriod.CopyReportingPeriodSetupFrom(Rec."No.");
                 end;
             }
             action(CreateIRISTransmission)
@@ -165,12 +165,10 @@ page 10031 "IRS Reporting Periods"
         }
     }
 
-#if not CLEAN25
     trigger OnOpenPage()
     var
-        IRSFormsFeature: Codeunit "IRS Forms Feature";
+        IRSReportingPeriod: Codeunit "IRS Reporting Period";
     begin
-        CurrPage.Editable := IRSFormsFeature.FeatureCanBeUsed();
+        IRSReportingPeriod.ShowIRSFormsGuideNotificationIfRequired();
     end;
-#endif
 }

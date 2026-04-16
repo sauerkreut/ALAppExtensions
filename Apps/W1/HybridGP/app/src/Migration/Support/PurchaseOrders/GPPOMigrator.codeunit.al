@@ -1,18 +1,18 @@
 namespace Microsoft.DataMigration.GP;
 
-using Microsoft.Purchases.Document;
-using Microsoft.Inventory.Journal;
-using Microsoft.Purchases.Setup;
+using Microsoft.Finance.GeneralLedger.Setup;
 using Microsoft.Foundation.Company;
 using Microsoft.Foundation.UOM;
-using Microsoft.Finance.GeneralLedger.Setup;
-using Microsoft.Purchases.Vendor;
-using Microsoft.Inventory.Item;
-using Microsoft.Purchases.Posting;
-using Microsoft.Inventory.Posting;
-using System.Integration;
 using Microsoft.Inventory.Costing;
+using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Journal;
+using Microsoft.Inventory.Posting;
 using Microsoft.Inventory.Setup;
+using Microsoft.Purchases.Document;
+using Microsoft.Purchases.Posting;
+using Microsoft.Purchases.Setup;
+using Microsoft.Purchases.Vendor;
+using System.Integration;
 
 codeunit 40108 "GP PO Migrator"
 {
@@ -82,7 +82,6 @@ codeunit 40108 "GP PO Migrator"
                 PurchaseHeader."Shipment Method Code" := CopyStr(GPPOP10100.SHIPMTHD, 1, MaxStrLen(PurchaseHeader."Shipment Method Code"));
                 PurchaseHeader.Validate("Prices Including VAT", false);
                 PurchaseHeader.Validate("Vendor Invoice No.", GPPOP10100.PONUMBER);
-                PurchaseHeader.Validate("Gen. Bus. Posting Group", GPCodeTxt);
 
                 UpdateShipToAddress(GPPOP10100, CountryCode, PurchaseHeader);
 
@@ -278,12 +277,11 @@ codeunit 40108 "GP PO Migrator"
         PurchaseLine."Line No." := LineNo;
         PurchaseLine."Buy-from Vendor No." := GPPOP10110.VENDORID;
         PurchaseLine.Type := PurchaseLineType::Item;
-        PurchaseLine.Validate("Gen. Bus. Posting Group", GPCodeTxt);
         PurchaseLine.Validate("Gen. Prod. Posting Group", GPCodeTxt);
         PurchaseLine."Unit of Measure" := UnitOfMeasure;
         PurchaseLine."Unit of Measure Code" := UnitOfMeasure;
-        PurchaseLine."Location Code" := LocationCode;
         PurchaseLine.Validate("No.", ItemNo);
+        PurchaseLine."Location Code" := LocationCode;
         PurchaseLine."Posting Group" := GPCodeTxt;
         PurchaseLine.Validate("Expected Receipt Date", GPPOP10110.PRMDATE);
         PurchaseLine.Description := CopyStr(GPPOP10110.ITEMDESC.Trim(), 1, MaxStrLen(PurchaseLine.Description));

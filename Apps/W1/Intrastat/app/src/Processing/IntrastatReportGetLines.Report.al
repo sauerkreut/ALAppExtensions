@@ -277,6 +277,7 @@ report 4810 "Intrastat Report Get Lines"
                         DecimalPlaces = 0 : 5;
                         MaxValue = 100;
                         MinValue = 0;
+                        AutoFormatType = 0;
                         Enabled = CostRegulationEnable;
                         ToolTip = 'Specifies the cost regulation percentage to cover freight and insurance. The statistical value of every line in the report is increased by this percentage.';
                     }
@@ -411,6 +412,7 @@ report 4810 "Intrastat Report Get Lines"
         IntrastatReportLine."Line No." += 10000;
         IntrastatReportLine.Date := "Item Ledger Entry"."Posting Date";
         IntrastatReportLine."Country/Region Code" := IntrastatReportMgt.GetIntrastatBaseCountryCode("Item Ledger Entry");
+        IntrastatReportLine."Intrastat Country/Region Code" := IntrastatReportMgt.GetIntrastatCodeFromCountryRegion(IntrastatReportLine."Country/Region Code");
         IntrastatReportLine."Transaction Type" := "Item Ledger Entry"."Transaction Type";
         IntrastatReportLine."Transport Method" := "Item Ledger Entry"."Transport Method";
         IntrastatReportLine."Source Entry No." := "Item Ledger Entry"."Entry No.";
@@ -505,6 +507,7 @@ report 4810 "Intrastat Report Get Lines"
         IntrastatReportLine."Line No." += 10000;
         IntrastatReportLine.Date := "Job Ledger Entry"."Posting Date";
         IntrastatReportLine."Country/Region Code" := IntrastatReportMgt.GetIntrastatBaseCountryCode("Job Ledger Entry");
+        IntrastatReportLine."Intrastat Country/Region Code" := IntrastatReportMgt.GetIntrastatCodeFromCountryRegion(IntrastatReportLine."Country/Region Code");
         IntrastatReportLine."Transaction Type" := "Job Ledger Entry"."Transaction Type";
         IntrastatReportLine."Transport Method" := "Job Ledger Entry"."Transport Method";
         IntrastatReportLine."Shpt. Method Code" := "Job Ledger Entry"."Shpt. Method Code";
@@ -642,6 +645,7 @@ report 4810 "Intrastat Report Get Lines"
             end;
 
         IntrastatReportLine."Country/Region Code" := IntrastatReportMgt.GetIntrastatBaseCountryCode("FA Ledger Entry");
+        IntrastatReportLine."Intrastat Country/Region Code" := IntrastatReportMgt.GetIntrastatCodeFromCountryRegion(IntrastatReportLine."Country/Region Code");
         if IntrastatReportHeader."Amounts in Add. Currency" then
             IntrastatReportLine.Amount :=
                 Round(

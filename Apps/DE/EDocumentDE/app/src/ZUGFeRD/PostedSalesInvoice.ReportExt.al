@@ -3,70 +3,36 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.eServices.EDocument.Formats;
+
 using Microsoft.Sales.History;
-using System.IO;
 reportextension 13918 "Posted Sales Invoice" extends "Standard Sales - Invoice"
 {
-    trigger OnPreReport()
-    begin
-        OnPreReportOnBeforeInitializePDF(Header, CreateZUGFeRDXML);
-        Clear(PDFDocument);
-        PDFDocument.Initialize();
-    end;
-
     trigger OnPreRendering(var RenderingPayload: JsonObject)
     begin
-        this.OnRenderingCompleteJson(RenderingPayload);
+        AddXMLAttachmentforZUGFeRDExport(RenderingPayload);
     end;
 
-    [NonDebuggable]
-    local procedure OnRenderingCompleteJson(var RenderingPayload: JsonObject)
-    var
-        UserCode: SecretText;
-        AdminCode: SecretText;
-        FileName: Text;
-        Name: Text;
-        MimeType: Text;
-        Description: Text;
-        DataType: Enum "PDF Attach. Data Relationship";
-    begin
-        if CurrReport.TargetFormat <> ReportFormat::PDF then
-            exit;
-
-        if not CreateZUGFeRDXML then
-            exit;
-        Name := 'factur-x.xml';
-        FileName := CreateXmlFile(Name);
-        DataType := "PDF Attach. Data Relationship"::Alternative;
-        MimeType := 'text/xml';
-        Description := 'This is the e-invoicing xml document';
-
-        PDFDocument.AddAttachment(Name, DataType, MimeType, FileName, Description, true);
-
-        RenderingPayload := PDFDocument.ToJson(RenderingPayload);
-        PDFDocument.ProtectDocument(UserCode, AdminCode);
-    end;
-
-    local procedure CreateXmlFile(Filename: Text) FilePath: Text
+    local procedure AddXMLAttachmentforZUGFeRDExport(var RenderingPayload: JsonObject)
     var
         ExportZUGFeRDDocument: Codeunit "Export ZUGFeRD Document";
-        FileObject: File;
-        OutStream: OutStream;
     begin
-        FilePath := System.TemporaryPath() + Filename;
-        FileObject.TextMode := true;
-        FileObject.Create(FilePath, TextEncoding::UTF8);
-        FileObject.CreateOutStream(OutStream);
-        ExportZUGFeRDDocument.CreateXML(Header, OutStream);
-        FileObject.Close();
+        if CurrReport.TargetFormat() <> ReportFormat::PDF then
+            exit;
+
+        if not ExportZUGFeRDDocument.IsZUGFeRDPrintProcess() then
+            exit;
+
+        ExportZUGFeRDDocument.CreateAndAddXMLAttachmentToRenderingPayload(Header, RenderingPayload);
     end;
 
+#pragma warning disable AS0072 
+#if not CLEAN27
+    [Obsolete('Event not used anymore. If you need to know whether the report is being called for ZUGFeRD Export then use IsZUGFeRDPrintProcess in Codeunit "Export ZUGFeRD Document"', '27.2')]
     [IntegrationEvent(false, false)]
     local procedure OnPreReportOnBeforeInitializePDF(SalesInvHeader: Record "Sales Invoice Header"; var CreateZUGFeRDXML: Boolean)
     begin
     end;
+#endif
+#pragma warning restore AS0072
 
-    var
-        PDFDocument: Codeunit "PDF Document";
-        CreateZUGFeRDXML: Boolean;
 }

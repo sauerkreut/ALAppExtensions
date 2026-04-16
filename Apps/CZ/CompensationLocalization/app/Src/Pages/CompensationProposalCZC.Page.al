@@ -108,6 +108,8 @@ page 31276 "Compensation Proposal CZC"
                 ShowCaption = false;
                 field(TotalBalance; TotalBalance)
                 {
+                    AutoFormatType = 1;
+                    AutoFormatExpression = '';
                     ApplicationArea = Basic, Suite;
                     Caption = 'Total Balance (LCY)';
                     Editable = false;
@@ -134,6 +136,17 @@ page 31276 "Compensation Proposal CZC"
                     TotalBalance := CurrPage.CustLedgEntries.Page.GetBalance() + CurrPage.VendLedgEntries.Page.GetBalance();
                     CurrPage.Update(false);
                 end;
+            }
+        }
+        area(Promoted)
+        {
+            group(Category_Process)
+            {
+                Caption = 'Process';
+
+                actionref(RecalculateBalance_Promoted; RecalculateBalance)
+                {
+                }
             }
         }
     }

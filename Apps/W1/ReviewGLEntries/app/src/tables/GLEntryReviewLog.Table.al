@@ -30,6 +30,8 @@ table 22218 "G/L Entry Review Log"
         }
         field(5; "Reviewed Amount"; Decimal)
         {
+            AutoFormatType = 1;
+            AutoFormatExpression = '';
             DataClassification = CustomerContent;
             ToolTip = 'Specifies the amount that was reviewed for the G/L entry.';
         }
@@ -38,6 +40,11 @@ table 22218 "G/L Entry Review Log"
             DataClassification = CustomerContent;
             ToolTip = 'Specifies the G/L account number associated with the G/L entry.';
         }
+        field(7; "Reviewed At"; DateTime)
+        {
+            DataClassification = CustomerContent;
+            ToolTip = 'Specifies the date and time when the G/L entry was reviewed.';
+        }
     }
 
     keys
@@ -45,6 +52,13 @@ table 22218 "G/L Entry Review Log"
         key(LineNo; "Line No.")
         {
             Clustered = true;
+        }
+        key(GLEntryNo; "G/L Entry No.")
+        {
+            IncludedFields = "Reviewed Amount", "Reviewed At";
+        }
+        key(ReviewedAmount; "Reviewed Amount")
+        {
         }
     }
     trigger OnInsert()

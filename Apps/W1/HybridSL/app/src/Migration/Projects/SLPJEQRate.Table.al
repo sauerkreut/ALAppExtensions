@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -10,6 +11,14 @@ table 47070 "SL PJEQRate"
     Access = Internal;
     Caption = 'SL PJEQRate';
     DataClassification = CustomerContent;
+    ObsoleteReason = 'Replaced by table SL PJEQRate Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -48,10 +57,12 @@ table 47070 "SL PJEQRate"
         field(9; ec_id06; Decimal)
         {
             Caption = 'ec_id06';
+            AutoFormatType = 0;
         }
         field(10; ec_id07; Decimal)
         {
             Caption = 'ec_id07';
+            AutoFormatType = 0;
         }
         field(11; ec_id08; DateTime)
         {
@@ -88,10 +99,12 @@ table 47070 "SL PJEQRate"
         field(19; ec_id16; Decimal)
         {
             Caption = 'ec_id16';
+            AutoFormatType = 0;
         }
         field(20; ec_id17; Decimal)
         {
             Caption = 'ec_id17';
+            AutoFormatType = 0;
         }
         field(21; ec_id18; DateTime)
         {
@@ -136,14 +149,17 @@ table 47070 "SL PJEQRate"
         field(31; rate1; Decimal)
         {
             Caption = 'rate1';
+            AutoFormatType = 0;
         }
         field(32; rate2; Decimal)
         {
             Caption = 'rate2';
+            AutoFormatType = 0;
         }
         field(33; rate3; Decimal)
         {
             Caption = 'rate3';
+            AutoFormatType = 0;
         }
         field(34; unit_of_measure; Text[10])
         {
@@ -159,3 +175,4 @@ table 47070 "SL PJEQRate"
         }
     }
 }
+#endif

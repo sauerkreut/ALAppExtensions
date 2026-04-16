@@ -4,13 +4,15 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.Purchases.Payables;
 
+using Microsoft.Purchases.History;
+
 pageextension 31016 "Vendor Ledger Entries CZL" extends "Vendor Ledger Entries"
 {
     layout
     {
         modify("External Document No.")
         {
-            Editable = true;
+            Editable = IsExtDocNoEditable;
         }
         addafter("Message to Recipient")
         {
@@ -79,6 +81,8 @@ pageextension 31016 "Vendor Ledger Entries CZL" extends "Vendor Ledger Entries"
         {
             field(SuggestedAmountToApplyCZL; Rec.CalcSuggestedAmountToApplyCZL())
             {
+                AutoFormatType = 1;
+                AutoFormatExpression = '';
                 Caption = 'Suggested Amount to Apply (LCY)';
                 ApplicationArea = Basic, Suite;
                 Editable = false;
@@ -92,4 +96,14 @@ pageextension 31016 "Vendor Ledger Entries CZL" extends "Vendor Ledger Entries"
             }
         }
     }
+
+    trigger OnOpenPage()
+    var
+    begin
+        IsExtDocNoEditable := ExtDocNoChangingCZL.IsAllowed();
+    end;
+
+    var
+        ExtDocNoChangingCZL: Codeunit "Ext. Doc. No. Changing CZL";
+        IsExtDocNoEditable: Boolean;
 }

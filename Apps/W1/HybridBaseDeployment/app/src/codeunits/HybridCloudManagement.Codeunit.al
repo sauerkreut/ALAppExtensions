@@ -1,20 +1,25 @@
+// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+
 namespace Microsoft.DataMigration;
 
+using Microsoft.Foundation.Company;
 using Microsoft.Utilities;
 using System.Apps;
-using System.Integration;
-using System.Security.User;
-using System.Security.AccessControl;
-using System.Upgrade;
-using System.Telemetry;
-using System.Reflection;
-using System.Environment.Configuration;
-using System.Threading;
-using System.Environment;
 using System.Azure.Identity;
+using System.Environment;
+using System.Environment.Configuration;
+using System.Integration;
 using System.Media;
+using System.Reflection;
+using System.Security.AccessControl;
+using System.Security.User;
+using System.Telemetry;
 using System.Text;
-using Microsoft.Foundation.Company;
+using System.Threading;
+using System.Upgrade;
 
 codeunit 4001 "Hybrid Cloud Management"
 {
@@ -94,6 +99,8 @@ codeunit 4001 "Hybrid Cloud Management"
         DataUpgradeScheduledLbl: Label 'Cloud Migration data upgrade scheduled.', Locked = true;
         UnblockedManuallyLbl: Label 'Unblocked manually';
         SettingForUserPermissionsMsg: Label 'Setting for Keeping user permissions was set to: %1.', Comment = '%1 - true or false';
+        CustomMigrationSettingMsg: Label 'Setting for Custom Migration Enabled was set to: %1.', Comment = '%1 - true or false';
+        OnPremDevelopmentSettingMsg: Label 'Setting for Enable OnPrem Development was set to: %1.', Comment = '%1 - true or false';
         DoNotManageCompaniesManuallyLbl: Label 'We strongly recommend that you don''t manage companies, such as renaming and deleting, while cloud migration is running.';
         LearnMoreMsg: Label 'Learn more';
         DontShowAgainMsg: Label 'Don''t show again';
@@ -114,6 +121,12 @@ codeunit 4001 "Hybrid Cloud Management"
         RecordLinksMigratedSuccessfullyLbl: Label 'Record links migrated successfully.', Locked = true;
         RecordLinksMigratedWithDataTransferLbl: Label 'Record links migrated with data transfer.', Locked = true;
         HybridCompanyStatusNotExistLbl: Label 'Hybrid company status does not exist.', Locked = true;
+        RecordLinkMigrationIncompleteMsg: Label 'The record link migration is not completed. Please complete the migration before proceeding with user mapping.';
+        LearnMoreLbl: Label 'Learn more';
+        DontShowThisAgainLbl: Label 'Don''t show this again.';
+        RecordLinkMigrationDocumentationHyperlinkTxt: Label 'https://go.microsoft.com/fwlink/?linkid=2335385', Locked = true;
+        WarnRecordLinkMigrationNotificationsTxt: Label 'Cloud Migration - Record Link Migration Warning';
+        WarnRecordLinkMigrationDescriptionTxt: Label 'Warning to the users to read the documentation before managing the record links during cloud migration.';
 
     procedure CanHandleNotification(SubscriptionId: Text; ProductId: Text): Boolean
     var
@@ -249,6 +262,26 @@ codeunit 4001 "Hybrid Cloud Management"
                 exit(false);
 
         exit(true);
+    end;
+
+    procedure IsCloudMigrationUISupported(): Boolean
+    var
+        EnvironmentInformation: Codeunit "Environment Information";
+    begin
+        if EnvironmentInformation.IsSaaS() then
+            exit(true);
+
+        exit(IsOnPremDevelopmentEnabled());
+    end;
+
+    procedure IsOnPremDevelopmentEnabled(): Boolean
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+    begin
+        if not IntelligentCloudSetup.Get() then
+            exit(false);
+
+        exit(IntelligentCloudSetup."Enable OnPrem Development");
     end;
 
     procedure IsIntelligentCloudEnabled(): Boolean
@@ -419,27 +452,11 @@ codeunit 4001 "Hybrid Cloud Management"
 
     procedure RepairCompanionTables()
     var
-        AllObj: Record AllObj;
-        PublishedApplication: Record "Published Application";
         CompanionTableRecordConsistencyRepair: DotNet CompanionTableRecordConsistencyRepair;
     begin
         Session.LogMessage('0000FJ1', 'Companion table repair started.', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::All, 'Category', GetTelemetryCategory());
         CompanionTableRecordConsistencyRepair := CompanionTableRecordConsistencyRepair.CompanionTableRecordConsistencyRepair();
-        AllObj.SetRange("Object Type", AllObj."Object Type"::"TableExtension");
-        PublishedApplication.SetRange(Installed, true);
-        if PublishedApplication.FindSet() then
-            repeat
-                AllObj.SetRange("App Runtime Package ID", PublishedApplication."Runtime Package ID");
-                if not AllObj.IsEmpty() then begin
-#pragma warning disable AA0217
-                    Session.LogMessage('0000FJ2', StrSubstNo('Starting Repair of Companion Tables for Package ID %1', PublishedApplication."Package ID"), Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
-                    CompanionTableRecordConsistencyRepair.UpdateCompanionTablesInAppWithMissingRecords(PublishedApplication."Runtime Package ID");
-                    Commit();
-                    Session.LogMessage('0000FJ3', StrSubstNo('Completed Repair of Companion Tables for Package ID %1', PublishedApplication."Package ID"), Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, 'Category', GetTelemetryCategory());
-#pragma warning restore
-                end;
-            until PublishedApplication.Next() = 0;
-
+        CompanionTableRecordConsistencyRepair.UpdateCompanionTablesInAppWithMissingRecords(true);
         Session.LogMessage('0000FJ4', 'Companion table repair completed successfully.', Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::All, 'Category', GetTelemetryCategory());
     end;
 
@@ -602,18 +619,28 @@ codeunit 4001 "Hybrid Cloud Management"
     end;
 
     procedure HandleShowCompanySelectionStep(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text)
+    begin
+        HandleShowCompanySelectionStep(HybridProductType, SqlConnectionString, SqlServerType, IRName, '', '', '');
+    end;
+
+    procedure HandleShowCompanySelectionStep(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text; SourceCompaniesTableName: Text; SetupMappingsTableName: Text; ReplicationMappingsTableName: Text)
     var
         HandledExternally: Boolean;
     begin
-        OnBeforeShowCompanySelectionStep(HybridProductType, SqlConnectionString, SqlServerType, IRName, HandledExternally);
+        OnBeforeShowCompanySelectionStep(HybridProductType, SqlConnectionString, SqlServerType, IRName, HandledExternally, SourceCompaniesTableName, SetupMappingsTableName, ReplicationMappingsTableName);
         if HandledExternally then
             exit;
 
-        EnableReplication(HybridProductType, SqlConnectionString, SqlServerType, IRName);
+        EnableReplication(HybridProductType, SqlConnectionString, SqlServerType, IRName, SourceCompaniesTableName, SetupMappingsTableName, ReplicationMappingsTableName);
         ClearCompanyCreationStatus();
     end;
 
     internal procedure EnableReplication(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text)
+    begin
+        EnableReplication(HybridProductType, SqlConnectionString, SqlServerType, IRName, '', '', '');
+    end;
+
+    internal procedure EnableReplication(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text; SourceCompaniesTableName: Text; SetupMappingsTableName: Text; ReplicationMappingsTableName: Text)
     var
         IntelligentCloudSetup: Record "Intelligent Cloud Setup";
         HybridDeployment: Codeunit "Hybrid Deployment";
@@ -621,7 +648,7 @@ codeunit 4001 "Hybrid Cloud Management"
         LatestVersion: Text;
     begin
         HybridDeployment.Initialize(HybridProductType.ID);
-        HybridDeployment.EnableReplication(SqlConnectionString, SqlServerType, IRName);
+        HybridDeployment.EnableReplication(SqlConnectionString, SqlServerType, IRName, SourceCompaniesTableName, SetupMappingsTableName, ReplicationMappingsTableName);
 
         HybridDeployment.GetVersionInformation(DeployedVersion, LatestVersion);
         IntelligentCloudSetup.SetDeployedVersion(DeployedVersion);
@@ -635,6 +662,7 @@ codeunit 4001 "Hybrid Cloud Management"
         HybridCompany: Record "Hybrid Company";
         GuidedExperience: Codeunit "Guided Experience";
         FeatureTelemetry: Codeunit "Feature Telemetry";
+        CustomMigrationProviderInterface: Interface "Custom Migration Provider";
         TelemetryDimensions: Dictionary of [Text, Text];
     begin
         TelemetryDimensions.Add('TotalNumberOfOnPremCompanies', Format(HybridCompany.Count(), 0, 9));
@@ -642,8 +670,16 @@ codeunit 4001 "Hybrid Cloud Management"
         GuidedExperience.CompleteAssistedSetup(ObjectType::Page, Page::"Hybrid Cloud Setup Wizard");
         IntelligentCloudSetup.Validate("Replication User", UserId());
         IntelligentCloudSetup.Modify();
-        RestoreDefaultMigrationTableMappings(false);
+
+        if IntelligentCloudSetup."Custom Migration Provider".AsInteger() = 0 then
+            RestoreDefaultMigrationTableMappings(false)
+        else begin
+            CustomMigrationProviderInterface := IntelligentCloudSetup."Custom Migration Provider";
+            CustomMigrationProviderInterface.SetupReplicationTableMappings();
+        end;
+
         RefreshIntelligentCloudStatusTable();
+        SelectLatestVersion(Database::"Intelligent Cloud Status");
         CreateCompanies();
 
         FeatureTelemetry.LogUptake('0000JMU', GetFeatureTelemetryName(), Enum::"Feature Uptake Status"::"Set up");
@@ -826,6 +862,7 @@ codeunit 4001 "Hybrid Cloud Management"
             HybridDeployment.ResetCloudData();
 
         MarkTablesAsReplaceData();
+        ValidateCustomMigrationTables();
         OnHandleRunReplication(Handled, RunId, ReplicationType);
         if not Handled then
             HybridDeployment.RunReplication(RunId, ReplicationType);
@@ -853,6 +890,27 @@ codeunit 4001 "Hybrid Cloud Management"
                 exit('Diagnostic');
         end;
         exit('');
+    end;
+
+    internal procedure ValidateCustomMigrationTables()
+    var
+        CloudMigReplicateDataMgt: Codeunit "Cloud Mig. Replicate Data Mgt.";
+    begin
+        if not IsNoCodeMigrationEnabled() then
+            exit;
+
+        CloudMigReplicateDataMgt.CheckCanChangeAllIntelligentCloudStatus();
+        CloudMigReplicateDataMgt.ValidateCustomMigrationTables();
+    end;
+
+    local procedure IsNoCodeMigrationEnabled(): Boolean
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+    begin
+        if not IntelligentCloudSetup.Get() then
+            exit(false);
+
+        exit(IntelligentCloudSetup."Custom Migration Enabled");
     end;
 
     internal procedure GetFeatureTelemetryName(): Text
@@ -1190,10 +1248,39 @@ codeunit 4001 "Hybrid Cloud Management"
     var
         IntelligentCloudSetup: Record "Intelligent Cloud Setup";
     begin
-        IntelligentCloudSetup.Get();
+        GetIntelligentCloudSetupSafe(IntelligentCloudSetup);
         IntelligentCloudSetup."Keep User Permissions" := not IntelligentCloudSetup."Keep User Permissions";
         IntelligentCloudSetup.Modify();
         Message(SettingForUserPermissionsMsg, IntelligentCloudSetup."Keep User Permissions");
+    end;
+
+    internal procedure EnableDisableNoCodeMigration()
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+    begin
+        GetIntelligentCloudSetupSafe(IntelligentCloudSetup);
+        IntelligentCloudSetup."Custom Migration Enabled" := not IntelligentCloudSetup."Custom Migration Enabled";
+        IntelligentCloudSetup."Custom Migration Provider" := IntelligentCloudSetup."Custom Migration Provider"::"Custom Migration Provider";
+        IntelligentCloudSetup.Modify();
+        Message(CustomMigrationSettingMsg, IntelligentCloudSetup."Custom Migration Enabled");
+    end;
+
+    internal procedure EnableDisableOnPremDevelopment()
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+        OnPremMigrationHandler: Codeunit "OnPrem Migration Handler";
+    begin
+        GetIntelligentCloudSetupSafe(IntelligentCloudSetup);
+        IntelligentCloudSetup."Enable OnPrem Development" := not IntelligentCloudSetup."Enable OnPrem Development";
+        IntelligentCloudSetup.Modify();
+        OnPremMigrationHandler.Activate();
+        Message(OnPremDevelopmentSettingMsg, IntelligentCloudSetup."Enable OnPrem Development");
+    end;
+
+    local procedure GetIntelligentCloudSetupSafe(var IntelligentCloudSetup: Record "Intelligent Cloud Setup")
+    begin
+        if not IntelligentCloudSetup.Get() then
+            IntelligentCloudSetup.Insert();
     end;
 
     internal procedure VerifyCanCompleteCloudMigration()
@@ -1338,7 +1425,7 @@ codeunit 4001 "Hybrid Cloud Management"
     end;
 
     [IntegrationEvent(false, false)]
-    local procedure OnBeforeShowCompanySelectionStep(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text; var Handled: Boolean)
+    local procedure OnBeforeShowCompanySelectionStep(var HybridProductType: Record "Hybrid Product Type"; SqlConnectionString: Text; SqlServerType: Text; IRName: Text; var Handled: Boolean; SourceCompaniesTableName: Text; SetupMappingsTableName: Text; ReplicationMappingsTableName: Text)
     begin
     end;
 
@@ -1369,6 +1456,11 @@ codeunit 4001 "Hybrid Cloud Management"
 
     [IntegrationEvent(false, false)]
     procedure OnShowProductTypeStep(var HybridProductType: Record "Hybrid Product Type")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    procedure OnShowCustomMigrationStep(var HybridProductType: Record "Hybrid Product Type")
     begin
     end;
 
@@ -1456,6 +1548,19 @@ codeunit 4001 "Hybrid Cloud Management"
 
         AddWebhookSubscription(SubscriptionId, ClientState);
         AddWebhookSubscription(ServiceSubscriptionId, ServiceClientState);
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Hybrid Deployment", 'OnBeforeRunReplication', '', false, false)]
+    local procedure SaveTenantMediaCountOnBeforeRunReplication()
+    var
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        TenantMedia: Record "Tenant Media";
+    begin
+        if not HybridCompanyStatus.Get() then
+            HybridCompanyStatus.Insert();
+
+        HybridCompanyStatus."Tenant Media Count" := TenantMedia.Count() + 1;
+        HybridCompanyStatus.Modify();
     end;
 
     [EventSubscriber(ObjectType::Table, Database::"Company", 'OnAfterRenameEvent', '', false, false)]
@@ -1615,6 +1720,8 @@ codeunit 4001 "Hybrid Cloud Management"
 
         if RecordLink.IsEmpty() then begin
             PopulateRecordLinks();
+            Session.LogMessage('0000PY7', RecordLinksMigratedSuccessfullyLbl, Verbosity::Normal, DataClassification::OrganizationIdentifiableInformation, TelemetryScope::ExtensionPublisher, 'Category', CloudMigrationTok);
+            UpdateCompanyRecordLinkMigrationStatus();
             exit;
         end;
 
@@ -1666,34 +1773,8 @@ codeunit 4001 "Hybrid Cloud Management"
 
         RecordLink.FindSet();
         repeat
-            MapRecordLinkUsers(RecordLink);
-            RecordLink.Modify();
             CreateRecordLinkMapping(RecordLink."Link ID", RecordLink."Link ID", RecordLink.Company);
         until RecordLink.Next() = 0;
-    end;
-
-    internal procedure UserMappingCompleted(): Boolean
-    var
-        HybridCompanyStatus: Record "Hybrid Company Status";
-    begin
-        if not HybridCompanyStatus.Get() then
-            exit(false);
-
-        exit(HybridCompanyStatus."User Mapping Completed");
-    end;
-
-    local procedure MapRecordLinkUsers(var RecordLink: Record "Record Link")
-    var
-        UserMappingWork: Record "User Mapping Work";
-    begin
-        if not UserMappingCompleted() then
-            exit;
-
-        if UserMappingWork.Get(RecordLink."User ID") then
-            RecordLink."User ID" := UserMappingWork."Dest User ID";
-
-        if UserMappingWork.Get(RecordLink."To User ID") then
-            RecordLink."To User ID" := UserMappingWork."Dest User ID";
     end;
 
     local procedure CreateRecordLinkMapping(SourceID: Integer; TargetID: Integer; Company: Text[30])
@@ -1725,7 +1806,6 @@ codeunit 4001 "Hybrid Cloud Management"
         ReplicationRecordLinkBuffer.CalcFields(Note);
         RecordLink.TransferFields(ReplicationRecordLinkBuffer, false);
         RecordLink."Link ID" := LinkId;
-        MapRecordLinkUsers(RecordLink);
         RecordLink.Insert();
         CreateRecordLinkMapping(ReplicationRecordLinkBuffer."Link ID", RecordLink."Link ID", RecordLink.Company);
         LinkId += 1;
@@ -1766,6 +1846,11 @@ codeunit 4001 "Hybrid Cloud Management"
 
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Guided Experience", 'OnRegisterAssistedSetup', '', false, false)]
     local procedure AddIntelligentCloudToAssistedSetup()
+    begin
+        AddCloudMigrationWizardToAssistedSetup();
+    end;
+
+    internal procedure AddCloudMigrationWizardToAssistedSetup()
     var
         GuidedExperience: Codeunit "Guided Experience";
         PermissionManager: Codeunit "Permission Manager";
@@ -2153,6 +2238,92 @@ codeunit 4001 "Hybrid Cloud Management"
     procedure CompaniesWarningNotificationLearnMore(Notification: Notification)
     begin
         Hyperlink(CompanyManagementDocumentationHyperlinkTxt);
+    end;
+
+    internal procedure SendRecordLinkMigrationNotification()
+    var
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        MyNotifications: Record "My Notifications";
+        ReplicationRecordLinkBuffer: Record "Replication Record Link Buffer";
+        RecordLinkMigrationNotification: Notification;
+    begin
+        if RecordLinkBufferBlocked() then
+            exit;
+
+        if ReplicationRecordLinkBuffer.IsEmpty() then
+            exit;
+
+        if HybridCompanyStatus.Get() then
+            if HybridCompanyStatus."Record Link Move Completed" then
+                exit;
+
+        if MyNotifications.IsEnabled(GetRecordLinkMigrationNotificationId()) then begin
+            RecordLinkMigrationNotification.Id := GetRecordLinkMigrationNotificationId();
+            RecordLinkMigrationNotification.Message := RecordLinkMigrationIncompleteMsg;
+            RecordLinkMigrationNotification.Scope := NotificationScope::LocalScope;
+            RecordLinkMigrationNotification.AddAction(LearnMoreLbl, Codeunit::"Hybrid Cloud Management", 'RecordLinkMigrationLearnMore');
+            RecordLinkMigrationNotification.AddAction(DontShowThisAgainLbl, Codeunit::"Hybrid Cloud Management", 'DontShowRecordLinkMigrationNotification');
+            RecordLinkMigrationNotification.Send();
+        end;
+    end;
+
+    local procedure GetRecordLinkMigrationNotificationId(): Guid
+    begin
+        exit('9347db62-fa51-4499-8083-4167cb3b5d91');
+    end;
+
+    procedure RecordLinkMigrationLearnMore(Notification: Notification)
+    begin
+        Hyperlink(RecordLinkMigrationDocumentationHyperlinkTxt);
+    end;
+
+    procedure DontShowRecordLinkMigrationNotification(Notification: Notification)
+    var
+        MyNotifications: Record "My Notifications";
+    begin
+        if not MyNotifications.SetStatus(GetRecordLinkMigrationNotificationId(), false) then
+            MyNotifications.InsertDefault(GetRecordLinkMigrationNotificationId(), WarnRecordLinkMigrationNotificationsTxt, WarnRecordLinkMigrationDescriptionTxt, false);
+    end;
+
+    internal procedure RecordLinkBufferBlocked(): Boolean
+    var
+        IntelligentCloudStatus: Record "Intelligent Cloud Status";
+    begin
+        IntelligentCloudStatus.SetRange("Table Id", Database::"Replication Record Link Buffer");
+        IntelligentCloudStatus.SetRange(Blocked, true);
+        exit(not IntelligentCloudStatus.IsEmpty());
+    end;
+
+    internal procedure IsCustomMigrationEnabled(): Boolean
+    var
+        IntelligentCloudSetup: Record "Intelligent Cloud Setup";
+    begin
+        if not IntelligentCloudSetup.Get() then
+            exit(false);
+
+        exit(IntelligentCloudSetup."Custom Migration Provider".AsInteger() <> 0);
+    end;
+
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::User, 'OnAfterRenameUser', '', false, false)]
+    local procedure RenameRecordLinkUsers(OldUserName: Code[50]; NewUserName: Code[50])
+    var
+        HybridCompanyStatus: Record "Hybrid Company Status";
+        RecordLink: Record "Record Link";
+    begin
+        if not HybridCompanyStatus.Get() then
+            exit;
+
+        if not HybridCompanyStatus."Record Link Move Completed" then
+            exit;
+
+        RecordLink.SetRange("User ID", OldUserName);
+        RecordLink.ModifyAll("User ID", NewUserName);
+
+        RecordLink.Reset();
+
+        RecordLink.SetRange("To User ID", OldUserName);
+        RecordLink.ModifyAll("To User ID", NewUserName);
     end;
 
     [EventSubscriber(ObjectType::Page, Page::Companies, 'OnOpenPageEvent', '', false, false)]

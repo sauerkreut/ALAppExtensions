@@ -5,15 +5,15 @@
 
 namespace Microsoft.DemoData.Localization;
 
-using Microsoft.DemoTool;
 using Microsoft.DemoData.Bank;
+using Microsoft.DemoData.Finance;
+using Microsoft.DemoData.FixedAsset;
+using Microsoft.DemoData.Foundation;
+using Microsoft.DemoData.HumanResources;
 using Microsoft.DemoData.Inventory;
 using Microsoft.DemoData.Purchases;
 using Microsoft.DemoData.Sales;
-using Microsoft.DemoData.HumanResources;
-using Microsoft.DemoData.FixedAsset;
-using Microsoft.DemoData.Foundation;
-using Microsoft.DemoData.Finance;
+using Microsoft.DemoTool;
 
 codeunit 11465 "US Contoso Localization"
 {
@@ -70,12 +70,11 @@ codeunit 11465 "US Contoso Localization"
                     Codeunit.Run(Codeunit::"Create Currency US");
                     Codeunit.Run(Codeunit::"Create Tax Group US");
                     Codeunit.Run(Codeunit::"Create Tax Setup US");
-#if not CLEAN27
-                    Codeunit.Run(Codeunit::"Create IRS 1099 Form-Box US");
-#endif
                 end;
             Enum::"Contoso Demo Data Level"::"Master Data":
                 begin
+                    Codeunit.Run(Codeunit::"Create Acc. Schedule Name US");
+                    Codeunit.Run(Codeunit::"Create Financial Report US");
                     Codeunit.Run(Codeunit::"Create Acc. Schedule Line US");
                     Codeunit.Run(Codeunit::"Create Column Layout US");
                     Codeunit.Run(Codeunit::"Create Curr Exchange Rate US");
@@ -83,7 +82,6 @@ codeunit 11465 "US Contoso Localization"
                     Codeunit.Run(Codeunit::"Create Tax Area US");
                     Codeunit.Run(Codeunit::"Create Tax Area Line US");
                     Codeunit.Run(Codeunit::"Create Tax Detail US");
-                    Codeunit.Run(Codeunit::"Create Allocation Account US");
                     CreateResourceUS.UpdateResourcesTaxGroup();
                 end;
         end;
@@ -123,17 +121,10 @@ codeunit 11465 "US Contoso Localization"
     end;
 
     local procedure InventoryModule(ContosoDemoDataLevel: Enum "Contoso Demo Data Level")
-    var
-        CreateInventoryPostingSetupUS: Codeunit "Create InventoryPostingSetupUS";
     begin
         case ContosoDemoDataLevel of
-            Enum::"Contoso Demo Data Level"::"Setup Data":
-                Codeunit.Run(Codeunit::"Create InventoryPostingSetupUS");
             Enum::"Contoso Demo Data Level"::"Master Data":
-                begin
-                    Codeunit.Run(Codeunit::"Create Location US");
-                    CreateInventoryPostingSetupUS.UpdateInventoryPosting();
-                end;
+                Codeunit.Run(Codeunit::"Create Location US");
         end;
     end;
 
@@ -184,6 +175,8 @@ codeunit 11465 "US Contoso Localization"
 
             Enum::"Contoso Demo Data Module"::Finance:
                 begin
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        Codeunit.Run(Codeunit::"Create Allocation Account US");
                     BindSubscription(CreateAccScheduleLineUS);
                     BindSubscription(CreateCurrencyUS);
                     BindSubscription(CreateGenJnlTemplateUS);
@@ -209,7 +202,8 @@ codeunit 11465 "US Contoso Localization"
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
                     BindSubscription(CreateItemJournalTemplateUS);
-                    BindSubscription(CreateItemUS);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        BindSubscription(CreateItemUS);
                     BindSubscription(CreateItemChargeUS);
                     BindSubscription(CreateLocationUS);
                 end;
@@ -295,7 +289,8 @@ codeunit 11465 "US Contoso Localization"
             Enum::"Contoso Demo Data Module"::Inventory:
                 begin
                     UnbindSubscription(CreateItemJournalTemplateUS);
-                    UnbindSubscription(CreateItemUS);
+                    if ContosoDemoDataLevel = Enum::"Contoso Demo Data Level"::"Master Data" then
+                        UnbindSubscription(CreateItemUS);
                     UnbindSubscription(CreateItemChargeUS);
                     UnbindSubscription(CreateLocationUS);
                 end;

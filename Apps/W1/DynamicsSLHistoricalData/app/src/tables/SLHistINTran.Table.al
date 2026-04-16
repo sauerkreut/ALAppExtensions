@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -9,6 +10,14 @@ table 42808 "SL Hist. INTran"
 {
     DataClassification = CustomerContent;
     ReplicateData = false;
+    ObsoleteReason = 'Replaced by table SL Hist. INTran Archive.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -46,10 +55,12 @@ table 42808 "SL Hist. INTran"
         }
         field(9; BMIEstimatedCost; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'BMIEstimatedCost';
         }
         field(10; BMIExtCost; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'BMIExtCost';
         }
         field(11; BMIMultDiv; Text[1])
@@ -58,6 +69,7 @@ table 42808 "SL Hist. INTran"
         }
         field(12; BMIRate; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'BMIRate';
         }
         field(13; BMIRtTp; Text[6])
@@ -66,18 +78,22 @@ table 42808 "SL Hist. INTran"
         }
         field(14; BMITranAmt; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'BMITranAmt';
         }
         field(15; BMIUnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'BMIUnitPrice';
         }
         field(16; CmmnPct; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CmmnPct';
         }
         field(17; CnvFact; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'CnvFact';
         }
         field(18; COGSAcct; Text[10])
@@ -114,6 +130,7 @@ table 42808 "SL Hist. INTran"
         }
         field(26; EstimatedCost; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'EstimatedCost';
         }
         field(27; Excpt; Integer)
@@ -122,6 +139,7 @@ table 42808 "SL Hist. INTran"
         }
         field(28; ExtCost; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'ExtCost';
         }
         field(29; ExtRefNbr; Text[15])
@@ -174,6 +192,7 @@ table 42808 "SL Hist. INTran"
         }
         field(42; KitStdQty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'KitStdQty';
         }
         field(43; LayerType; Text[1])
@@ -230,6 +249,7 @@ table 42808 "SL Hist. INTran"
         }
         field(56; OvrhdAmt; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'OvrhdAmt';
         }
         field(57; OvrhdFlag; Integer)
@@ -270,10 +290,12 @@ table 42808 "SL Hist. INTran"
         }
         field(66; Qty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'Qty';
         }
         field(67; QtyUnCosted; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'QtyUnCosted';
         }
         field(68; RcptDate; DateTime)
@@ -314,18 +336,22 @@ table 42808 "SL Hist. INTran"
         }
         field(77; S4Future03; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future03';
         }
         field(78; S4Future04; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future04';
         }
         field(79; S4Future05; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future05';
         }
         field(80; S4Future06; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'S4Future06';
         }
         field(81; S4Future07; DateTime)
@@ -370,6 +396,7 @@ table 42808 "SL Hist. INTran"
         }
         field(91; ShortQty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'ShortQty';
         }
         field(92; SiteID; Text[10])
@@ -402,6 +429,7 @@ table 42808 "SL Hist. INTran"
         }
         field(99; StdTotalQty; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'StdTotalQty';
         }
         field(100; Sub; Text[24])
@@ -430,6 +458,7 @@ table 42808 "SL Hist. INTran"
         }
         field(106; TranAmt; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'TranAmt';
         }
         field(107; TranDate; DateTime)
@@ -446,6 +475,7 @@ table 42808 "SL Hist. INTran"
         }
         field(110; UnitCost; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'UnitCost';
         }
         field(111; UnitDesc; Text[6])
@@ -458,6 +488,7 @@ table 42808 "SL Hist. INTran"
         }
         field(113; UnitPrice; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'UnitPrice';
         }
         field(114; User1; Text[30])
@@ -470,10 +501,12 @@ table 42808 "SL Hist. INTran"
         }
         field(116; User3; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'User3';
         }
         field(117; User4; Decimal)
         {
+            AutoFormatType = 0;
             Caption = 'User4';
         }
         field(118; User5; Text[10])
@@ -510,3 +543,4 @@ table 42808 "SL Hist. INTran"
         }
     }
 }
+#endif

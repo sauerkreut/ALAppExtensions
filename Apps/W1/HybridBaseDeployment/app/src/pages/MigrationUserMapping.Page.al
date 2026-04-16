@@ -1,10 +1,14 @@
+// ------------------------------------------------------------------------------------------------
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
+// ------------------------------------------------------------------------------------------------
+
 namespace Microsoft.DataMigration;
 
 using System.Environment.Configuration;
-using System.Telemetry;
 using System.Security.AccessControl;
 using System.Security.User;
-
+using System.Telemetry;
 
 page 4022 "Migration User Mapping"
 {
@@ -124,11 +128,14 @@ page 4022 "Migration User Mapping"
         }
     }
     trigger OnOpenPage()
+    var
+        HybridCloudManagement: Codeunit "Hybrid Cloud Management";
     begin
         WarnUserMappingDoneBefore();
         GroupVisible := true;
         TempUser.SetFilter("Authentication Email", '<>%1', '');
         FillUserIDList();
+        HybridCloudManagement.SendRecordLinkMigrationNotification();
     end;
 
     var
@@ -137,7 +144,6 @@ page 4022 "Migration User Mapping"
         NotAllUsersMappedMsg: Label 'Not all users are mapped. Do you want to run the mapping process anyway?';
         CancelConfirmMsg: Label 'Exit without processing user mapping?';
         UserMappingWasDoneContinueQst: Label 'You already mapped users in this migration on %1. If you map users again, you might run into unwanted results. Are you sure that you want to continue?', Comment = '%1 - Date and time when the last user mapping was done';
-
 
     local procedure ValidateAndProcess()
     begin
@@ -159,6 +165,7 @@ page 4022 "Migration User Mapping"
         User: Record User;
         User2: Record User;
         UserCodeunit: Codeunit User;
+        SkipUserRenameCommit: Boolean;
     begin
         Rec.Reset();
         Rec.SetFilter("Dest User ID", '<>%1', '');
@@ -174,6 +181,9 @@ page 4022 "Migration User Mapping"
                         User2.Modify(true);
                     end;
                     UserCodeunit.RenameUser(Rec."Dest User ID", Rec."Source User ID");
+                    OnSkipUserRenameCommit(SkipUserRenameCommit);
+                    if not SkipUserRenameCommit then
+                        Commit(); // Needed to optimize the performance. Code can get slow in some cases if many users are renamed.
                 end;
             until Rec.Next() = 0;
     end;
@@ -243,7 +253,6 @@ page 4022 "Migration User Mapping"
             Error('');
     end;
 
-
     procedure UpdateSetupRecord()
     var
         HybridCompanyStatus: Record "Hybrid Company Status";
@@ -255,5 +264,9 @@ page 4022 "Migration User Mapping"
         HybridCompanyStatus."User Mapping Completed" := true;
         HybridCompanyStatus.Modify();
     end;
-}
 
+    [IntegrationEvent(false, false)]
+    local procedure OnSkipUserRenameCommit(var SkipUserRenameCommit: Boolean)
+    begin
+    end;
+}

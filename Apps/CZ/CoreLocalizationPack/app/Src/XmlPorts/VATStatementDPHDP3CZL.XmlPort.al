@@ -4,10 +4,10 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.Finance.VAT.Reporting;
 
+using Microsoft.Finance.GeneralLedger.Setup;
 using Microsoft.Foundation.Company;
 using System.Environment;
 using System.Utilities;
-using Microsoft.Finance.GeneralLedger.Setup;
 
 xmlport 11766 "VAT Statement DPHDP3 CZL"
 {
@@ -1472,10 +1472,15 @@ xmlport 11766 "VAT Statement DPHDP3 CZL"
     var
         BufferAmount: Decimal;
     begin
-        if XMLTagAmount.Get(XMLTag, BufferAmount) then
-            if BufferAmount <> 0 then
-                exit(Format(BufferAmount, 0, 9));
-        exit('');
+        if not XMLTagAmount.Get(XMLTag, BufferAmount) then
+            exit('');
+
+        if BufferAmount = 0 then
+            exit('');
+
+        if GetVATStmtCalcParameters()."Print in Integers" then
+            BufferAmount := Round(BufferAmount, 1, GetVATStmtCalcParameters().GetRoundingDirection());
+        exit(Format(BufferAmount, 0, 9));
     end;
 
     procedure AddAmount(XMLTag: Code[20]; Amount: Decimal)
@@ -1548,26 +1553,29 @@ xmlport 11766 "VAT Statement DPHDP3 CZL"
 
     local procedure GetColumnValue(var VATStatementLine: Record "VAT Statement Line") ColumnValue: Decimal
     var
-        VATStatement: Report "VAT Statement";
+        TempVATStmtCalcParametersCZL: Record "VAT Stmt. Calc. Parameters CZL" temporary;
     begin
-        VATStatement.InitializeRequestCZL(
-          VATStatementName, VATStatementLine, Selection,
-          PeriodSelection, PrintInIntegers, UseAmtsInAddCurr,
-          SettlementNoFilter, RoundingDirection);
-
-        VATStatement.CalcLineTotal(VATStatementLine, ColumnValue, 0);
-        if PrintInIntegers then
-            ColumnValue := Round(ColumnValue, 1, VATStatement.GetAmtRoundingDirectionCZL());
-
-        ColumnValue := ColumnValue;
-
-        if VATStatementLine."Print with" = VATStatementLine."Print with"::"Opposite Sign" then
-            ColumnValue := -ColumnValue;
+        TempVATStmtCalcParametersCZL := GetVATStmtCalcParameters();
+        TempVATStmtCalcParametersCZL."Print in Integers" := false; // Calculate with decimals, rounding will be applied in GetAmount function
+        VATStatementLine.CalcTotal(TempVATStmtCalcParametersCZL, ColumnValue);
+        ColumnValue := ColumnValue * VATStatementLine.GetPrintSign();
     end;
 
     procedure CopyAttachmentFilter(var VATStatementAttachmentCZL: Record "VAT Statement Attachment CZL")
     begin
         VATStatementAttachmentCZL.CopyFilters(Attachment);
+    end;
+
+    local procedure GetVATStmtCalcParameters() VATStmtCalcParameters: Record "VAT Stmt. Calc. Parameters CZL"
+    begin
+        VATStmtCalcParameters."Start Date" := StartDate;
+        VATStmtCalcParameters.SetEndDate(EndDate);
+        VATStmtCalcParameters."Selection" := Selection;
+        VATStmtCalcParameters."Period Selection" := PeriodSelection;
+        VATStmtCalcParameters."Print in Integers" := PrintInIntegers;
+        VATStmtCalcParameters."Use Amounts in Add. Currency" := UseAmtsInAddCurr;
+        VATStmtCalcParameters.SetRoundingType(RoundingDirection);
+        VATStmtCalcParameters."VAT Settlement No. Filter" := SettlementNoFilter;
     end;
 }
 

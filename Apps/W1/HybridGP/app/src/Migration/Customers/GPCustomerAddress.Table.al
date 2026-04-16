@@ -1,5 +1,6 @@
 namespace Microsoft.DataMigration.GP;
 
+using Microsoft.Finance.SalesTax;
 using Microsoft.Sales.Customer;
 using System.Email;
 
@@ -80,24 +81,29 @@ table 4048 "GP Customer Address"
         GPSY01200: Record "GP SY01200";
         MailManagement: Codeunit "Mail Management";
         EmailAddress: Text[80];
+        TaxAreaCode: Code[20];
         Exists: Boolean;
     begin
-        if Customer.Get(CUSTNMBR) then begin
-            Exists := ShipToAddress.Get(CUSTNMBR, CopyStr(ADRSCODE, 1, 10));
+        if Customer.Get(Rec.CUSTNMBR) then begin
+            Exists := ShipToAddress.Get(Rec.CUSTNMBR, CopyStr(Rec.ADRSCODE, 1, MaxStrLen(ShipToAddress.Code)));
             ShipToAddress.Init();
-            ShipToAddress.Validate("Customer No.", CUSTNMBR);
-            ShipToAddress.Code := CopyStr(ADRSCODE, 1, 10);
+            ShipToAddress.Validate("Customer No.", Rec.CUSTNMBR);
+            ShipToAddress.Code := CopyStr(Rec.ADRSCODE.TrimEnd(), 1, MaxStrLen(ShipToAddress.Code));
             ShipToAddress.Name := Customer.Name;
-            ShipToAddress.Address := ADDRESS1;
-            ShipToAddress."Address 2" := CopyStr(ADDRESS2, 1, 50);
-            ShipToAddress.City := CopyStr(CITY, 1, 30);
-            ShipToAddress.Contact := CNTCPRSN;
-            ShipToAddress."Phone No." := PHONE1;
-            ShipToAddress."Shipment Method Code" := CopyStr(SHIPMTHD, 1, 10);
-            ShipToAddress."Fax No." := FAX;
-            ShipToAddress."Post Code" := ZIP;
-            ShipToAddress.County := STATE;
-            ShipToAddress."Tax Area Code" := TAXSCHID;
+            ShipToAddress.Address := CopyStr(Rec.ADDRESS1.TrimEnd(), 1, MaxStrLen(ShipToAddress.Address));
+            ShipToAddress."Address 2" := CopyStr(Rec.ADDRESS2.TrimEnd(), 1, MaxStrLen(ShipToAddress."Address 2"));
+            ShipToAddress.City := CopyStr(Rec.CITY.TrimEnd(), 1, MaxStrLen(ShipToAddress.City));
+            ShipToAddress.Contact := CopyStr(Rec.CNTCPRSN.TrimEnd(), 1, MaxStrLen(ShipToAddress.Contact));
+            ShipToAddress."Phone No." := CopyStr(Rec.PHONE1.TrimEnd(), 1, MaxStrLen(ShipToAddress."Phone No."));
+            ShipToAddress."Shipment Method Code" := CopyStr(Rec.SHIPMTHD.TrimEnd(), 1, MaxStrLen(ShipToAddress."Shipment Method Code"));
+            ShipToAddress."Fax No." := CopyStr(Rec.FAX.TrimEnd(), 1, MaxStrLen(ShipToAddress."Fax No."));
+            ShipToAddress."Post Code" := CopyStr(Rec.ZIP.TrimEnd(), 1, MaxStrLen(ShipToAddress."Post Code"));
+            ShipToAddress.County := CopyStr(Rec.STATE.TrimEnd(), 1, MaxStrLen(ShipToAddress.County));
+
+            TaxAreaCode := CopyStr(Rec.TAXSCHID.TrimEnd(), 1, MaxStrLen(ShipToAddress."Tax Area Code"));
+            CreateTaxAreaIfNeeded(TaxAreaCode);
+
+            ShipToAddress."Tax Area Code" := TaxAreaCode;
 
             if (CopyStr(ShipToAddress."Phone No.", 1, 14) = '00000000000000') then
                 ShipToAddress."Phone No." := '';
@@ -118,6 +124,18 @@ table 4048 "GP Customer Address"
             else
                 ShipToAddress.Modify();
         end;
+    end;
+
+    local procedure CreateTaxAreaIfNeeded(CodeToSet: Code[20])
+    var
+        TaxArea: Record "Tax Area";
+    begin
+        if TaxArea.Get(CodeToSet) then
+            exit;
+
+        Clear(TaxArea);
+        TaxArea.Validate(Code, CodeToSet);
+        TaxArea.Insert(true);
     end;
 
     var

@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -10,6 +11,14 @@ table 47029 "SL LotSerT"
     Access = Internal;
     DataClassification = CustomerContent;
     ReplicateData = false;
+    ObsoleteReason = 'Replaced by table SL LotSerT Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -108,6 +117,7 @@ table 47029 "SL LotSerT"
         field(24; Qty; Decimal)
         {
             Caption = 'Qty';
+            AutoFormatType = 0;
         }
         field(25; RcptNbr; Text[10])
         {
@@ -140,18 +150,22 @@ table 47029 "SL LotSerT"
         field(32; S4Future03; Decimal)
         {
             Caption = 'S4Future03';
+            AutoFormatType = 0;
         }
         field(33; S4Future04; Decimal)
         {
             Caption = 'S4Future04';
+            AutoFormatType = 0;
         }
         field(34; S4Future05; Decimal)
         {
             Caption = 'S4Future05';
+            AutoFormatType = 0;
         }
         field(35; S4Future06; Decimal)
         {
             Caption = 'S4Future06';
+            AutoFormatType = 0;
         }
         field(36; S4Future07; DateTime)
         {
@@ -216,10 +230,12 @@ table 47029 "SL LotSerT"
         field(51; UnitCost; Decimal)
         {
             Caption = 'UnitCost';
+            AutoFormatType = 0;
         }
         field(52; UnitPrice; Decimal)
         {
             Caption = 'UnitPrice';
+            AutoFormatType = 0;
         }
         field(53; User1; Text[30])
         {
@@ -232,10 +248,12 @@ table 47029 "SL LotSerT"
         field(55; User3; Decimal)
         {
             Caption = 'User3';
+            AutoFormatType = 0;
         }
         field(56; User4; Decimal)
         {
             Caption = 'User4';
+            AutoFormatType = 0;
         }
         field(57; User5; Text[10])
         {
@@ -271,3 +289,4 @@ table 47029 "SL LotSerT"
         }
     }
 }
+#endif

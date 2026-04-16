@@ -17,8 +17,10 @@ using System.Email;
 using System.Environment;
 using System.Environment.Configuration;
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Security.AccessControl;
+using System.Telemetry;
 
 #pragma warning disable AS0049
 codeunit 4400 "SOA Setup"
@@ -35,43 +37,45 @@ codeunit 4400 "SOA Setup"
     [Scope('OnPrem')]
     procedure CreateDefaultAgentNoEmail()
     var
-        TempAgentAccessControl: Record "Agent Access Control" temporary;
+        TempAgentSetupBuffer: Record "Agent Setup Buffer";
         TempSOASetup: Record "SOA Setup" temporary;
-        TempAgent: Record Agent temporary;
-        TempEmailAccount: Record "Email Account" temporary;
+        AgentSetup: Codeunit "Agent Setup";
+        SOASetup: Codeunit "SOA Setup";
+        AgentUserSecurityID: Guid;
     begin
-        GetAgent(TempAgent);
-        TempAgent.State := TempAgent.State::Enabled;
-        GetDefaultSOASetup(TempSOASetup, TempAgent);
+        Clear(TempSOASetup);
+        AgentSetup.GetSetupRecord(TempAgentSetupBuffer,
+           TempSOASetup."User Security ID",
+           "Agent Metadata Provider"::"SO Agent",
+           SOASetup.GetSOAUsername(),
+           SOASetup.GetSOAUserDisplayName(),
+           SOASetup.GetAgentSummary()
+        );
+
+        TempAgentSetupBuffer.State := TempAgentSetupBuffer.State::Enabled;
+        AgentUserSecurityID := AgentSetup.SaveChanges(TempAgentSetupBuffer);
+        GetSOASetup(TempSOASetup, AgentUserSecurityID);
         TempSOASetup."Email Monitoring" := false;
 
-        GetDefaultAgentAccessControl(TempAgent."User Security ID", TempAgentAccessControl);
-        UpdateAgent(TempAgent, TempAgentAccessControl, TempSOASetup, TempEmailAccount, true, true);
+        UpdateAgent(TempAgentSetupBuffer, TempSOASetup, true);
     end;
 
-    internal procedure CreateAgent(var TempAgent: Record Agent; var TempAgentAccessControl: Record "Agent Access Control" temporary; var TempSOASetup: Record "SOA Setup" temporary; var TempEmailAccount: Record "Email Account" temporary)
+    local procedure CreateAgent(var AgentSetupBuffer: Record "Agent Setup Buffer"; var TempSOASetup: Record "SOA Setup" temporary)
     var
-        AllProfile: Record "All Profile";
+        AgentSetup: Codeunit "Agent Setup";
     begin
-        TempSOASetup."Agent User Security ID" := Agent.Create("Agent Metadata Provider"::"SO Agent", TempAgent."User Name", TempAgent."Display Name", TempAgentAccessControl);
+        TempSOASetup."User Security ID" := AgentSetup.SaveChanges(AgentSetupBuffer);
         UpdateInstructions(TempSOASetup);
 
-        // TODO(qutreson) Remove this in favor System Application.
-        GetProfile(AllProfile);
-        Agent.SetProfile(TempSOASetup."Agent User Security ID", AllProfile);
-
-        if TempAgent.State = TempAgent.State::Enabled then
+        if AgentSetupBuffer.State = AgentSetupBuffer.State::Enabled then
             UpdateSOASetupActivationDT(TempSOASetup);
         UpdateSOASetup(TempSOASetup);
 
-        if TempAgent.State = TempAgent.State::Enabled then begin
+        if AgentSetupBuffer.State = AgentSetupBuffer.State::Enabled then begin
             EnableItemSearch();
-            Agent.Activate(TempSOASetup."Agent User Security ID");
             if TempSOASetup."Email Monitoring" and TempSOASetup."Incoming Monitoring" and not IsNullGuid(TempSOASetup."Email Account ID") then
                 SOAImpl.ScheduleSOAgent(TempSOASetup)
-        end
-        else
-            Agent.Deactivate(TempSOASetup."Agent User Security ID");
+        end;
     end;
 
     internal procedure GetInitials(): Text[4]
@@ -92,60 +96,62 @@ codeunit 4400 "SOA Setup"
     internal procedure AllowCreateNewSOAgent(): Boolean
     var
         SOASetup: Record "SOA Setup";
+        AgentSystemPermissions: Codeunit "Agent System Permissions";
     begin
-        SOASetup.Init();
-        SOASetup.SetAutoCalcFields(SOASetup.Exists);
-        SOASetup.SetRange(SOASetup.Exists, true);
+        if not AgentSystemPermissions.CurrentUserHasCanManageAllAgentsPermission() then
+            // Limit agent creation to agent admins.
+            exit(false);
+
         exit(SOASetup.IsEmpty());
     end;
 
-    internal procedure UpdateAgent(var TempAgent: Record Agent; var TempAgentAccessControl: Record "Agent Access Control" temporary; var TempSOASetup: Record "SOA Setup" temporary; var TempEmailAccount: Record "Email Account" temporary; AccessUpdated: Boolean; Schedule: Boolean)
+    internal procedure UpdateAgent(var AgentSetupBuffer: Record "Agent Setup Buffer"; var TempSOASetup: Record "SOA Setup" temporary; Schedule: Boolean)
     var
         AzureADGraphUser: Codeunit "Azure AD Graph User";
+        AgentSetup: Codeunit "Agent Setup";
     begin
         if AzureADGraphUser.IsUserDelegatedAdmin() or AzureADGraphUser.IsUserDelegatedHelpdesk() then
             Error(DelegateAdminErr);
 
-        if IsNullGuid(TempAgent."User Security ID") then begin
-            CreateAgent(TempAgent, TempAgentAccessControl, TempSOASetup, TempEmailAccount);
-            exit;
-        end;
-
-        if TempAgent.State = TempAgent.State::Enabled then begin
-            UpdateSOASetupActivationDT(TempSOASetup);
-            UpdateInstructions(TempSOASetup);
-        end;
-
-        Agent.SetDisplayName(TempAgent."User Security ID", TempAgent."Display Name");
-        if TempAgent.State = TempAgent.State::Enabled then begin
-            Agent.Activate(TempAgent."User Security ID");
-            EnableItemSearch();
-            if TempSOASetup."Email Monitoring" and TempSOASetup."Incoming Monitoring" and not IsNullGuid(TempSOASetup."Email Account ID") and Schedule then
-                SOAImpl.ScheduleSOAgent(TempSOASetup);
-        end
+        if IsNullGuid(AgentSetupBuffer."User Security ID") then
+            CreateAgent(AgentSetupBuffer, TempSOASetup)
         else begin
-            Agent.Deactivate(TempAgent."User Security ID");
-            SOAImpl.RemoveScheduledTask(TempSOASetup);
-        end;
-        UpdateSOASetup(TempSOASetup);
+            AgentSetup.SaveChanges(AgentSetupBuffer);
+            if AgentSetupBuffer.State = AgentSetupBuffer.State::Enabled then begin
+                UpdateSOASetupActivationDT(TempSOASetup);
+                UpdateInstructions(TempSOASetup);
+            end;
 
-        if AccessUpdated then
-            Agent.UpdateAccess(TempAgent."User Security ID", TempAgentAccessControl);
+            if AgentSetupBuffer.State = AgentSetupBuffer.State::Enabled then begin
+                EnableItemSearch();
+                if TempSOASetup."Email Monitoring" and TempSOASetup."Incoming Monitoring" and not IsNullGuid(TempSOASetup."Email Account ID") and Schedule then
+                    SOAImpl.ScheduleSOAgent(TempSOASetup);
+            end
+            else
+                SOAImpl.RemoveScheduledTask(TempSOASetup);
+
+            UpdateSOASetup(TempSOASetup);
+        end;
+
+        // Log SOA setup telemetry
+        LogTelemetry(AgentSetupBuffer, TempSOASetup);
     end;
 
     local procedure UpdateSOASetup(var TempSOASetup: Record "SOA Setup" temporary)
     var
         SOASetup: Record "SOA Setup";
     begin
-        if SOASetup.GetBasedOnAgentUserSecurityID(TempSOASetup."Agent User Security ID", false) then begin
+        if SOASetup.GetBasedOnAgentUserSecurityID(TempSOASetup."User Security ID", false) then begin
             SOASetup."Incoming Monitoring" := TempSOASetup."Incoming Monitoring";
             SOASetup."Email Monitoring" := TempSOASetup."Email Monitoring";
             if SOASetup."Email Monitoring" then begin
                 SOASetup."Email Account ID" := TempSOASetup."Email Account ID";
                 SOASetup."Email Connector" := TempSOASetup."Email Connector";
                 SOASetup."Email Address" := TempSOASetup."Email Address";
+                SOASetup."Email Folder" := TempSOASetup."Email Folder";
+                SOASetup."Email Folder Id" := TempSOASetup."Email Folder Id";
             end;
-
+            SOASetup."Analyze Attachments" := TempSOASetup."Analyze Attachments";
             SOASetup."Activated At" := TempSOASetup."Activated At";
             SOASetup."Earliest Sync At" := TempSOASetup."Earliest Sync At";
             SOASetup."Last Sync At" := TempSOASetup."Last Sync At";
@@ -160,6 +166,10 @@ codeunit 4400 "SOA Setup"
             SOASetup."Known Sender In. Msg. Review" := TempSOASetup."Known Sender In. Msg. Review";
             SOASetup."Unknown Sender In. Msg. Review" := TempSOASetup."Unknown Sender In. Msg. Review";
             SOASetup."Instructions Last Sync At" := TempSOASetup."Instructions Last Sync At";
+            SOASetup."Configure Email Template" := TempSOASetup."Configure Email Template";
+            CopyMailSignatureField(TempSOASetup, SOASetup);
+            SOASetup."Message Limit" := TempSOASetup."Message Limit";
+            SOASetup."Send Sales Quote" := TempSOASetup."Send Sales Quote";
 
             SOASetup.Modify();
         end
@@ -171,6 +181,53 @@ codeunit 4400 "SOA Setup"
         end;
     end;
 
+    local procedure LogTelemetry(var AgentSetupBuffer: Record "Agent Setup Buffer"; var TempSOASetup: Record "SOA Setup" temporary)
+    var
+        TempUserSettings: Record "User Settings";
+        FeatureTelemetry: Codeunit "Feature Telemetry";
+        Language: Codeunit Language;
+        TelemetryCustomDimension: Dictionary of [Text, Text];
+    begin
+        // SOA user settings
+        TelemetryCustomDimension.Add('AgentUserId', Format(TempSOASetup."User Security ID"));
+        Agent.GetUserSettings(AgentSetupBuffer."User Security ID", TempUserSettings);
+        if TempUserSettings."Language ID" <> 0 then
+            TelemetryCustomDimension.Add('Language', Language.GetCultureName(TempUserSettings."Language ID"))
+        else
+            TelemetryCustomDimension.Add('Language', '');
+        if TempUserSettings."Locale ID" <> 0 then
+            TelemetryCustomDimension.Add('Locale', Language.GetCultureName(TempUserSettings."Locale ID"))
+        else
+            TelemetryCustomDimension.Add('Locale', '');
+        TelemetryCustomDimension.Add('TimeZone', TempUserSettings."Time Zone");
+
+        // SOA setup config
+        TelemetryCustomDimension.Add('IncomingMonitoring', Format(TempSOASetup."Incoming Monitoring"));
+        TelemetryCustomDimension.Add('EmailMonitoring', Format(TempSOASetup."Email Monitoring"));
+        TelemetryCustomDimension.Add('AnalyzeAttachments', Format(TempSOASetup."Analyze Attachments"));
+        TelemetryCustomDimension.Add('SalesDocConfiguration', Format(TempSOASetup."Sales Doc. Configuration"));
+        TelemetryCustomDimension.Add('QuoteReview', Format(TempSOASetup."Quote Review"));
+        TelemetryCustomDimension.Add('OrderReview', Format(TempSOASetup."Order Review"));
+        TelemetryCustomDimension.Add('CreateOrderFromQuote', Format(TempSOASetup."Create Order from Quote"));
+        TelemetryCustomDimension.Add('SearchOnlyAvailableItems', Format(TempSOASetup."Search Only Available Items"));
+        TelemetryCustomDimension.Add('InclCapableToPromise', Format(TempSOASetup."Incl. Capable to Promise"));
+        TelemetryCustomDimension.Add('SendSalesQuote', Format(TempSOASetup."Send Sales Quote"));
+        TelemetryCustomDimension.Add('ConfigureEmailTemplate', Format(TempSOASetup."Configure Email Template"));
+        TelemetryCustomDimension.Add('KnownSenderInMsgReview', Format(TempSOASetup."Known Sender In. Msg. Review"));
+        TelemetryCustomDimension.Add('UnknownSenderInMsgReview', Format(TempSOASetup."Unknown Sender In. Msg. Review"));
+        TelemetryCustomDimension.Add('MessageLimit', Format(TempSOASetup."Message Limit"));
+        if not IsNullGuid(TempSOASetup."Email Account ID") then
+            TelemetryCustomDimension.Add('HasEmailAccountId', 'true')
+        else
+            TelemetryCustomDimension.Add('HasEmailAccountId', 'false');
+        TelemetryCustomDimension.Add('EmailConnector', Format(TempSOASetup."Email Connector"));
+
+        if (AgentSetupBuffer.State = AgentSetupBuffer.State::Enabled) then
+            FeatureTelemetry.LogUptake('0000QB5', GetFeatureName(), Enum::"Feature Uptake Status"::"Set up", TelemetryCustomDimension)
+        else
+            FeatureTelemetry.LogUptake('0000QB6', GetFeatureName(), Enum::"Feature Uptake Status"::Undiscovered, TelemetryCustomDimension);
+    end;
+
     local procedure SetDefaultSalesDocConfig(var SOASetup: Record "SOA Setup"; SalesDocConfigValue: Boolean)
     begin
         SOASetup."Sales Doc. Configuration" := SalesDocConfigValue;
@@ -179,6 +236,32 @@ codeunit 4400 "SOA Setup"
         SOASetup."Create Order from Quote" := true;
         SOASetup."Search Only Available Items" := true;
         SOASetup."Incl. Capable to Promise" := false;
+        SOASetup."Send Sales Quote" := true;
+    end;
+
+    local procedure CopyMailSignatureField(var FromSOASetup: Record "SOA Setup"; var ToSOASetup: Record "SOA Setup")
+    var
+        InStream: InStream;
+        OutStream: OutStream;
+    begin
+        Clear(ToSOASetup."Email Template");
+
+        FromSOASetup.CalcFields("Email Template");
+        if FromSOASetup."Email Template".HasValue() then begin
+            FromSOASetup."Email Template".CreateInStream(InStream, TextEncoding::UTF8);
+            ToSOASetup."Email Template".CreateOutStream(OutStream, TextEncoding::UTF8);
+            CopyStream(OutStream, InStream);
+        end;
+    end;
+
+    local procedure SetDefaultEmailSignature(var SOASetup: Record "SOA Setup")
+    begin
+        SOASetup.SetEmailSignature(GetDefaultEmailSignatureAsTxt());
+    end;
+
+    internal procedure GetDefaultEmailSignatureAsTxt(): Text
+    begin
+        exit(StrSubstNo(EmailSignatureLbl, SignatureClosingLbl, CompanyName(), SignatureNoteLbl));
     end;
 
     internal procedure UpdateInstructions(var TempSOASetup: Record "SOA Setup" temporary)
@@ -187,7 +270,7 @@ codeunit 4400 "SOA Setup"
         InstructionsSecret: SecretText;
     begin
         SOAPromptBuilder.PrepareInstructions(InstructionsSecret, TempSOASetup);
-        Agent.SetInstructions(TempSOASetup."Agent User Security ID", InstructionsSecret);
+        Agent.SetInstructions(TempSOASetup."User Security ID", InstructionsSecret);
         TempSOASetup."Instructions Last Sync At" := CurrentDateTime();
     end;
 
@@ -237,12 +320,10 @@ codeunit 4400 "SOA Setup"
     end;
 
     internal procedure GetDefaultAgentAccessControl(AgentUserSecurityID: Guid; var TempAgentAccessControl: Record "Agent Access Control" temporary)
-    var
-        Agents: Codeunit Agent;
     begin
         if IsNullGuid(AgentUserSecurityID) then
             exit;
-        Agents.GetUserAccess(AgentUserSecurityID, TempAgentAccessControl);
+        Agent.GetUserAccess(AgentUserSecurityID, TempAgentAccessControl);
     end;
 
     internal procedure GetDefaultProfile(var TempAllProfile: Record "All Profile" temporary)
@@ -250,11 +331,7 @@ codeunit 4400 "SOA Setup"
         ModuleInfo: ModuleInfo;
     begin
         NavApp.GetCurrentModuleInfo(ModuleInfo);
-        TempAllProfile.Init();
-        TempAllProfile.Scope := TempAllProfile.Scope::Tenant;
-        TempAllProfile."App ID" := ModuleInfo.Id;
-        TempAllProfile."Profile ID" := SalesOrderAgentTok;
-        TempAllProfile.Insert();
+        Agent.PopulateDefaultProfile(SalesOrderAgentTok, ModuleInfo.Id, TempAllProfile);
     end;
 
     internal procedure GetDefaultAccessControls(var TempAccessControlBuffer: Record "Access Control Buffer" temporary)
@@ -290,24 +367,42 @@ codeunit 4400 "SOA Setup"
         end;
     end;
 
-    internal procedure GetDefaultSOASetup(var TempSOASetup: Record "SOA Setup" temporary; var TempSOAgent: Record Agent temporary)
+    local procedure SetAgentDefaults(var TempSOAgent: Record Agent temporary)
+    begin
+        TempSOAgent.Init();
+        TempSOAgent."User Name" := GetSOAUsername();
+        TempSOAgent."Display Name" := SalesOrderAgentDisplayNameLbl;
+        TempSOAgent.Insert();
+    end;
+
+    internal procedure GetSOASetup(var TempSOASetup: Record "SOA Setup" temporary; AgentUserSecurityID: Guid)
     var
         SOASetup: Record "SOA Setup";
     begin
-        if IsNullGuid(TempSOASetup."Agent User Security ID") then
+        if IsNullGuid(AgentUserSecurityID) then begin
+            SetSOASetupDefaults(TempSOASetup, AgentUserSecurityID);
+            exit;
+        end;
+
+        if IsNullGuid(TempSOASetup."User Security ID") then begin
+            SOASetup.SetRange("User Security ID", AgentUserSecurityID);
             if SOASetup.FindFirst() then begin
+                SOASetup.CalcFields("Email Template");
                 TempSOASetup := SOASetup;
                 TempSOASetup.Insert();
-            end
-            else
-                SetSOASetupDefaults(TempSOASetup, TempSOAgent."User Security ID")
+                exit;
+            end;
+
+            SetSOASetupDefaults(TempSOASetup, AgentUserSecurityID);
+            exit;
+        end;
+
+        if SOASetup.GetBasedOnAgentUserSecurityID(TempSOASetup."User Security ID", false) then begin
+            TempSOASetup := SOASetup;
+            TempSOASetup.Insert();
+        end
         else
-            if SOASetup.GetBasedOnAgentUserSecurityID(TempSOASetup."Agent User Security ID", false) then begin
-                TempSOASetup := SOASetup;
-                TempSOASetup.Insert();
-            end
-            else
-                SetSOASetupDefaults(TempSOASetup, TempSOAgent."User Security ID");
+            SetSOASetupDefaults(TempSOASetup, AgentUserSecurityID);
     end;
 
     internal procedure CheckSOASetupStillValid(var SOASetup: Record "SOA Setup"): Boolean
@@ -357,6 +452,7 @@ codeunit 4400 "SOA Setup"
                 begin
                     if (AgentTaskUserInterventionRequestDetails."Page ID" = Page::"Sales Quote") then begin
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := GetUpdatedQuoteInterventionSuggestionCode();
                         AgentTaskUserInterventionSuggestion.Summary := StrSubstNo(SOAInterventionSuggestionSummaryLbl, SOAInterventionSuggestionQuoteLbl);
                         AgentTaskUserInterventionSuggestion.Description := StrSubstNo(SOAInterventionSuggestionDescriptionLbl, SOAInterventionSuggestionQuoteLockedLbl);
                         AgentTaskUserInterventionSuggestion.Instructions := StrSubstNo(SOAInterventionSuggestionInstructionsLbl, SOAInterventionSuggestionQuoteLockedLbl);
@@ -365,6 +461,7 @@ codeunit 4400 "SOA Setup"
 
                     if (AgentTaskUserInterventionRequestDetails."Page ID" = Page::"Sales Order") then begin
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := GetUpdatedOrderInterventionSuggestionCode();
                         AgentTaskUserInterventionSuggestion.Summary := StrSubstNo(SOAInterventionSuggestionSummaryLbl, SOAInterventionSuggestionOrderLbl);
                         AgentTaskUserInterventionSuggestion.Description := StrSubstNo(SOAInterventionSuggestionDescriptionLbl, SOAInterventionSuggestionOrderLockedLbl);
                         AgentTaskUserInterventionSuggestion.Instructions := StrSubstNo(SOAInterventionSuggestionInstructionsLbl, SOAInterventionSuggestionOrderLockedLbl);
@@ -375,6 +472,7 @@ codeunit 4400 "SOA Setup"
                 begin
                     if AgentTaskUserInterventionRequestDetails."Page ID" = Page::"SOA Multi Items Availability" then begin
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := SOAItemAvailabilityInterventionSuggestionCodeLbl;
                         AgentTaskUserInterventionSuggestion.Summary := SOAItemAvailabilityInterventionSuggestionSummaryLbl;
                         AgentTaskUserInterventionSuggestion.Description := SOAItemAvailabilityInterventionSuggestionDescriptionLbl;
                         AgentTaskUserInterventionSuggestion.Instructions := SOAItemAvailabilityInterventionSuggestionInstructionsLbl;
@@ -383,12 +481,14 @@ codeunit 4400 "SOA Setup"
 
                     if AgentTaskUserInterventionRequestDetails."Page ID" = Page::"Customer List" then begin
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := SOACustomerInterventionSuggestionCodeLbl;
                         AgentTaskUserInterventionSuggestion.Summary := SOACustomerInterventionSuggestionSummaryLbl;
                         AgentTaskUserInterventionSuggestion.Description := SOACustomerInterventionSuggestionDescriptionLbl;
                         AgentTaskUserInterventionSuggestion.Instructions := SOACustomerInterventionSuggestionInstructionsLbl;
                         AgentTaskUserInterventionSuggestion.Insert();
 
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := SOAContactInterventionSuggestionCodeLbl;
                         AgentTaskUserInterventionSuggestion.Summary := SOAContactInterventionSuggestionSummaryLbl;
                         AgentTaskUserInterventionSuggestion.Description := SOAContactInterventionSuggestionDescriptionLbl;
                         AgentTaskUserInterventionSuggestion.Instructions := SOAContactInterventionSuggestionInstructionsLbl;
@@ -397,6 +497,7 @@ codeunit 4400 "SOA Setup"
 
                     if AgentTaskUserInterventionRequestDetails."Page ID" = Page::"Contact List" then begin
                         AgentTaskUserInterventionSuggestion.Init();
+                        AgentTaskUserInterventionSuggestion.Code := SOAContactInterventionSuggestionCodeLbl;
                         AgentTaskUserInterventionSuggestion.Summary := SOAContactInterventionSuggestionSummaryLbl;
                         AgentTaskUserInterventionSuggestion.Description := SOAContactInterventionSuggestionDescriptionLbl;
                         AgentTaskUserInterventionSuggestion.Instructions := SOAContactInterventionSuggestionInstructionsLbl;
@@ -516,27 +617,18 @@ codeunit 4400 "SOA Setup"
         TempSOASetup."Incoming Monitoring" := true;
         TempSOASetup."Email Monitoring" := true;
         SetDefaultSalesDocConfig(TempSOASetup, true);
-        TempSOASetup."Agent User Security ID" := AgentUserSecurityID;
+        TempSOASetup."Analyze Attachments" := true;
+        TempSOASetup."User Security ID" := AgentUserSecurityID;
+        SetDefaultEmailSignature(TempSOASetup);
         TempSOASetup.Insert();
     end;
 
-    local procedure SetAgentDefaults(var TempSOAgent: Record Agent temporary)
+    internal procedure GetSOAUserDisplayName(): Text[80]
     begin
-        TempSOAgent.Init();
-        TempSOAgent."User Name" := GetSOAUsername();
-        TempSOAgent."Display Name" := SalesOrderAgentDisplayNameLbl;
-        TempSOAgent.Insert();
+        exit(SalesOrderAgentDisplayNameLbl);
     end;
 
-    local procedure GetProfile(var AllProfile: Record "All Profile")
-    var
-        CurrentModuleInfo: ModuleInfo;
-    begin
-        NavApp.GetCallerModuleInfo(CurrentModuleInfo);
-        AllProfile.Get(AllProfile.Scope::Tenant, CurrentModuleInfo.Id, SalesOrderAgentTok);
-    end;
-
-    local procedure GetSOAUsername(): Text[50]
+    internal procedure GetSOAUsername(): Text[50]
     begin
         exit(SalesOrderAgentNameLbl + ' - ' + CompanyName());
     end;
@@ -624,6 +716,55 @@ codeunit 4400 "SOA Setup"
         EmailsCount := SOATestSetup.GetEmailCount();
     end;
 
+    procedure SupportedAttachmentContentType(FileMIMEType: Text): Boolean
+    begin
+        if FileMIMEType in ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'] then
+            exit(true)
+        else
+            exit(false);
+    end;
+
+    internal procedure IsPdfAttachmentContentType(FileMIMEType: Text): Boolean
+    begin
+        if FileMIMEType = 'application/pdf' then
+            exit(true);
+
+        exit(false);
+    end;
+
+    [TryFunction]
+    internal procedure DocumentExceedsPageCountThreshold(DocInStream: Instream; var Exceeds: Boolean)
+    var
+        PdfDocument: Codeunit "PDF Document";
+    begin
+        Exceeds := PdfDocument.GetPdfPageCount(DocInStream) > PageCountThreshold();
+    end;
+
+    internal procedure PageCountThreshold(): Integer
+    begin
+        exit(10)
+    end;
+
+    internal procedure GetMaxNoOfAttachmentsPerEmail(): Integer
+    begin
+        exit(10)
+    end;
+
+    internal procedure GetFeatureName(): Text
+    begin
+        exit('Sales Order Agent');
+    end;
+
+    internal procedure GetUpdatedQuoteInterventionSuggestionCode(): Code[20]
+    begin
+        exit(StrSubstNo(SOAInterventionSuggestionCodeLbl, SOAInterventionSuggestionQuoteLockedLbl));
+    end;
+
+    internal procedure GetUpdatedOrderInterventionSuggestionCode(): Code[20]
+    begin
+        exit(StrSubstNo(SOAInterventionSuggestionCodeLbl, SOAInterventionSuggestionOrderLockedLbl));
+    end;
+
     var
         SOAImpl: Codeunit "SOA Impl";
         Agent: Codeunit Agent;
@@ -633,25 +774,32 @@ codeunit 4400 "SOA Setup"
         SOAEditTok: Label 'SOA - EDIT', Locked = true, MaxLength = 20;
         SalesOrderAgentTok: Label 'Sales Order Agent', Locked = true;
         SalesOrderAgentInitialLbl: Label 'SO', MaxLength = 4;
-        SOASummaryLbl: Label 'Monitors incoming emails for sales inquiries, matches senders to customers, checks inventory, and creates quotes. When processing replies, the agent converts accepted quotes into orders. This agent uses generative AI—review its actions for accuracy.';
+        SOASummaryLbl: Label 'Monitors incoming emails for sales inquiries, matches senders to customers, checks inventory, and creates quotes. When processing replies, the agent converts accepted quotes into orders.';
         DelegateAdminErr: Label 'Delegated admin and helpdesk users are not allowed to update the agent.';
-        SOAInterventionSuggestionSummaryLbl: Label 'I have updated the %1', Comment = '%1 = Sales Document Type';
-        SOAInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to a sales %1 as part of reviewing it before sending it to a customer.', Comment = '%1 = Sales Document Type', Locked = true;
-        SOAInterventionSuggestionInstructionsLbl: Label 'I have updated the sales %1. Make sure to download the PDF again before including the %1 information in any outgoing communication.', Comment = '%1 = Sales Document Type', Locked = true;
+        SOAInterventionSuggestionCodeLbl: Label 'SOA-UPDATE-%1', Locked = true, Comment = '%1 = Sales Document Type';
+        SOAInterventionSuggestionSummaryLbl: Label 'I have updated the %1', Comment = '%1 = Sales Document Type', MaxLength = 100;
+        SOAInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to a sales %1 as part of reviewing it before sending it to a customer.', Comment = '%1 = Sales Document Type', Locked = true, MaxLength = 1024;
+        SOAInterventionSuggestionInstructionsLbl: Label 'I have updated the sales %1. Make sure to download the PDF again before including the %1 information in any outgoing communication.', Comment = '%1 = Sales Document Type', Locked = true, MaxLength = 1024;
         SOAInterventionSuggestionQuoteLbl: Label 'quote';
         SOAInterventionSuggestionOrderLbl: Label 'order';
         SOAInterventionSuggestionQuoteLockedLbl: Label 'quote', Locked = true;
         SOAInterventionSuggestionOrderLockedLbl: Label 'order', Locked = true;
-        SOAItemAvailabilityInterventionSuggestionSummaryLbl: Label 'I have made the items available';
-        SOAItemAvailabilityInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to the item availability. Rerun the item availability check', Locked = true;
-        SOAItemAvailabilityInterventionSuggestionInstructionsLbl: Label 'I have updated the item availability. Make sure to recheck the item availability and proceed further.', Locked = true;
-        SOACustomerInterventionSuggestionSummaryLbl: Label 'I have added the customer';
-        SOACustomerInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to add the customer information. Rerun the customer information check', Locked = true;
-        SOACustomerInterventionSuggestionInstructionsLbl: Label 'I have updated the customer information. Rerun the customer information check and proceed further.', Locked = true;
-        SOAContactInterventionSuggestionSummaryLbl: Label 'I have added the contact';
-        SOAContactInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to add the contact information. Rerun the contact information check', Locked = true;
-        SOAContactInterventionSuggestionInstructionsLbl: Label 'I have updated the contact information. Rerun the contact information check on the contact list page and proceed further.', Locked = true;
+        SOAItemAvailabilityInterventionSuggestionCodeLbl: Label 'SOA-ITEM-AVAILABLE', Locked = true;
+        SOAItemAvailabilityInterventionSuggestionSummaryLbl: Label 'I have made the items available', MaxLength = 100;
+        SOAItemAvailabilityInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to the item availability. Rerun the item availability check', Locked = true, MaxLength = 1024;
+        SOAItemAvailabilityInterventionSuggestionInstructionsLbl: Label 'I have updated the item availability. Make sure to recheck the item availability and proceed further.', Locked = true, MaxLength = 1024;
+        SOACustomerInterventionSuggestionCodeLbl: Label 'SOA-CUSTOMER-ADDED', Locked = true;
+        SOACustomerInterventionSuggestionSummaryLbl: Label 'I have added the customer', MaxLength = 100;
+        SOACustomerInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to add the customer information. Rerun the customer information check', Locked = true, MaxLength = 1024;
+        SOACustomerInterventionSuggestionInstructionsLbl: Label 'I have updated the customer information. Rerun the customer information check and proceed further.', Locked = true, MaxLength = 1024;
+        SOAContactInterventionSuggestionCodeLbl: Label 'SOA-CONTACT-ADDED', Locked = true;
+        SOAContactInterventionSuggestionSummaryLbl: Label 'I have added the contact', MaxLength = 100;
+        SOAContactInterventionSuggestionDescriptionLbl: Label 'Used to indicate that a user has done some manual updates to add the contact information. Rerun the contact information check', Locked = true, MaxLength = 1024;
+        SOAContactInterventionSuggestionInstructionsLbl: Label 'I have updated the contact information. Rerun the contact information check on the contact list page and proceed further.', Locked = true, MaxLength = 1024;
         NewEmailsSinceDeactivationLbl: Label 'New e-mails (%1) have arrived since %2 but haven''t been processed yet. Should Sales Order Agent also process these?', Comment = '%1 - Number of emails, %2 - Date and time of deactivation.';
         SOAAttemptedConnectionFailedErr: Label 'The agent can''t be activated because the connection to the selected Microsoft 365 mailbox failed. Ask your Microsoft 365 administrator to check if the user configuring the agent has permission to access the mailbox.';
         SOAAttemptedConnectionHttpRequestFailedErr: Label 'The agent can''t be activated because its settings don''t allow Http Requests. Ask your administrator to update this setting and try again.';
+        EmailSignatureLbl: Label '%1<div>%2</div><div><br></div><div><em>%3</em></div>', Locked = true;
+        SignatureClosingLbl: Label 'Best regards';
+        SignatureNoteLbl: Label 'We write mails with AI. We review and send with care.';
 }

@@ -6,9 +6,9 @@
 #pragma warning disable AS0007
 namespace Microsoft.Agent.SalesOrderAgent;
 
-using System.Upgrade;
 using System.AI;
 using System.Environment;
+using System.Upgrade;
 
 codeunit 4589 "SOA Upgrade"
 {
@@ -25,6 +25,12 @@ codeunit 4589 "SOA Upgrade"
     begin
         RegisterCapability();
         AddBillingTypeToCapability();
+    end;
+
+    trigger OnUpgradePerCompany()
+    begin
+        AddDailyEmailLimit();
+        UpgradeUserSecurityIDField();
     end;
 
     local procedure RegisterCapability()
@@ -48,9 +54,39 @@ codeunit 4589 "SOA Upgrade"
         if not UpgradeTag.HasUpgradeTag(GetAddBillingTypeToSOACapabilityTag()) then begin
             if EnvironmentInformation.IsSaaSInfrastructure() then
                 if CopilotCapability.IsCapabilityRegistered(Enum::"Copilot Capability"::"Sales Order Agent") then
-                    CopilotCapability.ModifyCapability(Enum::"Copilot Capability"::"Sales Order Agent", Enum::"Copilot Availability"::Preview, Enum::"Copilot Billing Type"::"Microsoft Billed", LearnMoreUrlTxt);
+                    CopilotCapability.ModifyCapability(Enum::"Copilot Capability"::"Sales Order Agent", Enum::"Copilot Availability"::"Generally Available", Enum::"Copilot Billing Type"::"Microsoft Billed", LearnMoreUrlTxt);
 
             UpgradeTag.SetUpgradeTag(GetAddBillingTypeToSOACapabilityTag());
+        end;
+    end;
+
+    local procedure UpgradeUserSecurityIDField()
+    var
+        DummySOASetup: Record "SOA Setup";
+        UpgradeTag: Codeunit "Upgrade Tag";
+        SOADataTransfer: DataTransfer;
+    begin
+        if UpgradeTag.HasUpgradeTag(GetUserSecurityIDUpgradeTag()) then
+            exit;
+        SOADataTransfer.SetTables(Database::"SOA Setup", Database::"SOA Setup");
+        SOADataTransfer.AddFieldValue(DummySOASetup.FieldNo("Agent User Security ID"), DummySOASetup.FieldNo("User Security ID"));
+        SOADataTransfer.CopyFields();
+
+        UpgradeTag.SetUpgradeTag(GetUserSecurityIDUpgradeTag());
+    end;
+
+    local procedure AddDailyEmailLimit()
+    var
+        SOASetup: Record "SOA Setup";
+        UpgradeTag: Codeunit "Upgrade Tag";
+    begin
+        if not UpgradeTag.HasUpgradeTag(GetSetDailyEmailLimitTag()) then begin
+            if SOASetup.FindFirst() then begin
+                SOASetup."Message Limit" := SOASetup.GetDefaultMessageLimit();
+                SOASetup.Modify();
+            end;
+
+            UpgradeTag.SetUpgradeTag(GetSetDailyEmailLimitTag());
         end;
     end;
 
@@ -64,9 +100,25 @@ codeunit 4589 "SOA Upgrade"
         exit('MS-581366-BillingTypeToSalesOrderAgentCapability-20250731');
     end;
 
+    internal procedure GetSetDailyEmailLimitTag(): Code[250]
+    begin
+        exit('MS-597734-DailyEmailLimit-20250822');
+    end;
+
+    local procedure GetUserSecurityIDUpgradeTag(): Code[250]
+    begin
+        exit('MS-597811-UserSecurityIDField-20251114');
+    end;
+
     [EventSubscriber(ObjectType::Codeunit, Codeunit::"Upgrade Tag", OnGetPerDatabaseUpgradeTags, '', false, false)]
     local procedure RegisterPerDatabaseUpgradeTags(var PerDatabaseUpgradeTags: List of [Code[250]])
     begin
         PerDatabaseUpgradeTags.Add(GetAddBillingTypeToSOACapabilityTag());
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Upgrade Tag", OnGetPerCompanyUpgradeTags, '', false, false)]
+    local procedure RegisterPerCompanyUpgradeTags(var PerCompanyUpgradeTags: List of [Code[250]])
+    begin
+        PerCompanyUpgradeTags.Add(GetSetDailyEmailLimitTag());
     end;
 }

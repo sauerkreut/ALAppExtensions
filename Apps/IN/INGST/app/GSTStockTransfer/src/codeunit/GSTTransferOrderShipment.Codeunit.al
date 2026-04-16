@@ -8,12 +8,12 @@ using Microsoft.Finance.Dimension;
 using Microsoft.Finance.GeneralLedger.Journal;
 using Microsoft.Finance.GeneralLedger.Posting;
 using Microsoft.Finance.GeneralLedger.Setup;
+using Microsoft.Finance.GST.Application;
 using Microsoft.Finance.GST.Base;
 using Microsoft.Finance.TaxBase;
 using Microsoft.Finance.TaxEngine.TaxTypeHandler;
 using Microsoft.Foundation.AuditCodes;
 using Microsoft.Foundation.NoSeries;
-using Microsoft.Finance.GST.Application;
 using Microsoft.Inventory.Item;
 using Microsoft.Inventory.Ledger;
 using Microsoft.Inventory.Location;
@@ -1239,11 +1239,30 @@ codeunit 18391 "GST Transfer Order Shipment"
                 NewDetailedGSTLedgerEntry."Custom Duty Amount" := -1 * OldDetailedGSTLedgerEntry."Custom Duty Amount";
                 OnBeforeInsertNewDetailedGSTLedgerEntry(NewDetailedGSTLedgerEntry, OldDetailedGSTLedgerEntry, TransferShipmentLineNew, TransShptLine);
                 NewDetailedGSTLedgerEntry.Insert(true);
-                PostUndoTransShipmentLineToGenJnlLine(NewDetailedGSTLedgerEntry, TransferShipmentLineNew);
-                PostGeneralEntriesUndoShipment(NewDetailedGSTLedgerEntry, TransferShipmentLineNew);
                 InsertGSTLedgerEntryTransferUndoShipment(NewDetailedGSTLedgerEntry, TransferShipmentLineNew);
                 InsertDetailedGSTEntryInfoUndoTransferShipment(OldDetailedGSTLedgerEntry, NewDetailedGSTLedgerEntry, TransShptLine, TransferShipmentLineNew);
             until OldDetailedGSTLedgerEntry.Next() = 0;
+    end;
+
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Undo Transfer Shipment", 'OnAfterCode', '', false, false)]
+    local procedure OnCodeOnAfterUndoTransferShpt(var TransShptLine: Record "Transfer Shipment Line")
+    var
+        DetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry";
+        TransferShipmentLineNew: Record "Transfer Shipment Line";
+    begin
+        TransferShipmentLineNew.SetRange("Document No.", TransShptLine."Document No.");
+        TransferShipmentLineNew.SetFilter(Quantity, '<%1', 0);
+        TransferShipmentLineNew.SetRange("Correction Line", true);
+        if TransferShipmentLineNew.FindSet() then
+            repeat
+                DetailedGSTLedgerEntry.SetRange("Document No.", TransferShipmentLineNew."Document No.");
+                DetailedGSTLedgerEntry.SetRange("Document Line No.", TransferShipmentLineNew."Line No.");
+                if DetailedGSTLedgerEntry.FindSet() then
+                    repeat
+                        PostUndoTransShipmentLineToGenJnlLine(DetailedGSTLedgerEntry, TransferShipmentLineNew);
+                        PostGeneralEntriesUndoShipment(DetailedGSTLedgerEntry, TransferShipmentLineNew);
+                    until DetailedGSTLedgerEntry.Next() = 0;
+            until TransferShipmentLineNew.Next() = 0;
     end;
 
     local procedure InsertGSTLedgerEntryTransferUndoShipment(NewDetailedGSTLedgerEntry: Record "Detailed GST Ledger Entry"; TransferShipmentLineNew: Record "Transfer Shipment Line")

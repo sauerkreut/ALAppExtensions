@@ -117,15 +117,19 @@ table 47056 "SL SOAddress"
         }
         field(34; S4Future03; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(35; S4Future04; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(36; S4Future05; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(37; S4Future06; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(38; S4Future07; DateTime)
         {
@@ -195,9 +199,11 @@ table 47056 "SL SOAddress"
         }
         field(60; User3; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(61; User4; Decimal)
         {
+            AutoFormatType = 0;
         }
         field(62; User5; Text[10])
         {
@@ -231,20 +237,21 @@ table 47056 "SL SOAddress"
         Exists: Boolean;
     begin
         if Customer.Get(CustId) then begin
-            Exists := ShipToAddress.Get(CustId, CopyStr(ShipToId, 1, 10));
+            Exists := ShipToAddress.Get(CustId, CopyStr(ShipToId, 1, MaxStrLen(ShipToAddress.Code)));
             ShipToAddress.Init();
             ShipToAddress.Validate("Customer No.", CustId);
-            ShipToAddress.Code := CopyStr(ShipToId, 1, 10);
+            ShipToAddress.Code := CopyStr(ShipToId, 1, MaxStrLen(ShipToAddress.Code));
             ShipToAddress.Name := Customer.Name;
             ShipToAddress.Address := Addr1;
-            ShipToAddress."Address 2" := CopyStr(Addr2, 1, 50);
-            ShipToAddress.City := CopyStr(City, 1, 30);
+            ShipToAddress."Address 2" := CopyStr(Addr2, 1, MaxStrLen(ShipToAddress."Address 2"));
+            ShipToAddress.City := CopyStr(City, 1, MaxStrLen(ShipToAddress.City));
             ShipToAddress.Contact := Attn;
             ShipToAddress."Phone No." := Phone;
             ShipToAddress."Fax No." := Fax;
             ShipToAddress."Post Code" := Zip;
             ShipToAddress."E-Mail" := EMailAddr;
-            ShipToAddress.County := Country;
+            ShipToAddress.County := State;
+            ShipToAddress."Country/Region Code" := Country;
 
             if not Exists then
                 ShipToAddress.Insert()

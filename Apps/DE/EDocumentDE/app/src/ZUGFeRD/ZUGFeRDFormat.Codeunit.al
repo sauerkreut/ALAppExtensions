@@ -4,13 +4,18 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.eServices.EDocument.Formats;
 
-using System.Utilities;
-using Microsoft.Foundation.Company;
-using Microsoft.Sales.Customer;
-using Microsoft.Sales.History;
-using Microsoft.Purchases.Document;
+using Microsoft.Bank.BankAccount;
 using Microsoft.eServices.EDocument;
+using Microsoft.eServices.EDocument.IO.Peppol;
+using Microsoft.Foundation.Company;
+using Microsoft.Purchases.Document;
+using Microsoft.Sales.Customer;
+using Microsoft.Sales.Document;
+using Microsoft.Sales.History;
+using Microsoft.Service.Document;
+using Microsoft.Service.History;
 using System.IO;
+using System.Utilities;
 
 codeunit 13920 "ZUGFeRD Format" implements "E-Document"
 {
@@ -18,12 +23,23 @@ codeunit 13920 "ZUGFeRD Format" implements "E-Document"
     InherentPermissions = X;
 
     var
+        EDocPEPPOLBIS30: Codeunit "EDoc PEPPOL BIS 3.0";
+        EDocPEPPOLValidationDE: Codeunit "EDoc PEPPOL Validation DE";
         EDocImportZUGFeRD: Codeunit "Import ZUGFeRD Document";
 
     procedure Check(var SourceDocumentHeader: RecordRef; EDocumentService: Record "E-Document Service"; EDocumentProcessingPhase: Enum "E-Document Processing Phase")
+    var
+        CompanyInformation: Record "Company Information";
     begin
-        CheckCompanyInfoMandatory();
+        OnBeforeCheck(SourceDocumentHeader, EDocumentService, EDocumentProcessingPhase);
+        CheckCompanyInfoMandatory(CompanyInformation);
+        CheckBankAccountIBANMandatory(SourceDocumentHeader, CompanyInformation);
         CheckBuyerReferenceMandatory(EDocumentService, SourceDocumentHeader);
+        EDocPEPPOLValidationDE.SetBuyerReference(EDocumentService."Buyer Reference");
+        BindSubscription(EDocPEPPOLValidationDE);
+        EDocPEPPOLBIS30.Check(SourceDocumentHeader, EDocumentService, EDocumentProcessingPhase);
+        UnbindSubscription(EDocPEPPOLValidationDE);
+        OnAfterCheck(SourceDocumentHeader, EDocumentService, EDocumentProcessingPhase);
     end;
 
     procedure Create(EDocumentService: Record "E-Document Service"; var EDocument: Record "E-Document"; var SourceDocumentHeader: RecordRef; var SourceDocumentLines: RecordRef; var TempBlob: Codeunit "Temp Blob")
@@ -91,6 +107,15 @@ codeunit 13920 "ZUGFeRD Format" implements "E-Document"
 
         EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Purchase Credit Memo";
         EDocServiceSupportedType.Insert();
+
+        EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Invoice";
+        EDocServiceSupportedType.Insert();
+
+        EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Credit Memo";
+        EDocServiceSupportedType.Insert();
+
+        EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Order";
+        EDocServiceSupportedType.Insert();
     end;
 
     [EventSubscriber(ObjectType::Table, Database::"E-Document Log", OnBeforeExportDataStorage, '', false, false)]
@@ -106,15 +131,60 @@ codeunit 13920 "ZUGFeRD Format" implements "E-Document"
             exit;
 
         FileName := StrSubstNo(EDOCLogFileTxt, EDocumentLog."E-Doc. Entry No");
-        FileName += '.pdf';
+        FileName += EDocumentService.GetDefaultFileExtension();
     end;
 
-    local procedure CheckCompanyInfoMandatory()
+    [EventSubscriber(ObjectType::Table, Database::"E-Document Service", OnAfterGetDefaultFileExtension, '', false, false)]
+    local procedure HandleOnAfterGetDefaultFileExtension(EDocumentService: Record "E-Document Service"; var FileExtension: Text)
     var
-        CompanyInformation: Record "Company Information";
+        PDFFileTypeTok: Label '.pdf', Locked = true;
+    begin
+        if EDocumentService."Document Format" <> EDocumentService."Document Format"::ZUGFeRD then
+            exit;
+
+        FileExtension := PDFFileTypeTok;
+    end;
+
+    local procedure CheckCompanyInfoMandatory(var CompanyInformation: Record "Company Information")
     begin
         CompanyInformation.Get();
         CompanyInformation.TestField("E-Mail");
+    end;
+
+    local procedure CheckBankAccountIBANMandatory(SourceDocumentHeader: RecordRef; var CompanyInformation: Record "Company Information")
+    var
+        BankAccount: Record "Bank Account";
+        SalesInvoiceHeader: Record "Sales Invoice Header";
+        ServiceInvoiceHeader: Record "Service Invoice Header";
+        BankAccountCodeFieldRef: FieldRef;
+        CheckBankAccount: Boolean;
+        BankAccountCode: Code[20];
+        BankAccFieldNo: Integer;
+    begin
+        if not (SourceDocumentHeader.Number() in
+            [Database::"Sales Header",
+             Database::"Sales Invoice Header",
+             Database::"Sales Cr.Memo Header",
+             Database::"Service Header",
+             Database::"Service Invoice Header",
+             Database::"Service Cr.Memo Header"])
+        then
+            exit;
+
+        BankAccFieldNo := SalesInvoiceHeader.FieldNo("Company Bank Account Code");
+        if SourceDocumentHeader.Number() in [Database::"Service Header", Database::"Service Invoice Header", Database::"Service Cr.Memo Header"] then
+            BankAccFieldNo := ServiceInvoiceHeader.FieldNo("Company Bank Account Code");
+
+        BankAccountCodeFieldRef := SourceDocumentHeader.Field(BankAccFieldNo);
+        BankAccountCode := BankAccountCodeFieldRef.Value();
+
+        if BankAccountCode <> '' then
+            CheckBankAccount := BankAccount.Get(BankAccountCode);
+
+        if CheckBankAccount then
+            BankAccount.TestField(IBAN)
+        else
+            CompanyInformation.TestField(IBAN);
     end;
 
     local procedure CheckBuyerReferenceMandatory(EDocumentService: Record "E-Document Service"; SourceDocumentHeader: RecordRef)
@@ -128,6 +198,16 @@ codeunit 13920 "ZUGFeRD Format" implements "E-Document"
             exit;
 
         if not EDocumentService."Buyer Reference Mandatory" then
+            exit;
+
+        if not (SourceDocumentHeader.Number in
+            [Database::"Sales Header",
+            Database::"Sales Invoice Header",
+            Database::"Sales Cr.Memo Header",
+            Database::"Service Header",
+            Database::"Service Invoice Header",
+            Database::"Service Cr.Memo Header"])
+        then
             exit;
 
         case EDocumentService."Buyer Reference" of
@@ -151,4 +231,15 @@ codeunit 13920 "ZUGFeRD Format" implements "E-Document"
     local procedure OnBuyerReferenceOnElseCase(var SourceDocumentHeader: RecordRef; EDocumentService: Record "E-Document Service")
     begin
     end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeCheck(var SourceDocumentHeader: RecordRef; EDocumentService: Record "E-Document Service"; EDocumentProcessingPhase: Enum Microsoft.eServices.EDocument."E-Document Processing Phase")
+    begin
+    end;
+
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCheck(var SourceDocumentHeader: RecordRef; EDocumentService: Record "E-Document Service"; EDocumentProcessingPhase: Enum "E-Document Processing Phase")
+    begin
+    end;
+
 }

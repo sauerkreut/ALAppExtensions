@@ -22,8 +22,8 @@ using Microsoft.Inventory.Location;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Setup;
 using System.Globalization;
-using System.Utilities;
 using System.Telemetry;
+using System.Utilities;
 
 report 10583 "Sales - Invoice"
 {
@@ -737,7 +737,9 @@ report 10583 "Sales - Invoice"
                 trigger OnPreDataItem()
                 begin
 #if not CLEAN27
+#pragma warning disable AL0432
                     NoOfLoops := Abs(NumberOfCopies) + Cust."Invoice Copies" + 1;
+#pragma warning restore AL0432
 #else
                     NoOfLoops := Abs(NumberOfCopies) + 1;
 #endif
@@ -1168,4 +1170,3 @@ report 10583 "Sales - Invoice"
         NextEntryNo := NextEntryNo + 1
     end;
 }
-

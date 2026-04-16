@@ -2,6 +2,7 @@ namespace Microsoft.Test.Sustainability;
 
 using Microsoft.Foundation.Address;
 using Microsoft.Inventory.Item;
+using Microsoft.Inventory.Ledger;
 using Microsoft.Purchases.Document;
 using Microsoft.Purchases.History;
 using Microsoft.Sales.Document;
@@ -272,13 +273,13 @@ codeunit 148214 "Sustainability Excise Test"
 
         // [THEN] Verify that the "Emission Cost Per Unit", "Total Emission Cost" must be updated from Carbon Pricing in Purchase Line.
         Assert.AreEqual(
-            CarbonPricing."Carbon Price",
+            (CarbonPricing."Carbon Price" * ExpectedCO2eEmission) / (PurchaseLine."Qty. per Unit of Measure" * PurchaseLine.Quantity),
             PurchaseLine."Emission Cost Per Unit",
             StrSubstNo(ValueMustBeEqualErr, PurchaseLine.FieldCaption("Emission Cost Per Unit"), CarbonPricing."Carbon Price", PurchaseLine.TableCaption()));
         Assert.AreEqual(
-            CarbonPricing."Carbon Price" * PurchaseLine.Quantity,
+            CarbonPricing."Carbon Price" * ExpectedCO2eEmission,
             PurchaseLine."Total Emission Cost",
-            StrSubstNo(ValueMustBeEqualErr, PurchaseLine.FieldCaption("Total Emission Cost"), CarbonPricing."Carbon Price" * PurchaseLine.Quantity, PurchaseLine.TableCaption()));
+            StrSubstNo(ValueMustBeEqualErr, PurchaseLine.FieldCaption("Total Emission Cost"), CarbonPricing."Carbon Price" * ExpectedCO2eEmission, PurchaseLine.TableCaption()));
 
         // [WHEN] Post a Purchase Document.
         PurchaseInvHeader.Get(LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, true));
@@ -286,13 +287,13 @@ codeunit 148214 "Sustainability Excise Test"
         // [THEN] Verify that the "Emission Cost Per Unit", "Total Emission Cost" must be updated from Carbon Pricing in Purchase Invoice Line.
         FindPurchaseInvoiceLine(PurchaseInvHeader, PurchaseInvLine);
         Assert.AreEqual(
-            CarbonPricing."Carbon Price",
+            PurchaseLine."Emission Cost Per Unit",
             PurchaseInvLine."Emission Cost per Unit",
-            StrSubstNo(ValueMustBeEqualErr, PurchaseInvLine.FieldCaption("Emission Cost per Unit"), CarbonPricing."Carbon Price", PurchaseInvLine.TableCaption()));
+            StrSubstNo(ValueMustBeEqualErr, PurchaseInvLine.FieldCaption("Emission Cost per Unit"), PurchaseLine."Emission Cost Per Unit", PurchaseInvLine.TableCaption()));
         Assert.AreEqual(
-            CarbonPricing."Carbon Price" * PurchaseLine.Quantity,
+            CarbonPricing."Carbon Price" * ExpectedCO2eEmission,
             PurchaseInvLine."Total Emission Cost",
-            StrSubstNo(ValueMustBeEqualErr, PurchaseInvLine.FieldCaption("Total Emission Cost"), CarbonPricing."Carbon Price" * PurchaseLine.Quantity, PurchaseInvLine.TableCaption()));
+            StrSubstNo(ValueMustBeEqualErr, PurchaseInvLine.FieldCaption("Total Emission Cost"), CarbonPricing."Carbon Price" * ExpectedCO2eEmission, PurchaseInvLine.TableCaption()));
     end;
 
     [Test]
@@ -654,7 +655,7 @@ codeunit 148214 "Sustainability Excise Test"
         VerifyExciseJournalLineFromPurchInvoiceLine(SustExciseJournalLine, PurchaseInvLine, ExpectedCO2eEmission);
 
         // [GIVEN] Update Description in Excise Journal Line.
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine.Modify();
 
         // [WHEN] Invoke "Register" action in "Sustainability Excise Journal".
@@ -758,7 +759,7 @@ codeunit 148214 "Sustainability Excise Test"
 
         // [GIVEN] Update "Document Type", Description in Excise Journal Line.
         SustExciseJournalLine."Document Type" := SustExciseJournalLine."Document Type"::"Credit Memo";
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine.Modify();
 
         // [WHEN] Invoke "Register" action in "Sustainability Excise Journal".
@@ -861,7 +862,7 @@ codeunit 148214 "Sustainability Excise Test"
 
         // [GIVEN] Update "Document Type", Description in Excise Journal Line.
         SustExciseJournalLine."Document Type" := SustExciseJournalLine."Document Type"::Journal;
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine."Total Embedded CO2e Emission" := -SustExciseJournalLine."Total Embedded CO2e Emission";
         SustExciseJournalLine.Modify();
 
@@ -1061,7 +1062,7 @@ codeunit 148214 "Sustainability Excise Test"
         VerifyExciseJournalLineFromSalesInvoiceLine(SustExciseJournalLine, SalesInvoiceLine);
 
         // [GIVEN] Update Description in Excise Journal Line.
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine.Modify();
 
         // [WHEN] Invoke "Register" action in "Sustainability Excise Journal".
@@ -1147,7 +1148,7 @@ codeunit 148214 "Sustainability Excise Test"
 
         // [GIVEN] Update "Document Type", Description in Excise Journal Line.
         SustExciseJournalLine."Document Type" := SustExciseJournalLine."Document Type"::"Credit Memo";
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine.Modify();
 
         // [WHEN] Invoke "Register" action in "Sustainability Excise Journal".
@@ -1232,7 +1233,7 @@ codeunit 148214 "Sustainability Excise Test"
 
         // [GIVEN] Update "Document Type", Description in Excise Journal Line.
         SustExciseJournalLine."Document Type" := SustExciseJournalLine."Document Type"::Journal;
-        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Account No.");
+        SustExciseJournalLine.Validate(Description, SustExciseJournalLine."Source No.");
         SustExciseJournalLine.Modify();
 
         // [WHEN] Invoke "Register" action in "Sustainability Excise Journal".
@@ -1297,6 +1298,198 @@ codeunit 148214 "Sustainability Excise Test"
             TotalEPRFee,
             SalesInvoiceLine."Total EPR Fee",
             StrSubstNo(ValueMustBeEqualErr, SalesInvoiceLine.FieldCaption("Total EPR Fee"), TotalEPRFee, SalesInvoiceLine.TableCaption()));
+    end;
+
+    [Test]
+    [HandlerFunctions('ConfirmHandler')]
+    procedure TestCBAMCalculatePopulatesDescriptionFromPurchaseInvoiceLine()
+    var
+        PurchaseHeader: Record "Purchase Header";
+        PurchaseLine: Record "Purchase Line";
+        EmissionFee: array[3] of Record "Emission Fee";
+        PurchaseInvHeader: Record "Purch. Inv. Header";
+        PurchaseInvLine: Record "Purch. Inv. Line";
+        SustainabilityAccount: Record "Sustainability Account";
+        SustExciseJournalBatch: Record "Sust. Excise Journal Batch";
+        SustExciseJournalLine: Record "Sust. Excise Jnl. Line";
+        SustainabilityExciseJournalMgt: Codeunit "Sust. Excise Journal Mgt.";
+        SustainabilityExciseJournal: TestPage "Sustainability Excise Journal";
+        CategoryCode: Code[20];
+        SubcategoryCode: Code[20];
+        AccountCode: Code[20];
+        ExpectedDescription: Text[100];
+        EmissionCO2: Decimal;
+        EmissionCH4: Decimal;
+        EmissionN2O: Decimal;
+        ExpectedCO2eEmission: Decimal;
+        TotalEmissionCost: Decimal;
+    begin
+        // [SCENARIO 614178] Verify that the Description field is populated from the posted purchase invoice line when Calculate action is invoked for CBAM in Excise Jnl.
+        Initialize();
+
+        // [GIVEN] Create a Sustainability Account.
+        CreateSustainabilityAccount(AccountCode, CategoryCode, SubcategoryCode, LibraryRandom.RandInt(10));
+        SustainabilityAccount.Get(AccountCode);
+
+        // [GIVEN] Get a Sustainability Excise Journal Batch for CBAM.
+        SustExciseJournalBatch := SustainabilityExciseJournalMgt.GetASustainabilityJournalBatch();
+        SustExciseJournalBatch.Type := SustExciseJournalBatch.Type::CBAM;
+        SustExciseJournalBatch.Modify();
+
+        // [GIVEN] Generate Emission values.
+        EmissionCO2 := LibraryRandom.RandIntInRange(100, 100);
+        EmissionCH4 := LibraryRandom.RandIntInRange(200, 200);
+        EmissionN2O := LibraryRandom.RandIntInRange(300, 300);
+        TotalEmissionCost := LibraryRandom.RandInt(10);
+
+        // [GIVEN] Create Emission Fee With Emission Scope.
+        CreateEmissionFeeWithEmissionScope(EmissionFee, SustainabilityAccount."Emission Scope", '');
+
+        // [GIVEN] Save Expected CO2e Emission.
+        ExpectedCO2eEmission := EmissionCH4 * EmissionFee[1]."Carbon Equivalent Factor" + EmissionCO2 * EmissionFee[2]."Carbon Equivalent Factor" + EmissionN2O * EmissionFee[3]."Carbon Equivalent Factor";
+
+        // [GIVEN] Modify all the Previous Record with CBAM Reported True.
+        PurchaseInvLine.SetRange("CBAM Compliance", true);
+        PurchaseInvLine.SetRange("CBAM Reported", false);
+        PurchaseInvLine.SetRange(Type, PurchaseInvLine.Type::Item);
+        PurchaseInvLine.SetFilter("No.", '<>%1', '');
+        PurchaseInvLine.SetFilter("Sust. Account No.", '<>%1', '');
+        PurchaseInvLine.ModifyAll("CBAM Reported", true);
+
+        // [GIVEN] Create a Purchase Header.
+        LibraryPurchase.CreatePurchHeader(PurchaseHeader, "Purchase Document Type"::Order, LibraryPurchase.CreateVendorNo());
+        PurchaseHeader.SetHideValidationDialog(true);
+        PurchaseHeader.Validate("Posting Date", WorkDate());
+        PurchaseHeader.Modify();
+
+        // [GIVEN] Create a Purchase Line.
+        LibraryPurchase.CreatePurchaseLine(
+            PurchaseLine,
+            PurchaseHeader,
+            "Purchase Line Type"::Item,
+            LibraryInventory.CreateItemNo(),
+            LibraryRandom.RandInt(10));
+
+        // [GIVEN] Set a specific description on the purchase line.
+        ExpectedDescription := Format(LibraryRandom.RandText(50));
+        PurchaseLine.Validate(Description, ExpectedDescription);
+        PurchaseLine.Validate("Direct Unit Cost", LibraryRandom.RandIntInRange(10, 200));
+        PurchaseLine.Validate("Sust. Account No.", AccountCode);
+        PurchaseLine.Validate("Emission CO2", EmissionCO2);
+        PurchaseLine.Validate("Emission CH4", EmissionCH4);
+        PurchaseLine.Validate("Emission N2O", EmissionN2O);
+        PurchaseLine.Validate("Total Emission Cost", TotalEmissionCost);
+        PurchaseLine.Validate("CBAM Compliance", true);
+        PurchaseLine.Validate("Source of Emission Data", PurchaseLine."Source of Emission Data"::Other);
+        PurchaseLine.Validate("Emission Verified", true);
+        PurchaseLine.Modify();
+
+        // [GIVEN] Post Purchase Document.
+        PurchaseInvHeader.Get(LibraryPurchase.PostPurchaseDocument(PurchaseHeader, true, true));
+
+        // [WHEN] Invoke "Calculate" action in "Sustainability Excise Journal".
+        SustainabilityExciseJournal.OpenEdit();
+        SustainabilityExciseJournal.Calculate.Invoke();
+
+        // [THEN] Verify "Sust. Excise Jnl. Line" is created with correct description.
+        FindPurchaseInvoiceLine(PurchaseInvHeader, PurchaseInvLine);
+        SustExciseJournalLine.SetRange("Journal Template Name", SustExciseJournalBatch."Journal Template Name");
+        SustExciseJournalLine.SetRange("Journal Batch Name", SustExciseJournalBatch.Name);
+        Assert.RecordCount(SustExciseJournalLine, 1);
+
+        // [THEN] Verify that the Description field is populated from the source purchase invoice line.
+        SustExciseJournalLine.FindFirst();
+        Assert.AreEqual(
+            ExpectedDescription,
+            SustExciseJournalLine.Description,
+            StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption(Description), ExpectedDescription, SustExciseJournalLine.TableCaption()));
+
+        // [THEN] Verify other fields are correctly populated.
+        VerifyExciseJournalLineFromPurchInvoiceLine(SustExciseJournalLine, PurchaseInvLine, ExpectedCO2eEmission);
+    end;
+
+    [Test]
+    [HandlerFunctions('ConfirmHandler')]
+    procedure TestEPRCalculatePopulatesDescriptionFromSalesInvoiceLine()
+    var
+        SalesHeader: Record "Sales Header";
+        SalesLine: Record "Sales Line";
+        SalesInvoiceHeader: Record "Sales Invoice Header";
+        SalesInvoiceLine: Record "Sales Invoice Line";
+        SustainabilityAccount: Record "Sustainability Account";
+        ItemLedgerEntry: Record "Item Ledger Entry";
+        SustExciseJournalBatch: Record "Sust. Excise Journal Batch";
+        SustExciseJournalLine: Record "Sust. Excise Jnl. Line";
+        SustainabilityExciseJournalMgt: Codeunit "Sust. Excise Journal Mgt.";
+        SustainabilityExciseJournal: TestPage "Sustainability Excise Journal";
+        CategoryCode: Code[20];
+        SubcategoryCode: Code[20];
+        AccountCode: Code[20];
+        ExpectedDescription: Text[100];
+        TotalEPRFee: Decimal;
+    begin
+        // [SCENARIO 614178] Verify that the Description field is populated from the posted sales invoice line when Calculate action is invoked for EPR in Excise Jnl.
+        Initialize();
+
+        // [GIVEN] Create a Sustainability Account.
+        CreateSustainabilityAccount(AccountCode, CategoryCode, SubcategoryCode, LibraryRandom.RandInt(10));
+        SustainabilityAccount.Get(AccountCode);
+
+        // [GIVEN] Get a Sustainability Excise Journal Batch for EPR.
+        SustExciseJournalBatch := SustainabilityExciseJournalMgt.GetASustainabilityJournalBatch();
+        SustExciseJournalBatch.Type := SustExciseJournalBatch.Type::EPR;
+        SustExciseJournalBatch.Modify();
+
+        // [GIVEN] Generate "Total EPR Fee".
+        TotalEPRFee := LibraryRandom.RandInt(20);
+
+        // [GIVEN] Modify all the Previous Record as EPR Reported True.
+        ItemLedgerEntry.SetRange("EPR Reported", false);
+        ItemLedgerEntry.SetFilter("Sust. Account No.", '<>%1', '');
+        ItemLedgerEntry.ModifyAll("EPR Reported", true);
+
+        // [GIVEN] Create a Sales Header.
+        LibrarySales.CreateSalesHeader(SalesHeader, "Sales Document Type"::Order, LibrarySales.CreateCustomerNo());
+
+        // [GIVEN] Create a Sales Line.
+        LibrarySales.CreateSalesLine(
+            SalesLine,
+            SalesHeader,
+            "Sales Line Type"::Item,
+            LibraryInventory.CreateItemNo(),
+            LibraryRandom.RandIntInRange(10, 10));
+
+        // [GIVEN] Set a specific description on the sales line.
+        ExpectedDescription := Format(LibraryRandom.RandText(50));
+        SalesLine.Validate(Description, ExpectedDescription);
+        SalesLine.Validate("Unit Price", LibraryRandom.RandIntInRange(10, 200));
+        SalesLine.Validate("Sust. Account No.", AccountCode);
+        SalesLine.Validate("Total CO2e", LibraryRandom.RandInt(20));
+        SalesLine.Validate("Total EPR Fee", TotalEPRFee);
+        SalesLine.Modify();
+
+        // [GIVEN] Post Sales Document.
+        SalesInvoiceHeader.Get(LibrarySales.PostSalesDocument(SalesHeader, true, true));
+
+        // [WHEN] Invoke "Calculate" action in "Sustainability Excise Journal".
+        SustainabilityExciseJournal.OpenEdit();
+        SustainabilityExciseJournal.Calculate.Invoke();
+
+        // [THEN] Verify "Sust. Excise Jnl. Line" is created with correct description.
+        FindSalesInvoiceLine(SalesInvoiceHeader, SalesInvoiceLine);
+        SustExciseJournalLine.SetRange("Journal Template Name", SustExciseJournalBatch."Journal Template Name");
+        SustExciseJournalLine.SetRange("Journal Batch Name", SustExciseJournalBatch.Name);
+        Assert.RecordCount(SustExciseJournalLine, 1);
+
+        // [THEN] Verify that the Description field is populated from the source sales invoice line.
+        SustExciseJournalLine.FindFirst();
+        Assert.AreEqual(
+            ExpectedDescription,
+            SustExciseJournalLine.Description,
+            StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption(Description), ExpectedDescription, SustExciseJournalLine.TableCaption()));
+
+        // [THEN] Verify other fields are correctly populated.
+        VerifyExciseJournalLineFromSalesInvoiceLine(SustExciseJournalLine, SalesInvoiceLine);
     end;
 
     local procedure Initialize()
@@ -1405,10 +1598,6 @@ codeunit 148214 "Sustainability Excise Test"
             SustExciseTransLog."Entry Type",
             StrSubstNo(ValueMustBeEqualErr, SustExciseTransLog.FieldCaption("Entry Type"), SustExciseJournalLine."Entry Type", SustExciseTransLog.TableCaption()));
         Assert.AreEqual(
-            SustExciseJournalLine."Account No.",
-            SustExciseTransLog."Account No.",
-            StrSubstNo(ValueMustBeEqualErr, SustExciseTransLog.FieldCaption("Account No."), SustExciseJournalLine."Account No.", SustExciseTransLog.TableCaption()));
-        Assert.AreEqual(
             SustExciseJournalLine."Partner Type",
             SustExciseTransLog."Partner Type",
             StrSubstNo(ValueMustBeEqualErr, SustExciseTransLog.FieldCaption("Partner Type"), SustExciseJournalLine."Partner Type", SustExciseTransLog.TableCaption()));
@@ -1445,10 +1634,6 @@ codeunit 148214 "Sustainability Excise Test"
               SustExciseJournalLine."Entry Type"::Purchase,
               SustExciseJournalLine."Entry Type",
               StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption("Entry Type"), SustExciseJournalLine."Entry Type"::Purchase, SustExciseJournalLine.TableCaption()));
-        Assert.AreEqual(
-            PurchaseInvLine."Sust. Account No.",
-            SustExciseJournalLine."Account No.",
-            StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption("Account No."), PurchaseInvLine."Sust. Account No.", SustExciseJournalLine.TableCaption()));
         Assert.AreEqual(
             SustExciseJournalLine."Partner Type"::Vendor,
             SustExciseJournalLine."Partner Type",
@@ -1498,10 +1683,6 @@ codeunit 148214 "Sustainability Excise Test"
               SustExciseJournalLine."Entry Type"::Sales,
               SustExciseJournalLine."Entry Type",
               StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption("Entry Type"), SustExciseJournalLine."Entry Type"::Sales, SustExciseJournalLine.TableCaption()));
-        Assert.AreEqual(
-            SalesInvoiceLine."Sust. Account No.",
-            SustExciseJournalLine."Account No.",
-            StrSubstNo(ValueMustBeEqualErr, SustExciseJournalLine.FieldCaption("Account No."), SalesInvoiceLine."Sust. Account No.", SustExciseJournalLine.TableCaption()));
         Assert.AreEqual(
             SustExciseJournalLine."Partner Type"::Customer,
             SustExciseJournalLine."Partner Type",

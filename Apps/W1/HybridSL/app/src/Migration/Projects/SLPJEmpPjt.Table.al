@@ -1,3 +1,4 @@
+#if not CLEANSCHEMA31
 // ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
@@ -10,6 +11,14 @@ table 47066 "SL PJEmpPjt"
     Access = Internal;
     Caption = 'SL PJEmpPjt';
     DataClassification = CustomerContent;
+    ObsoleteReason = 'Replaced by table SL PJEmpPjt Buffer.';
+#if not CLEAN28
+    ObsoleteState = Pending;
+    ObsoleteTag = '28.0';
+#else
+    ObsoleteState = Removed;
+    ObsoleteTag = '31.0';
+#endif
 
     fields
     {
@@ -52,10 +61,12 @@ table 47066 "SL PJEmpPjt"
         field(10; ep_id06; Decimal)
         {
             Caption = 'ep_id06';
+            AutoFormatType = 0;
         }
         field(11; ep_id07; Decimal)
         {
             Caption = 'ep_id07';
+            AutoFormatType = 0;
         }
         field(12; ep_id08; DateTime)
         {
@@ -80,6 +91,7 @@ table 47066 "SL PJEmpPjt"
         field(17; labor_rate; Decimal)
         {
             Caption = 'labor_rate';
+            AutoFormatType = 0;
         }
         field(18; lupd_datetime; DateTime)
         {
@@ -112,10 +124,12 @@ table 47066 "SL PJEmpPjt"
         field(25; user3; Decimal)
         {
             Caption = 'user3';
+            AutoFormatType = 0;
         }
         field(26; user4; Decimal)
         {
             Caption = 'user4';
+            AutoFormatType = 0;
         }
     }
 
@@ -127,3 +141,4 @@ table 47066 "SL PJEmpPjt"
         }
     }
 }
+#endif

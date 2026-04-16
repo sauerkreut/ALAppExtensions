@@ -5,10 +5,10 @@
 
 namespace Microsoft.DemoData.Finance;
 
-using Microsoft.Finance.VAT.Reporting;
 using Microsoft.DemoData.Foundation;
 using Microsoft.DemoTool;
 using Microsoft.DemoTool.Helpers;
+using Microsoft.Finance.VAT.Reporting;
 
 codeunit 17168 "Create VAT Setup Post.Grp. AU"
 {
@@ -34,13 +34,14 @@ codeunit 17168 "Create VAT Setup Post.Grp. AU"
     var
         FinanceModuleSetup: Record "Finance Module Setup";
         ContosoVATStatement: Codeunit "Contoso VAT Statement";
+        CreateGLAccount: Codeunit "Create G/L Account";
         CreateAUGLAccounts: Codeunit "Create AU GL Accounts";
     begin
         FinanceModuleSetup.Get();
 
         ContosoVATStatement.SetOverwriteData(true);
-        ContosoVATStatement.InsertVatSetupPostingGrp(FinanceModuleSetup."VAT Prod. Post Grp. Standard", true, 10, CreateAUGLAccounts.GstPayable(), CreateAUGLAccounts.GstReceivable(), true, 1, GST10DescriptionLbl);
-        ContosoVATStatement.InsertVatSetupPostingGrp(FinanceModuleSetup."VAT Prod. Post Grp. Reduced", true, 0, CreateAUGLAccounts.GstPayable(), CreateAUGLAccounts.GstReceivable(), true, 1, NonGSTDescriptionLbl);
+        ContosoVATStatement.InsertVatSetupPostingGrp(FinanceModuleSetup."VAT Prod. Post Grp. Standard", true, 10, CreateGLAccount.VATPayable(), CreateAUGLAccounts.GstReceivable(), true, 1, GST10DescriptionLbl);
+        ContosoVATStatement.InsertVatSetupPostingGrp(FinanceModuleSetup."VAT Prod. Post Grp. Reduced", true, 0, CreateGLAccount.VATPayable(), CreateAUGLAccounts.GstReceivable(), true, 1, NonGSTDescriptionLbl);
         ContosoVATStatement.SetOverwriteData(false);
     end;
 

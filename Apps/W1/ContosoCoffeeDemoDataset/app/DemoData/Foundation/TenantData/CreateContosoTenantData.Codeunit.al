@@ -5,10 +5,10 @@
 
 namespace Microsoft.DemoData.Foundation;
 
+using Microsoft.DemoTool;
+using Microsoft.Integration.Graph;
 using System.Environment.Configuration;
 using System.Reflection;
-using Microsoft.Integration.Graph;
-using Microsoft.DemoTool;
 using System.Utilities;
 
 codeunit 5691 "Create Contoso Tenant Data"
@@ -124,8 +124,9 @@ codeunit 5691 "Create Contoso Tenant Data"
     local procedure ExcludeNewFeature(FeatureKey: Record "Feature Key"): Boolean
     begin
         if FeatureKey.ID in ['PowerAutomateCopilot',
-                             'SemanticMetadataSearch',
-                             'AdvancedTellMe']
+                             'FullTextSearch',
+                             'AdvancedTellMe',
+                             'SemanticMetadataSearch']
         then
             exit(true);
 

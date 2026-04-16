@@ -33,10 +33,12 @@ codeunit 10054 "IRS Forms Facade"
         IRSFormsOrchestrator.GetPrintingImplementation().PrintContent(IRS1099FormDocHeader);
     end;
 
-    procedure CreateTransmission(var Transmission: Record "Transmission IRIS"; PeriodNo: Text[4])
+#pragma warning disable AS0078
+    procedure CreateTransmission(Transmission: Record "Transmission IRIS"; PeriodNo: Text[4])
     begin
         IRSFormsOrchestrator.GetIRISImplementation().CreateTransmission(Transmission, PeriodNo);
     end;
+#pragma warning restore AS0078
 
     procedure CheckOriginalTransmission(var Transmission: Record "Transmission IRIS")
     begin
@@ -71,5 +73,30 @@ codeunit 10054 "IRS Forms Facade"
     procedure CreateAcknowledgmentRequestXmlContent(SearchParamType: Enum "Search Param Type IRIS"; SearchId: Text; var TempBlob: Codeunit "Temp Blob")
     begin
         IRSFormsOrchestrator.GetIRISXmlImplementation().CreateAcknowledgmentRequestXmlContent(SearchParamType, SearchId, TempBlob);
+    end;
+
+    procedure GetTCC(): Text
+    begin
+        exit(IRSFormsOrchestrator.GetIRISConfigurationImplementation().GetTCC());
+    end;
+
+    procedure GetSoftwareId(): Text
+    begin
+        exit(IRSFormsOrchestrator.GetIRISConfigurationImplementation().GetSoftwareId());
+    end;
+
+    procedure GetConsentAppURL(): Text
+    begin
+        exit(IRSFormsOrchestrator.GetIRISConfigurationImplementation().GetConsentAppURL());
+    end;
+
+    procedure GetContactInfo(var ContactName: Text; var ContactEmail: Text; var ContactPhone: Text)
+    begin
+        IRSFormsOrchestrator.GetIRISConfigurationImplementation().GetContactInfo(ContactName, ContactEmail, ContactPhone);
+    end;
+
+    procedure TestMode(): Boolean
+    begin
+        exit(IRSFormsOrchestrator.GetIRISConfigurationImplementation().TestMode());
     end;
 }

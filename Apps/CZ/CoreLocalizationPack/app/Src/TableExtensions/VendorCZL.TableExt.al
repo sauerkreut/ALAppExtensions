@@ -37,7 +37,8 @@ tableextension 11702 "Vendor CZL" extends Vendor
                     if RegNoServiceConfigCZL.RegNoSrvIsEnabled() then begin
                         LogNotVerified := false;
                         RegistrationLogMgtCZL.ValidateRegNoWithARES(ResultRecordRef, Rec, "No.", RegistrationLogCZL."Account Type"::Vendor);
-                        ResultRecordRef.SetTable(Rec);
+                        if ResultRecordRef.Number <> 0 then
+                            ResultRecordRef.SetTable(Rec);
                     end;
 
                 if LogNotVerified then
@@ -123,6 +124,15 @@ tableextension 11702 "Vendor CZL" extends Vendor
         }
 #endif
     }
+
+    trigger OnDelete()
+    var
+        UnreliablePayerEntryCZL: Record "Unreliable Payer Entry CZL";
+    begin
+        UnreliablePayerEntryCZL.SetRange("Vendor No.", Rec."No.");
+        UnreliablePayerEntryCZL.DeleteAll(true);
+        RegistrationLogMgtCZL.DeleteVendorLog(Rec);
+    end;
 
     var
         UnrelPayerServiceSetupCZL: Record "Unrel. Payer Service Setup CZL";

@@ -11,14 +11,13 @@ using Microsoft.Finance.GeneralLedger.Journal;
 using Microsoft.Finance.GeneralLedger.Ledger;
 using Microsoft.Foundation.AuditCodes;
 using Microsoft.Purchases.Payables;
-using Microsoft.Sales.Setup;
 using Microsoft.Purchases.Vendor;
 using Microsoft.Sales.Customer;
 using Microsoft.Sales.Receivables;
+using Microsoft.Sales.Setup;
 using System.Reflection;
 using System.Telemetry;
 using System.Utilities;
-using Microsoft.Finance.Currency;
 
 codeunit 10826 "Generate File FEC"
 {
@@ -630,11 +629,10 @@ codeunit 10826 "Generate File FEC"
     var
         DetailedVendorLedgEntry: Record "Detailed Vendor Ledg. Entry";
     begin
-        if GetDetailedVendorLedgEntry(DetailedVendorLedgEntry, VendorLedgEntryApplied."Entry No.") then begin
-            if DetailedVendorLedgEntry."Posting Date" > AppliedDate then
-                AppliedDate := DetailedVendorLedgEntry."Posting Date";
-        end else
-            AppliedDate := VendorLedgEntryApplied."Posting Date";
+        if GetDetailedVendorLedgEntry(DetailedVendorLedgEntry, VendorLedgEntryApplied."Entry No.") then
+            AppliedDate := DT2Date(DetailedVendorLedgEntry.SystemCreatedAt)
+        else
+            AppliedDate := DT2Date(VendorLedgEntryApplied.SystemCreatedAt);
     end;
 
     local procedure GetDetailedVendorLedgEntry(var DetailedVendorLedgEntryApplied: Record "Detailed Vendor Ledg. Entry"; AppliedVendorLedgerEntryNo: Integer): Boolean
@@ -828,30 +826,9 @@ codeunit 10826 "Generate File FEC"
         TextLine: Text;
         BlobOutStream: OutStream;
     begin
-        TempBlob.CreateOutStream(BlobOutStream);
+        TempBlob.CreateOutStream(BlobOutStream, TextEncoding::UTF8);
         foreach TextLine in LinesList do
             BlobOutStream.WriteText(TextLine);
-    end;
-
-    local procedure GetCustomerReceivablesAccount(CustomerNo: Code[20]): Code[20]
-    var
-        DetailedCustLedgEntry: Record "Detailed Cust. Ledg. Entry";
-        CustomerPostingGroup: Record "Customer Posting Group";
-    begin
-        DetailedCustLedgEntry.SetRange("Customer No.", CustomerNo);
-        DetailedCustLedgEntry.FindFirst();
-        CustomerPostingGroup.Get(DetailedCustLedgEntry."Posting Group");
-        exit(CustomerPostingGroup."Receivables Account");
-    end;
-
-    local procedure GetVendorPayablesAccount(VendorNo: Code[20]): Code[20]
-    var
-        Vendor: Record Vendor;
-        VendorPostingGroup: Record "Vendor Posting Group";
-    begin
-        Vendor.Get(VendorNo);
-        VendorPostingGroup.Get(Vendor."Vendor Posting Group");
-        exit(VendorPostingGroup."Payables Account");
     end;
 
     local procedure AllowMultiplePosting(var PartyNo: Code[20]; var PartyName: Text[100]; GLEntry: Record "G/L Entry"; Customer: Record Customer)
@@ -877,17 +854,5 @@ codeunit 10826 "Generate File FEC"
                         PartyName := Customer.Name;
                     end;
             until AltCustPostGroup.Next() = 0;
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Exch. Rate Adjmt. Process", 'OnAfterInitDtldCustLedgerEntry', '', false, false)]
-    local procedure UpdateDtldCustLedgerEntryCurrAdjmtAccNo(var DetailedCustLedgEntry: Record "Detailed Cust. Ledg. Entry")
-    begin
-        DetailedCustLedgEntry."Curr. Adjmt. G/L Account No." := GetCustomerReceivablesAccount(DetailedCustLedgEntry."Customer No.");
-    end;
-
-    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Exch. Rate Adjmt. Process", 'OnAfterInitDtldVendLedgerEntry', '', false, false)]
-    local procedure UpdateDtldVendLedgerEntryCurrAdjmtAccNo(var DetailedVendorLedgEntry: Record "Detailed Vendor Ledg. Entry")
-    begin
-        DetailedVendorLedgEntry."Curr. Adjmt. G/L Account No." := GetVendorPayablesAccount(DetailedVendorLedgEntry."Vendor No.");
     end;
 }

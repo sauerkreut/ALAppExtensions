@@ -4,12 +4,13 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.DemoTool.Helpers;
 
+using Microsoft.Finance.GeneralLedger.Journal;
 using Microsoft.FixedAssets.Depreciation;
-using Microsoft.FixedAssets.Setup;
 using Microsoft.FixedAssets.FixedAsset;
-using Microsoft.FixedAssets.Maintenance;
-using Microsoft.FixedAssets.Journal;
 using Microsoft.FixedAssets.Insurance;
+using Microsoft.FixedAssets.Journal;
+using Microsoft.FixedAssets.Maintenance;
+using Microsoft.FixedAssets.Setup;
 
 codeunit 4776 "Contoso Fixed Asset"
 {
@@ -62,6 +63,7 @@ codeunit 4776 "Contoso Fixed Asset"
         DepreciationBook.Validate(Description, Description);
         DepreciationBook.Validate("G/L Integration - Acq. Cost", AcqCost);
         DepreciationBook.Validate("G/L Integration - Depreciation", Depreciation);
+        DepreciationBook.Validate("G/L Integration - Bonus Depr.", Depreciation);
         DepreciationBook.Validate("G/L Integration - Write-Down", WriteDown);
         DepreciationBook.Validate("G/L Integration - Appreciation", Appreciation);
         DepreciationBook.Validate("G/L Integration - Custom 1", Custom1);
@@ -225,9 +227,18 @@ codeunit 4776 "Contoso Fixed Asset"
     end;
 
     procedure InsertFixedAsset(FANo: Code[20]; Description: Text[100]; FAClassCode: Code[10]; FASubclassCode: Code[20]; FALocationCode: Code[10]; MainAssetComponent: Enum "FA Component Type"; SerialNo: Text[30];
+                                                                                                                                                                      NextServiceDate: Date;
+                                                                                                                                                                      VendorNo: Code[20];
+                                                                                                                                                                      MaintenanceVendorNo: Code[20])
+    begin
+        InsertFixedAsset(FANo, Description, FAClassCode, FASubclassCode, FALocationCode, MainAssetComponent, SerialNo, NextServiceDate, VendorNo, MaintenanceVendorNo, '');
+    end;
+
+    procedure InsertFixedAsset(FANo: Code[20]; Description: Text[100]; FAClassCode: Code[10]; FASubclassCode: Code[20]; FALocationCode: Code[10]; MainAssetComponent: Enum "FA Component Type"; SerialNo: Text[30];
                                                                                                                                                                           NextServiceDate: Date;
                                                                                                                                                                           VendorNo: Code[20];
-                                                                                                                                                                          MaintenanceVendorNo: Code[20])
+                                                                                                                                                                          MaintenanceVendorNo: Code[20];
+                                                                                                                                                                          FAPostingGroupCode: Code[20])
     var
         FixedAsset: Record "Fixed Asset";
         Exists: Boolean;
@@ -250,6 +261,7 @@ codeunit 4776 "Contoso Fixed Asset"
             FixedAsset.Validate("Next Service Date", NextServiceDate);
         FixedAsset.Validate("Vendor No.", VendorNo);
         FixedAsset.Validate("Maintenance Vendor No.", MaintenanceVendorNo);
+        FixedAsset.Validate("FA Posting Group", FAPostingGroupCode);
 
         if Exists then
             FixedAsset.Modify(true)
@@ -259,8 +271,8 @@ codeunit 4776 "Contoso Fixed Asset"
 
     procedure InsertMainAssetComponent(MainAssetNo: Code[20]; FANo: Code[20])
     var
-        MainAssetComponent: Record "Main Asset Component";
         FixedAsset: Record "Fixed Asset";
+        MainAssetComponent: Record "Main Asset Component";
         Exists: Boolean;
     begin
         if MainAssetComponent.Get(MainAssetNo, FANo) then begin
@@ -395,6 +407,25 @@ codeunit 4776 "Contoso Fixed Asset"
             FAJournalBatch.Modify(true)
         else
             FAJournalBatch.Insert(true);
+    end;
+
+    procedure InsertFAGenJournalLine(JournalTemplateName: Code[10]; JournalBatchName: Code[10]; LineNo: Integer; AccountNo: Code[20]; PostingDate: Date; FAPostingType: Enum "Gen. Journal Line FA Posting Type"; DocumentNo: Code[20]; Description: Text[100]; BalAccountType: Enum "Gen. Journal Account Type"; BalAccountNo: Code[20]; Amount: Decimal)
+    var
+        GenJournalLine: Record "Gen. Journal Line";
+    begin
+        GenJournalLine.Validate("Journal Template Name", JournalTemplateName);
+        GenJournalLine.Validate("Journal Batch Name", JournalBatchName);
+        GenJournalLine.Validate("Line No.", LineNo);
+        GenJournalLine.Validate("Account Type", Enum::"Gen. Journal Account Type"::"Fixed Asset");
+        GenJournalLine.Validate("Account No.", AccountNo);
+        GenJournalLine.Validate("Posting Date", PostingDate);
+        GenJournalLine.Validate("FA Posting Type", FAPostingType);
+        GenJournalLine.Validate("Document No.", DocumentNo);
+        GenJournalLine.Validate(Description, Description);
+        GenJournalLine.Validate("Bal. Account Type", BalAccountType);
+        GenJournalLine.Validate("Bal. Account No.", BalAccountNo);
+        GenJournalLine.Validate(Amount, Amount);
+        GenJournalLine.Insert(true);
     end;
 
     procedure InsertInsuranceJournalTemplate(Name: Code[10]; Description: Text[80]; NoSeriesCode: Code[20])
