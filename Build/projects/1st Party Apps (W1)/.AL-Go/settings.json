@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/AL-Go/0c7b1de38ba518aaf5fdee3902c2d2ae886ede32/Actions/.Modules/settings.schema.json",
   "projectName": "1st Party Apps (W1)",
+  "baselineVersion": "29.0.48710.0",
   "appFolders": [
     "..\\..\\..\\Apps\\W1\\*\\app",
     "..\\..\\..\\Apps\\W1\\*\\*\\app",
