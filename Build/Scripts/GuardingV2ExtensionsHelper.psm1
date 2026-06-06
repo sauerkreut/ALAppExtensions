@@ -116,28 +116,26 @@ function Restore-BaselinesFromArtifacts {
 
         if (-not $baselineURL) {
             Write-Host "::Warning:: Unable to find URL for baseline version $BaselineVersion"
-            Write-Host "Trying latest compatible AppBaselines-BCArtifacts version..."
+            Write-Host "Trying latest compatible W1 baseline artifact URL..."
 
-            $fallbackBaselineVersion = $null
+            $fallbackBaselineURL = $null
             try {
-                $fallbackBaselineVersion = Get-PackageLatestVersion -PackageName "AppBaselines-BCArtifacts"
+                $minimumVersion = Get-ConfigValue -Key "repoVersion" -ConfigType AL-Go
+                $fallbackBaselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $minimumVersion -select Latest
+
+                if (-not $fallbackBaselineURL) {
+                    #Fallback to bcinsider
+                    $fallbackBaselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $minimumVersion -select Latest -storageAccount bcinsider -accept_insiderEula
+                }
             }
             catch {
-                Write-Host "::Warning:: Could not resolve fallback baseline version: $($_.Exception.Message)"
+                Write-Host "::Warning:: Could not resolve fallback baseline URL: $($_.Exception.Message)"
             }
 
-            if ($fallbackBaselineVersion -and ($fallbackBaselineVersion -ne $BaselineVersion)) {
-                $BaselineVersion = $fallbackBaselineVersion
+            if ($fallbackBaselineURL -and ($fallbackBaselineURL -match "\d+\.\d+\.\d+\.\d+")) {
+                $BaselineVersion = $Matches[0]
+                $baselineURL = $fallbackBaselineURL
                 $baselineFolder = Join-Path (Get-BaseFolder) "out/baselineartifacts/$BaselineVersion"
-
-                if (-not (Test-Path $baselineFolder)) {
-                    $baselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $BaselineVersion
-
-                    if (-not $baselineURL) {
-                        #Fallback to bcinsider
-                        $baselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $BaselineVersion -storageAccount bcinsider -accept_insiderEula
-                    }
-                }
             }
         }
 
