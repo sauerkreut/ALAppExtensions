@@ -92,6 +92,8 @@ function Restore-BaselinesFromArtifacts {
     )
     Import-Module -Name $PSScriptRoot\EnlistmentHelperFunctions.psm1
 
+    $originalBaselineVersion = $BaselineVersion
+
     if (-not $BaselineVersion) {
         $baselinePackage = Get-ConfigValue -Key "AppBaselines-BCArtifacts" -ConfigType Packages
         if (-not $baselinePackage) {
@@ -113,6 +115,36 @@ function Restore-BaselinesFromArtifacts {
         }
 
         if (-not $baselineURL) {
+            Write-Host "::Warning:: Unable to find URL for baseline version $BaselineVersion"
+            Write-Host "Trying latest compatible AppBaselines-BCArtifacts version..."
+
+            $fallbackBaselineVersion = $null
+            try {
+                $fallbackBaselineVersion = Get-PackageLatestVersion -PackageName "AppBaselines-BCArtifacts"
+            }
+            catch {
+                Write-Host "::Warning:: Could not resolve fallback baseline version: $($_.Exception.Message)"
+            }
+
+            if ($fallbackBaselineVersion -and ($fallbackBaselineVersion -ne $BaselineVersion)) {
+                $BaselineVersion = $fallbackBaselineVersion
+                $baselineFolder = Join-Path (Get-BaseFolder) "out/baselineartifacts/$BaselineVersion"
+
+                if (-not (Test-Path $baselineFolder)) {
+                    $baselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $BaselineVersion
+
+                    if (-not $baselineURL) {
+                        #Fallback to bcinsider
+                        $baselineURL = Get-BCArtifactUrl -type Sandbox -country W1 -version $BaselineVersion -storageAccount bcinsider -accept_insiderEula
+                    }
+                }
+            }
+        }
+
+        if (-not $baselineURL) {
+            if ($originalBaselineVersion) {
+                throw "Unable to find URL for baseline versions $originalBaselineVersion or $BaselineVersion"
+            }
             throw "Unable to find URL for baseline version $BaselineVersion"
         }
         Write-Host "Downloading from $baselineURL to $baselineFolder"
